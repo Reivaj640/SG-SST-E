@@ -337,6 +337,13 @@ systemctl is-active kair-firma
 # 6. VERIFICAR que el proceso que corre es el nuevo
 sudo systemctl show -p MainPID -p ActiveEnterTimestamp kair-firma
 curl -sS https://firma.kair.fyi/health
+
+# 6b. VERIFICAR que el SELLO de version-annuncia lo que se instalo.
+#     `version_sello` es un campo ADITIVO del /health (`kair_version` no se toca).
+#     Si el archivo `VERSION` no viaja en el tar, el campo dice que no hay sello:
+#     eso es correcto, pero inutil, y por eso el paso 1b lo copia al stage.
+cat /opt/kair-firma/app/VERSION
+cd /opt/kair-firma/app && sudo -u kairfirma node scripts/generar-sello-version.js --comprobar
 ```
 
 > **Si el despliegue cambia `package.json` o `package-lock.json`, hay que INSTALAR
@@ -415,6 +422,18 @@ cd $repo
 git archive --format=tar.gz --output="$env:TEMP\kair-deploy\svc.tar.gz" HEAD `
   "$svc/src" "$svc/web" "$svc/scripts" "$svc/config" "$svc/package.json" "$svc/package-lock.json" "$svc/legal-readiness.json"
 tar -xzf "$env:TEMP\kair-deploy\svc.tar.gz" -C "$stage\app" --strip-components=2
+
+# 1b. EL SELLO DE VERSION (despues del archive, a proposito).
+#     El sello dice que commit y que arbol estan instalandose. Se genera DESPUES
+#     del `git archive` porque el archivo `VERSION` NO se commitea (si se
+#     commiteara, anunciaria el commit anterior), y `git archive` solo saca lo
+#     commiteado: por eso se copia al stage a mano.
+#     El /health publica el sello en `version_sello` (campo aditivo: `kair_version`
+#     no se toca). Sin este archivo, el campo dice explicitamente que no hay sello.
+$commit = (git rev-parse HEAD).Trim()
+node "$svc/scripts/generar-sello-version.js" --commit="$commit"
+Copy-Item "$svc\VERSION" "$stage\app\VERSION" -Force
+Get-Content "$stage\app\VERSION"
 
 # 2. Los documentos legales que el readiness lee
 #    (solo los del servicio en la nube: el Anexo de Nube VIGENTE y el Anexo de Encargo).
@@ -780,6 +799,72 @@ Queda registrado como tal, con fecha.
 
 ---
 
+### 5.1.4 El resultado medido de la comprobacion del servidor (12-nov-2026)
+
+Lo de arriba es el **procedimiento**. Esta es la **primera vez que queda registrado su resultado**, que es
+lo que pide el requisito `7.13` del cuadro canonico ("Registrar el resultado de la comprobacion del
+servidor", que sealaba: "Es el acta del despliegue. El documento que la recoge es
+`docs/MIGRACION-SERVIDOR-FIRMA.md`, seccion 5.1").
+
+**Medicion.** 12-nov-2026, 19:52Z a 19:57Z, por SSH en modo de solo lectura contra `kair-server`
+(`javier@192.168.1.11`). **Commit de referencia: `264d08df`** (identico a `origin/Dev`).
+
+| Que se midio | Resultado |
+|---|---|
+| Servicio | `active` / `enabled`, `MainPID 281641`, `NRestarts 0`, arrancado 12-nov 09:30:23 -05 |
+| Salud | `GET /health` -> `status: ok`, `db: ok`, `smtp: configured` |
+| Migraciones | **61** aplicadas, la ultima `062_encargado_poderes_append_only` |
+| Manifiesto | `191c08b837b41069de4e2d25d7158fd90a7c3ce5f93b22696d2d7050f8a4013f` — **byte a byte igual** al del repositorio |
+| Texto del Acuerdo | `app/scripts/fixtures/acuerdo-v1.6.txt` -> `08e1eb8b…f13e` (coincide con el manifiesto) |
+| Anexo de Nube v1.3 | `/opt/kair-firma/legal/anexo-nube-v1.3.html` -> `fdd10551…b585d` (coincide) |
+| Anexo de Encargo | `/opt/kair-firma/legal/anexo-encargo.html` -> `6308b1f7…b8948` (coincide) |
+| Permisos | **236 archivos y 18 directorios** escribibles por cualquiera (`-perm -0002`); `/opt/kair-firma/logs` es `755 root:root` |
+| Logs | `health-check.log` con 411 704 B y 5 820 lineas desde el 26-oct, **sin rotacion** (no existe `/etc/logrotate.d/kair-firma`) |
+| Red | El 3001 escucha **solo** en `127.0.0.1`; `cloudflared` `active` |
+| Node del servidor | **v20.20.2** |
+| Datos | 5 firmas, 55 eventos, 1 empresa, **0** eventos `OTP_MEDIO_CORPORATIVO`; el ultimo evento es del **6-nov** |
+| Respaldos | El ultimo es del **11-nov 22:00** (`de14e3f4…de20a`, `integrity ok`); **no hay copia fuera del servidor**; los actos del P8 (12-nov) no estan en ningun respaldo |
+| Preflight del Anexo de Nube | **`ok: true`, exit 0** (texto vigente con huella coincidente y 1 Empresa con el Anexo suscrito **y contrafirmado**) |
+
+**Que codigo corre.** El despliegue es por **copia de archivos** y el servidor **no tiene `.git`**, asi que
+`git log` no lo dice y el `/health` tampoco (devuelve `kair_version: "compatible-0.1.189"`, un valor fijo).
+La respuesta se armo comparando el sha256 de cada archivo desplegable del repositorio con el de los
+mismos archivos en el servidor: **247 archivos en comun, 6 diferentes, 0 sobrantes**.
+
+Los 6 que difieren son `package.json`, `package-lock.json` (el **📦1051 no esta desplegado**),
+`scripts/actualizar-manifiesto-1047.js`, `scripts/actualizar-manifiesto-v1.6.js`, `deploy/setup-vm.sh` y
+`deploy/README-DESPLIEGUE.md`. **Todo `src/` que corre es byte a byte el de `264d08df`.**
+
+La comparacion es reproducible y **sale con codigo 1 nombrando los archivos** mientras haya diferencias:
+
+```bash
+# En el servidor (solo lectura)
+cd /opt/kair-firma/app
+find . -type f -not -path './node_modules/*' -not -path './data/*' -not -path './storage/*' \
+  -not -path './logs/*' -not -path './backups/*' -not -name '*.enc' -not -name '*.pdf' -not -name '*.log' \
+  -print0 | xargs -0 sha256sum | sed 's#  \./#  #' | LC_ALL=C sort > /tmp/manifiesto-servidor.txt
+
+# En el PC, con el repositorio al dia
+node firma-service/scripts/comparar-despliegue.js \
+  --repo <ruta>/sgsst-electron-app/firma-service \
+  --servidor /tmp/manifiesto-servidor.txt
+```
+
+**Actas completas de esta medicion**, con la salida integra de cada comando:
+`sgsst-electron-app/docs/gestion-humana/firma-electronica/verificacion-cierre/acta-comprobacion-servidor-2026-11-12.md`
+(requisito 7.13) y `.../acta-despliegue-2026-11-12.md` (requisito 8.8).
+
+**Lo que quedo abierto por esta comprobacion** (todo con dueño, ninguno es un misterio):
+
+1. Desplegar el **📦1051** con el paso de instalacion (`npm ci --omit=dev`, servicio parado). Es lo que
+   deja de correr `proxy-addr 2.0.7`. **Owner** (`sudo`).
+2. **Permisos**: los 236 archivos en 777 se corrigen con el paso 2b de §5.1. **Owner** (`sudo`).
+3. **La bandera `FIRMA_EXIGIR_ANEXO_NUBE`**: apagada. El preflight ya dio 0, asi que la condicion
+   tecnica se cumple; falta encenderla y reiniciar. **Owner** (`sudo`).
+4. **Rotacion de logs**: el `logrotate` esta escrito en el repositorio, falta instalarlo. **Owner**.
+5. **Respaldo off-site**: el destino es una decision del owner; el script esta escrito y validado.
+6. **Node 22** en el servidor: decision tomada el 11-nov, no ejecutada. **Owner**.
+
 ## 5.2 Retirar el rastro de prueba
 
 ```bash
@@ -1020,7 +1105,33 @@ la suite contra `firma.sqlite` y se perdio `SIGN-2026-037663`.
 
 ---
 
-## 7. Estado de la suite (2026-11-11)
+## 7. Estado de la suite
+
+La medicion vigente es la del **2026-11-12** (corrida final sobre el arbol de trabajo de esta
+ronda, ya con el arbol de dependencias nuevo y los 41 tests nuevos que trajo):
+
+```
+tests 2665 | pass 2663 | fail 0 | skipped 2
+```
+
+Medido con **Node 22.23.4** (ABI 127) en el PC de trabajo, con `better-sqlite3` 11.10.0
+recompilado para ese ABI: 317 s. Los 2 `skipped` son los que ya estaban asi el 11-nov.
+
+La medicion anterior (12-nov-2026, antes del cambio de dependencias) fue
+`tests 2606 | pass 2604 | fail 0 | skipped 2`, en 415 s; la de antes (11-nov-2026) fue
+`tests 2574 | pass 2572 | fail 0 | skipped 2`, en 220 s. **La diferencia son 59 pruebas nuevas**
+(2 665 - 2 606), todas en verde; el numero de la seccion 7 se queda
+atrasado si no se actualiza, y una cifra vencida leida como vigente es un verde falso.
+
+> La reproduccion desde **clon limpio** esta medida y registrada en
+> `docs/gestion-humana/firma-electronica/verificacion-cierre/t1-corrida-desde-clon-limpio.md`
+> (tres corridas, 0 fallos). La corrida sobre el estado **commiteado** sigue pendiente: la tiene el
+> owner, porque exige el commit candidato (T3).
+
+> **El EOL de este archivo esta fijado por su test.** Si lo abres en un editor que normalice a
+> CRLF, el diff entero se mueve. Las ediciones se hacen a nivel de bytes.
+
+### 7.1 La medicion del 11-nov-2026
 
 ```
 tests 2574 | pass 2572 | fail 0 | skipped 2
@@ -1326,6 +1437,84 @@ El P8 **se ejecuto en produccion** el 12-nov-2026. Los cuatro actos, con su hora
 **Lo que NO debe pasar:** que la suscripcion nueva se escriba sobre la vieja, que un manifiesto
 declare «firmado» sin que exista la suscripcion del texto vigente, o que la compuerta se cierre con
 una fecha de suscripcion que nadie merece.
+
+### 8.4. El respaldo fuera del servidor (off-site): la segunda copia
+
+> **El problema, medido el 12-nov-2026.** Los respaldos son diarios a las 22:00, se cifran con GPG
+> simetrico AES256 y verifican su propia integridad: eso esta bien. Pero viven en
+> `/opt/kair-firma/backups`, **en el mismo disco que la base**. Si la maquina se muere, se pierden
+> los dos. Una copia cifrada en el mismo servidor no es un respaldo: es una segunda copia.
+> Aparte: **los cuatro actos del P8 (12-nov) todavia no estaban en ningun respaldo** — el ultimo era
+> del 11-nov a las 22:00, y el del 12-nov a las 22:00 ya los incluye.
+
+#### El script
+
+`firma-service/deploy/backup-offsite.sh`. **No toca `backup-firma.sh`** (el que corre a diario y ya
+> hace bien su trabajo): este es otro, y solo se lleva los `.enc` **ya cifrados** a otro sitio.
+
+| | |
+|---|---|
+| **Nunca borra la copia local** | La poda local es de `backup-firma.sh` y respeta el hold legal |
+| **No se da por buena la copia hasta que el hash del destino coincide** | Un `scp` que "salio bien" no prueba que el archivo llego entero; el hash si |
+| **Sin destino configurado no es un error** | Sale con codigo 0 y lo deja escrito en el log: la decision del destino es del owner |
+| **La poda del destino solo ocurre DESPUES de una copia verificada** | Y nunca borra mas copias de las que la retencion local permite |
+| **Solo viajan `.enc`** | No se escribe nada en claro |
+
+#### Instalacion (la corre el owner: `sudo` pide contrasena)
+
+```bash
+# 1. El script
+sudo install -m 700 -o root -g root \
+  /ruta/al/repo/sgsst-electron-app/firma-service/deploy/backup-offsite.sh \
+  /opt/kair-firma/backup-offsite.sh
+
+# 2. La configuracion (el destino es una decision del owner)
+sudo install -m 600 -o root -g root /dev/null /opt/kair-firma/backup-offsite.conf
+sudo sh -c 'cat > /opt/kair-firma/backup-offsite.conf <<EOF
+METODO=rclone
+REMOTO=rclone:mi-bucket/kair
+RETENCION_DIAS=30
+EOF'
+
+# 3. Que haria, sin hacer nada
+sudo bash /opt/kair-firma/backup-offsite.sh --estado
+
+# 4. Copiar y verificar
+sudo bash /opt/kair-firma/backup-offsite.sh
+
+# 5. Comprobar que el destino tiene lo mismo
+sudo bash /opt/kair-firma/backup-offsite.sh --verificar
+```
+
+`METODO` puede ser `rsync` (otra maquina), `scp` (otra maquina, ultima instancia) o `rclone` (un
+> bucket en la nube: **el destino no depende de otra maquina**, que es la opcion mas fuerte). Sin
+> `rsync`, `scp` ni `rclone` instalados, el metodo no se puede usar.
+
+Para dejarlo diario, anadir al `crontab` de root (el de `backup-firma.sh` es de root y el usuario
+> `javier` no lo ve):
+
+```bash
+sudo crontab -l > /tmp/cron-actual.txt 2>/dev/null || true
+sudo sh -c 'cat /tmp/cron-actual.txt; echo "30 22 * * * /bin/bash /opt/kair-firma/backup-offsite.sh"' | sudo crontab -
+```
+
+#### Lo que falto y todavia falta
+
+- **El destino es del owner**: hace falta decidir a donde va la copia (bucket, otra maquina, disco
+>  externo) y poner las credenciales. Sin eso el script esta escrito y validado, pero **no copia**.
+- **La restauracion desde la copia off-site no esta probada**: `probar-restauracion.sh` prueba el
+>  camino local; falta probarlo con un archivo que venga del destino.
+
+#### La trampa que el ensayo en el servidor encontre
+
+> El selector de archivos **no puede ser por nombre**. Un `ls | sort | tail -1` elige
+> `firma-pre-despliegue-20261026-180335.sqlite.enc` —la "p" de "pre" ordena **despues** del "2" de
+> "2026"—, y se llevaria un respaldo de octubre **pensando que es el de hoy**. En el directorio hay
+> 22 respaldos de la base y 16 del storage, y ademas archivos que no son respaldos diarios
+> (`pre-despliegue`, `antes-limpieza-consentimiento`, `manual-pre-994`). El selector es por **fecha
+> de modificacion** y con el **patron de nombre exacto** que usa `backup-firma.sh`
+> (`firma-2???????-??????.sqlite.enc`). Sin este detalle, la copia off-site seria de un archivo
+> equivocado, y el hash cuadraria igual porque compara el archivo equivocado consigo mismo.
 
 ---
 

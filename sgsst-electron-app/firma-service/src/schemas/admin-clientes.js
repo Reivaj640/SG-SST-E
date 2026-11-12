@@ -41,13 +41,15 @@ const ALLOWED_OPS = Object.freeze([
 
 /**
  * Validador del array de operaciones. Garantiza que cada item es del enum.
+ *
+ * M.13 (zod 3 -> zod 4): el `errorMap` por esquema ya no existe; zod 4 lo
+ * ignora en silencio y el mensaje pasa a ser el generico ("Invalid option:
+ * expected one of ..."). El equivalente es `error`.
  */
 const allowedOperationsField = z.array(z.enum(ALLOWED_OPS), {
-  errorMap: () => ({
-    message:
-      'Cada item de allowed_operations debe ser uno de: ' +
-      ALLOWED_OPS.join(', '),
-  }),
+  error:
+    'Cada item de allowed_operations debe ser uno de: ' +
+    ALLOWED_OPS.join(', '),
 })
   .min(1, 'allowed_operations no puede estar vacío')
   .max(10, 'allowed_operations máximo 10 items');

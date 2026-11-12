@@ -31,7 +31,13 @@ const codigoBody = z.object({}).strict();
 
 const suscribirBody = z.object({
   otp: z.string().trim().regex(/^\d{6}$/, 'el código son 6 dígitos'),
-  acepta: z.boolean({ required_error: 'acepta es requerido' }),
+  // M.13 (zod 3 -> zod 4): `required_error` ya no existe; zod 4 lo ignora en
+  // silencio y el mensaje pasa a ser el generico. El equivalente es `error`,
+  // y la forma de FUNCION mantiene el sentido de `required_error`: el mensaje
+  // propio sale SOLO cuando el campo FALTA.
+  acepta: z.boolean({
+    error: (issue) => (issue.input === undefined ? 'acepta es requerido' : undefined),
+  }),
 }).strict();
 
 /**

@@ -44,6 +44,13 @@ __pycache__/
 .DS_Store
 Thumbs.db
 
+# 📦1053 — El SELLO DE VERSION del despliegue (`firma-service/VERSION`).
+# Lo genera `firma-service/scripts/generar-sello-version.js` en el momento del
+# despliegue, con el commit que se va a instalar. NO se commitea: si se
+# commiteara, anunciaría el commit ANTERIOR (el sello se hace después del
+# commit, y el `/health` publicaría una versión que ya no es la que corre).
+sgsst-electron-app/firma-service/VERSION
+
 # Herramientas locales de BD (solo dev, no van al repo; clean-dbs BORRA datos)
 sgsst-electron-app/firma-service/scripts/clean-dbs.js
 sgsst-electron-app/firma-service/scripts/inspect-dbs.js

@@ -1076,6 +1076,7 @@ function aplicar(plan, opts) {
   let sesionesBorradas = 0;
   let lotesBorrados = 0;
   let consentimientosBorrados = 0;
+  let eventosConsentimientoBorrados = 0;
   let archivosBorrados = 0;
   let tokensBorrados = 0;
   let holdsBorrados = 0;
@@ -1083,6 +1084,7 @@ function aplicar(plan, opts) {
   const hayTokens = tablaExiste('gh_firma_tokens');
   const hayHolds = tablaExiste('gh_firma_holds');
   const hayPapel = tablaExiste('gh_firma_firmas_papel');
+  const hayEventosConsentimiento = tablaExiste('gh_consentimientos_eventos');
 
   try {
     const tx = db.transaction(() => {
@@ -1116,6 +1118,24 @@ function aplicar(plan, opts) {
         firmasBorradas += fi.changes;
       }
       for (const c of plan.consentimientos) {
+        // PRIMERO los eventos del consentimiento. La FK de la migracion 010
+        // apunta al consentimiento (`gh_consentimientos_eventos.consent_id` ->
+        // `gh_consentimientos_firma.id`) y SQLite no deja borrar el padre
+        // antes que el hijo.
+        //
+        // Sin esta linea la limpieza POR RANGO falla con "FOREIGN KEY
+        // constraint failed" en cuanto un consentimiento tenga eventos, que es
+        // el caso normal: los escribe `src/services/consent.js`. La
+        //.transaction revierte (no se pierde nada) pero la reversion queda
+        // bloqueada y el operador recibe una traza de pila en vez de un
+        // resultado. Es el mismo orden que ya usaba el modo
+        // `--solo-consentimientos`.
+        if (hayEventosConsentimiento) {
+          const ce = db.prepare(
+            'DELETE FROM gh_consentimientos_eventos WHERE consent_id = ?'
+          ).run(c.id);
+          eventosConsentimientoBorrados += ce.changes;
+        }
         const rc = db.prepare('DELETE FROM gh_consentimientos_firma WHERE id = ?').run(c.id);
         consentimientosBorrados += rc.changes;
       }
@@ -1207,6 +1227,7 @@ function aplicar(plan, opts) {
   console.log(`  holds eliminados:         ${holdsBorrados}`);
   console.log(`  firmas en papel borradas: ${papelBorrados}`);
   console.log(`  consentimientos:          ${consentimientosBorrados}`);
+  console.log(`  eventos de consentimiento: ${eventosConsentimientoBorrados}`);
   console.log(`  archivos eliminados:      ${archivosBorrados}`);
   console.log(`  hold revisados:           ${conHold.length}`);
   console.log(`  hold forzados:            ${forzados.length}`
@@ -1219,6 +1240,7 @@ function aplicar(plan, opts) {
   return {
     firmasBorradas, eventosBorrados, consentimientosBorrados, archivosBorrados,
     tokensBorrados, holdsBorrados, papelBorrados,
+    eventosConsentimientoBorrados,
     holdsForzados: forzados.length, holdBloqueados: bloqueados.length,
   };
 }

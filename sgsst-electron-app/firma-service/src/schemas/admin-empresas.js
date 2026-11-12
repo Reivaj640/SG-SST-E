@@ -159,9 +159,12 @@ const suscripcionAnexoEncargoBody = z.object({
  * constancia de contra qué lo contrastó y de dónde quedó radicado.
  */
 const verificarRepresentanteBody = z.object({
+  // M.13 (zod 3 -> zod 4): el `errorMap` por esquema ya no existe; zod 4 lo
+  // ignora en silencio y el mensaje pasa a ser el generico ("Invalid option:
+  // expected one of ..."). El equivalente es `error`.
   tipo_documento: z
     .enum(['CERTIFICADO_CAMARA', 'RUT', 'PODER'], {
-      errorMap: () => ({ message: 'tipo_documento tiene que ser CERTIFICADO_CAMARA, RUT o PODER' }),
+      error: 'tipo_documento tiene que ser CERTIFICADO_CAMARA, RUT o PODER',
     }),
   referencia: z
     .string()
@@ -204,7 +207,14 @@ const contrafirmaBody = z.object({
     .string()
     .trim()
     .regex(/^\d{6}$/, 'el código son 6 dígitos'),
-  acepta: z.boolean({ required_error: 'acepta es requerido' }),
+  // M.13 (zod 3 -> zod 4): `required_error` ya no existe; zod 4 lo ignora en
+  // silencio y el mensaje pasa a ser el generico ("Invalid input: expected
+  // boolean, received undefined"). El equivalente es `error`, y la forma de
+  // FUNCION mantiene el sentido de `required_error`: el mensaje propio sale
+  // SOLO cuando el campo FALTA, no cuando viene con otro tipo.
+  acepta: z.boolean({
+    error: (issue) => (issue.input === undefined ? 'acepta es requerido' : undefined),
+  }),
 }).strict();
 
 /**
@@ -282,8 +292,10 @@ const updateEmpresaBody = z.object({
 });
 
 const setActivoBody = z.object({
+  // M.13 (zod 3 -> zod 4): `required_error` -> `error` (misma razon que en
+  // `acepta`, en `contrafirmaBody` mas arriba).
   activo: z.boolean({
-    required_error: 'activo es requerido',
+    error: (issue) => (issue.input === undefined ? 'activo es requerido' : undefined),
   }),
 });
 

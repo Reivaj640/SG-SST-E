@@ -9652,3 +9652,242 @@ Reglas:
 5. **El gemelo también.** Cuando un control se aplica a un instrumento, se busca su gemelo y se contrasta: la contrafirma del Anexo de Encargo y la del Anexo de Nube son el mismo acto con otro texto.
 6. **Pruebas:** `poderes-encargado.test.js` **20/20** (registro, revocación, vigencia, cotejo de nombres, la contrafirma con y sin faculty, la certificación posterior, las rutas y el trigger append-only contra el archivo real), `anexo-nube-contrafirma.test.js` **20/20**, `readiness-legal.test.js` **59/59** (incluye «sin la acreditación, el ítem NO puede quedar ok», para los dos instrumentos), `admin-empresas-anexos.test.js` (la lectura trae la acreditación en las **dos** formas) y el guard de UI de `main/test-anexos-1038.js` (exige la línea en las dos vistas). Suite completa del firma-service: **2 574 tests · 2 572 pass · 0 fail**.
 7. **El falso negativo es tan peligroso como el falso positivo.** La vista del Anexo de Encargo mostraba «Facultad acreditada: NO DECLARADA» con la faculty **ya acreditada en el expediente**, porque la lectura (`GET /internal/admin/empresas/:id/anexos`) no traía el `contrafirma_evidencia` en la forma del Encargo (en la del Nube sí venía). El operador concluía que faltaba un poder que ya estaba, y el trabajo de acreditación se repetía o se bloquea: es el mismo modo de falla del «FIRMADO» en verde, del lado contrario. **Regla de bolsillo: cuando se agrega un dato a una forma de lectura, hay que buscar las DOS formas — la del gemelo no se actualiza sola.** Y el falso negativo es el más caro de los dos, porque nadie se queja de una falta que no existe: se la cree.
+
+## 🐗 El día que el test del verificador llevaba los números del documento escritos a mano (2026-11-12)
+
+El mapa de la meta (27 puntos, con su tabla resumen) tiene un verificador: `scripts/contar-estados-meta-apertura.js` regenera la tabla desde el conteo real y **falla** si el documento no cuadra con su propio conteo. Es el mecanismo que impide que un documento de estado se pudra sin que nadie se entere. Y su test tenía un agujero.
+
+El test `tests/scripts/contar-estados-meta-apertura.test.js` comprobaba dos cosas: que el verificador **detectara una tabla editada a mano**, y que `--escribir` **fuera idempotente**. Para las dos, el test **escribía a mano la fila que iba a alterar**:
+
+```js
+texto.replace('| **TOTAL** | **1** | **19** | **0** | **20** |', '| **TOTAL** | **99** | ...')
+```
+
+Ese texto era el estado del documento **en el momento de escribir el test**. Cuando el mapa pasó de 20 a 26 bloques y la fila se volvió `| **TOTAL** | **1** | **25** | **0** | **26** |`, el `replace` **no encontró nada**: la tabla no se alteró, el verificador dijo «cuadra» y el test de «detecta una tabla editada a mano» **falló** — no porque el verificador estuviera roto, sino porque el test dejó de probar lo que decía probar. Peor fue el de idempotencia: alteraba la misma cadena inexistente, corría `--escribir` y afirmaba que el `**99**` ya no estaba. Pasaba **siempre**, porque el `**99**` nunca se había escrito. Un test verde que no puede fallar no es una prueba: es un adorno.
+
+El arreglo no fue poner el número nuevo: fue **dejar de escribir el dato**. La fila se deriva del documento en tiempo de ejecución, y el test **afirma que la alteración ocurrió** antes de afirmar nada sobre el resultado. Un test que necesita un número fijo en su cuerpo es un test que se rompe cuando el mundo cambia; un test que deriva el dato no se rompe nunca, y si el dato no está, falla diciendo por qué.
+
+Reglas:
+
+1. **Un test no lleva el estado del sistema escrito a mano.** Si el dato que el test altera es parte de lo que el sistema produce, el test lo **deriva** en el momento de correr. La alternativa —volver a escribir el número cuando cambia— es una bomba de tiempo con la caducidad del cambio.
+2. **Un test tiene que poder fallar.** Si la alteración previa al `assert` no está verificada, el `assert` posterior no prueba nada. La alteración es parte de la prueba: se verifica **igual** que el resultado.
+3. **Un test que falla porque el mundo cambio no se arregla cambiandolo: se arregla entendiendolo.** El fallo era la información: la fila del documento ya no era la que el testRecording decía. Se leyó el fallo, se derivó el dato y se volvió a correr.
+4. **Pruebas:** `contar-estados-meta-apertura.test.js` **7/7** (estado inválido, bloque faltante, tabla editada a mano, idempotencia y origen declarado en cada bloque), `verificar-sumas-paquete-abogado.test.js` **6/6**, `probar-t6-medio-corporativo.test.js` **5/5**. Suite completa del firma-service: **2 624 tests · 2 622 pass · 0 fail · 2 skipped**.
+
+## 🐗 El día que el script que actualizaba el documento duplicó el texto que acababa de escribir (2026-11-12)
+
+Para poner al día el cuadro canónico de 96 requisitos con lo que el equipo había medido, se escribió `scripts/actualizar-cuadro-canonico-2026-11-12.js`: el cuerpo de cada requisito medido se copia **literalmente** del informe que lo midió (el cuadro no dice nada que el informe no sostenga), la palabra de estado se actualiza, y la tabla la regenera el verificador de siempre.
+
+El script **duplicaba el texto**. La primera versión reemplazaba **solo el encabezado** (`**N.N · título — ESTADO.**`) y dejaba el cuerpo anterior **debajo** del nuevo: el documento quedaba diciendo lo mismo dos veces. El tamaño lo delató: el canónico pasó de **104 674** a **189 643** bytes en la primera corrida, y a **267 042** en la segunda, porque la segunda corrida le añadió **otro** cuerpo nuevo encima del que ya estaba duplicado. Un archivo que crece con cada corrida no es un archivo: es una fuga.
+
+Había dos defectos en el mismo script, y el segundo solo se vio después de arreglar el primero:
+
+- **Reemplazaba la coincidencia, no el bloque.** El regex encontraba el encabezado y el `replace` devolvía el encabezado nuevo: el cuerpo viejo quedaba vivo. Un parche de documento tiene que reemplazar **desde el encabezado del bloque hasta el encabezado del siguiente**, no lo que el regex casó.
+- **Recalculaba la línea base contra el archivo que estaba reescribiendo.** El bloque dice «*Cambio de estado: en la ronda del 30-oct-2026 figuraba como X*». En la segunda corrida, X ya era el estado nuevo, así que la línea decía «figuraba como CERRADO» de un requisito que el 30-oct estaba pendiente. Y la tabla de la sección de revisión escribía «CERRADO -> CERRADO». **La línea base de una transformación idempotente no puede ser el archivo que ella misma reescribe**: tiene que venir de otro sitio. Aquí vino de **la tabla de la corrida anterior, dentro del propio documento**.
+
+Reglas:
+
+1. **Un parche de documento reemplaza el bloque entero**, del encabezado al siguiente encabezado. Si el cuerpo anterior sobrevive debajo del nuevo, el documento dice lo mismo dos veces y **nadie lo nota**: el texto nuevo es el que se lee.
+2. **La línea base de una transformación idempotente no es el archivo de trabajo.** O viene de un archivo aparte, o se **recupera del propio documento** (lo que el documento ya dijo la vez anterior). Una transformación que depende de su propio resultado no es idempotente: es acumulativa.
+3. **La idempotencia se comprueba sobre los BYTES, no sobre el resultado.** La segunda corrida tiene que dejar el archivo **igual**, byte a byte: `sha256` antes y después. Comparar «no se quejó» no es comparar nada.
+4. **El tamaño del documento es un indicador de estado.** 104 KB → 190 KB → 267 KB en dos corridas: el numero dizia lo que el `git diff` escondía. Cuando un parche hace crecer un documento, se mira **por qué** antes de seguir.
+5. **Pruebas:** el script corre **idempotente** (verificado con `sha256` del archivo antes y después de la segunda corrida) y la tabla del cuadro la regenera y la verifica `scripts/contar-estados-checklist.js` (74 cerrados / 22 pendientes sobre 96). Suite completa: **2 624 tests · 2 622 pass · 0 fail · 2 skipped**.
+
+## 🐗 El día que dos documentos numeraban lo mismo y el conflicto se comió tres requisitos (2026-11-12)
+
+La verificación del §7 del `SECURITY.md` (39 casillas de pre-producción) se escribió como informe con sus propios identificadores: `7.1` a `7.39`. El **cuadro canónico** también tiene una sección 7 —«Producción y despliegue»— con sus `7.1` a `7.15`. Dos vocabularios, el mismo espacio de nombres, sin que nadie lo dijera.
+
+El actualizador del canónico lee **todos** los informes de `verificacion-cierre/` y parsea sus encabezados `### N.N`. Con los dos informes en la carpeta, los identificadores `7.1`, `7.3`, `7.4`, `7.5`, `7.6`, `7.7`, `7.8`, `7.9`, `7.11`, `7.12`, `7.13` y `7.15` aparecían **dos veces**. La regla que había coded era «si un identificador está duplicado, se salta el segundo». Resultado: **doce requisitos del canónico dejaron de actualizarse** (el script lo imprimió, pero como un aviso más), y **tres requisitos que solo existían en el informe del §7 —`7.2`, `7.10` y `7.14`— se escribieron en el canónico con el texto equivocado**: la casilla de seguridad, no el requisito de producción y despliegue. Los tres quedaron con una medición que no era la suya, y el verificador de conteo no lo notó: el estado es una palabra, y la palabra estaba bien puesta.
+
+Lo que lo agravó: **el conflicto se resolvió en silencio**. El script avisaba «Sin tocar (encabezado multiple o estado duplicado en los informes)» y siguió escribiendo. Un salto silencioso en un paso que decide qué texto dice un documento es un salto silencioso en la verdad.
+
+El arreglo fue de dos partes. **Los identificadores del informe del §7 llevan ahora prefijo de espacio de nombres** (`S7.1` a `S7.39`), y el documento lo declara: los subtítulos `## 7.x` son las subsecciones del `SECURITY.md` y no se renombraron. **Y un identificador duplicado es ahora un error que detiene el script** (sale con código 1 y **no escribe nada**), distinto del caso legítimo —un encabezado del canónico que cubre varios identificadores, como `**6.5 a 6.9**`—, que se informa aparte. Y como no hay forma de saber a quién pertenecía cada texto, el canónico se **restauró desde git** y se reaplicó desde cero: `git checkout -- <documento>` y el script otra vez. Con 34 requisitos medidos y 96 en total, la cuenta cuadra.
+
+Reglas:
+
+1. **Cuando dos vocabularios comparten un espacio de identificadores, los identificadores se prefijan.** El prefijo no es cosmético: es lo que evita que un requisito herede la medición de otro. Y el documento **declara** la regla, para que el que lea no tenga que deducirla.
+2. **Un conflicto es un error, nunca un salto silencioso.** Un paso que decide qué texto dice un documento tiene que **parar** cuando no puede decidir. `git checkout` y volver a correr es barato; un documento con el texto equivocado en tres requisitos es caro: se lee, se cita y se pierde la confianza.
+3. **«No se tocó» y «se tocó mal» se distinguen antes de seguir.** Un encabezado que cubre varios identificadores es un caso previsto; un identificador en dos informes es un conflicto. Printarlos juntos los mezcla y hides el segundo.
+4. **Después de un cambio en la fuente, el documento se rehace desde el origen.** Si hay duda de qué quedó, se restaura desde git y se reaplica: el estado anterior del documento no es una fuente, es una hipótesis.
+5. **Pruebas:** el script sale con **código 1 y sin escribir** cuando hay identificadores duplicados; el canónico cuadra con `scripts/contar-estados-checklist.js` (74 cerrados / 22 pendientes) y es **idempotente**. Suite completa: **2 624 tests · 2 622 pass · 0 fail · 2 skipped**.
+
+## 🐗 El día que "es una copia" no significaba "se regenera igual" (2026-11-12)
+
+El paquete del abogado (14 adjuntos) se arma con `scripts/armar-paquete-abogado.js`. Ese script **copia** cada adjunto desde su origen en el repositorio, **regenera** el `SHA256SUMS.txt` y **borra** los adjuntos que no estén en su lista. Es el generador del paquete, y por eso se corría al cerrar cada ronda.
+
+El problema: **el generador está congelado en la ronda de la v1.4**. Su lista dice que el adjunto 01 es `01-acuerdo-uso-v1.4.txt` (73 208 B), que el 02 es el Anexo de Encargo, que el 03 es `anexo-nube-v1.0.html` y que el 04 es la Constancia de la v1.4. Hoy el Acuerdo vigente es la **v1.6** (75 961 B) y el Anexo de Nube vigente es la **v1.3**, ya suscrita y contrafirmada. Correr el generador hoy no habría "actualizado" el paquete: **habría devuelto textos viejos a un paquete que va al abogado**, y de paso habría borrado adjuntos que su lista no conoce. Un texto suscrito no se revierte por una herramientas de empaquetado.
+
+Lo que se hizo fue lo contrario de correrlo: el **único** adjunto que había cambiado (el 09, la respuesta al checklist) se copió **byte a byte** desde el origen, se actualizó su fila en la nota al abogado (tamaño y huella), y el `SHA256SUMS.txt` se regeneró **desde los archivos reales**, con el mismo formato y el mismo orden del generador. Se añadió además una **guardia** (`scripts/verificar-sumas-paquete-abogado.js`, con su test) que detecta la deriva del manifiesto nombrando el archivo y **no escribe**.
+
+Reglas:
+
+1. **Antes de correr un generador, se lee lo que ESCRIBE, no lo que se supone que escribe.** Los generadores se congelan: su lista es una foto del pasado. El que arma el paquete hoy tenía cuatro meses de foto.
+2. **Un generador que borra lo que no conoce no se corre "por si acaso".** `armar-paquete-abogado.js` borra los adjuntos que no están en su lista; correrlo sin revisar la lista es una apuesta con los adjuntos.
+3. **El paquete es una copia del origen: cuando cambia un adjunto, se refresca ese adjunto, no se rearma el paquete.** Copia byte a byte, fila de la nota al abogado con el tamaño y la huella nuevos, y manifiesto de sumas regenerado desde los archivos reales.
+4. **Un manifiesto de integridad sin quien lo verifique es una promesa.** La guardia nueva (`verificar-sumas-paquete-abogado.js`, 6/6) es la que convierte el `SHA256SUMS.txt` en un control y no en un adorno: es exactamente el fallo que se encontró en la ronda anterior —el manifiesto desactualizado desde el 📦1050— el que hizo aparecer la guardia.
+5. **Pruebas:** `verificar-sumas-paquete-abogado.test.js` **6/6** (deriva detectada nombrando el archivo, archivo faltante, adjunto sin amparar, y que el verificador **no escribe**). Suite completa: **2 624 tests · 2 622 pass · 0 fail · 2 skipped**.
+
+## 🐗 El día que el bloque decía "falta la validación escrita" y la validación llevaba cinco días escrita (2026-11-12)
+
+El mapa de la meta de apertura (27 bloques) tenía esta frase en el bloque M.2: *"falta la validación escrita que el código exige"*. Suena a una carencia grave, y durante una ronda entera se trato como una carencia. No lo era.
+
+La validación escrita **existed**: la decisión C la tomó el owner el 5-nov-2026 y está en el plan de cierre (§8, línea 100: «DECIDIDA el 5-nov-2026 por el owner: ENCENDERLA», con su orden obligatorio), repetida en el encabezado del plan (línea 5) y detallada en el §13 como guion de encendido paso a paso. Y la validación que el **código** exige no es un documento: es un control, el preflight (`scripts/preflight-anexo-nube.js`), que existe desde el 5-nov, que aborta con código 5 si no hay ninguna Empresa activa con el Anexo de Nube suscrito **y contrafirmado** sobre el texto vigente, y que **nunca se había corrido contra producción**.
+
+Se corrió el 12-nov-2026 a las 19:56Z, contra una **copia** de la base hecha con `.backup` (la original no se abrió en escritura): **exit 0**. El texto vigente `legal/anexo-nube-v1.3.html` (85 143 B) está en el servidor con huella `fdd10551…b585d`, **igual** a la del manifiesto; hay 1 Empresa activa, `900829731` ASEPLUS CARIBE S.A.S., con el Anexo de Nube suscrito `2026-11-12T15:38:27.990Z` y contrafirmado `2026-11-12T16:13:54.106Z`; y `FIRMA_EXIGIR_ANEXO_NUBE` está **no definida** en el proceso.
+
+La conclusión cambia el bloque por completo: **de la decisión y de la validación no falta nada; falta el acto**. Encender la bandera y reiniciar. El resto —qué se hace con las empresas que no tengan el Anexo— ya lo define la propia compuerta, que las bloquea hasta que suscriban.
+
+Reglas:
+
+1. **Un control que existe y no se ha corrido no es una validación pendiente: es una medición pendiente.** La diferencia importa porque una se resuelve escribiendo un documento y la otra con un comando.Aqui hay dos trabajos distintos y no se pueden intercambiar.
+2. **Antes de decir "falta la validación", se busca la validación.** Un documento que afirma una carencia es una hipótesis, no un hecho. Este caso fue el inverso del habitual: no faltaba el documento, sobraba la corrida.
+3. **La evidencia de un control se produce corriéndolo contra el sistema real, no con su código fuente.** El preflight existe desde el 5-nov; su exit code contra la base de producción del 12-nov es lo que decide si se puede abrir.
+4. **Un control que lee la base se corre contra una copia.** La cuenta de servicio no puede abrir la base de producción en escritura; la copia con `.backup` es consistente y no deja el original con un byte distinto.
+5. **Pruebas:** el bloque M.2 del mapa quedo reescrito con la evidencia y el comando; el acta `verificacion-cierre/acta-comprobacion-servidor-2026-11-12.md` deja el preflight con su salida íntegra.
+
+## 🐗 El día que "qué código corre" no lo podía responder nadie (2026-11-12)
+
+El despliegue de la firma electrónica se hace **copiando archivos**. El servidor **no tiene `.git`** (medido el 12-nov: `/opt/kair-firma/.git` no existe), así que `git log` no dice qué corre; y el manifiesto `legal-readiness.json`, que es byte a byte igual entre el repositorio y producción, describe los **textos** (el Acuerdo y los anexos), no el código. El `/health` tampoco sirve: devuelve `kair_version: "compatible-0.1.189"`, un valor **fijo** que no cambia con ningún despliegue.
+
+El resultado fue que durante una ronda entera se dio por hecho que el 📦1051 (el bump de `proxy-addr` a 2.0.8, `express` a 4.22.3 y `qs` a 6.16.2) estaba desplegado, y no lo estaba: producción seguía con `proxy-addr 2.0.7`, que es la **crítica** que ese commit arregla. No lo delató el `npm audit` del servidor, ni el servicio, que estaba sano.
+
+La respuesta se armó comparando el sha256 de cada archivo desplegable del repositorio con el de los mismos archivos en el servidor: **247 archivos en común, 6 diferentes, 0 sobrantes**. Los 6 son `package.json`, `package-lock.json`, dos scripts auxiliares y dos archivos de despliegue. Todo `src/` que corre es **byte a byte** el de `264d08df`. Eso es mucho más preciso que "el despliegue está al día" o "no está al día": el despliegue está al día **salvo un paquete de dependencias**, y eso se puede volver a medir en cualquier momento.
+
+El hallazgo de fondo es otro, y es el que más cuesta: la afirmación "todo `src/` es idéntico" se apoya en una **hipótesis** —que el directorio `app/` del servidor se había copiado entero desde el repo— que resultaba falsa por la fecha de modificación del directorio (11-nov 13:52, anterior a dos commits). Se comprobó archivo por archivo antes de afirmarlo, y la hipótesis se cayó: el código de runtime sí estaba al día, copiado el 12-nov a las 09:30.
+
+Reglas:
+
+1. **"Qué código corre" se responde con una comparación de bytes, no con una inferencia.** La fecha de modificación de un directorio no dice qué hay adentro: se copiaron archivos sueltos sobre un árbol más viejo.
+2. **Un despliegue por copia necesita un verificador que compare, o es una caja negra.** `scripts/comparar-despliegue.js` sale con código 1 y **nombra** los archivos que difieren mientras haya diferencias, y con 0 cuando el árbol desplegado es idéntico al repositorio.
+3. **Un verificador de despliegue no se basta con medir: tiene que poder repetirse.** El script calcula el manifiesto del repositorio, lee el del servidor y compara; los tests (6/6) comprueban que detecta una diferencia nombrándola, que detecta un sobrante, que da el visto bueno cuando todo cuadra y que **no escribe ni un byte** en lo que compara.
+4. **`node_modules` no se compara.** Las dependencias instaladas no son código desplegable: se comparan por separado, con su propio control (que es el `npm audit` del servidor).
+5. **Pruebas:** `comparar-despliegue.test.js` **6/6**; la comparación real del 12-nov-2026 quedó en el acta `verificacion-cierre/acta-despliegue-2026-11-12.md`.
+
+## 🐗 El día que el hito estaba en el Historial y no en la BITACORA (2026-11-12)
+
+El requisito `8.10` del cuadro canonico pide que la documentacion del proyecto este al dia, y su
+informe senalaba dos huecos concretos: "`BITACORA.md` sin el hito v1.6/P8" y "`CONTEXT.md` con un
+estado que ya no existe". El segundo ya se habia cerrado (la ronda del 12-nov reescribio el bloque
+de estado de `CONTEXT.md`). El primero seguia abierto, y la razon era comoda: el hito **si** estaba
+escrito, en el `Historial.md`, que es donde vive. Escribirlo en la `BITACORA.md` no era informacion
+nueva: era **mover el mismo hecho al documento donde lo busca quien lee**.
+
+La `BITACORA.md` es el registro de **por que se rompio algo y que regla quedo**. Por eso esta entrada
+no es "que se hizo el 12-nov", sino "que paso la primera vez que el servicio ejecuto una cadena de
+actos completos en produccion, y por que el hito no se habia anotado".
+
+**El hito, en corto.** El 12-nov-2026 se ejecuto el P8: la suscripcion y la contrafirma del Anexo de
+Nube v1.3 y del Anexo de Encargo 2026-11-11, con ASEPLUS CARIBE S.A.S. como empresa de prueba. El
+Acuerdo v1.6 (`08e1eb8b…f13e`) quedo publicado con vigencia del 11-nov-2026, la autorizacion
+operativa quedo registrada en el servicio (registro id 4, append-only), las 61 migraciones estan
+aplicadas y el gate `publicacion` responde **LISTO**, con 42 items, 0 bloqueantes y un solo aviso
+(`empresas_nube`, que es la compuerta del Anexo de Nube apagada). El manifiesto quedo en
+`191c08b8…f8a4013f`, byte a byte igual entre el repositorio y produccion.
+
+**Lo que el hito NO es.** ASEPLUS es una empresa **de prueba**. El P8 fue un ensayo del circuito
+completo, no la apertura: hoy no hay ninguna empresa real suscrita, y por eso el servicio no se puede
+abrir todavia.
+
+**Por que el hito no estaba anotado en la `BITACORA.md`.** La `BITACORA.md` registra lo que se
+rompio, y el P8 no rompio nada: salio bien. Pero un hito que sale bien tambien necesita quedar
+escrito, porque el dia que el servicio tenga que explicar **por que el 12-nov ya se habian
+ejecutado los cuatro actos**, la respuesta no puede estar en la cabeza de nadie.
+
+Reglas:
+
+1. **Un hito que sale bien tambien se anota.** La `BITACORA.md` no es solo el Album de los fallos: es
+   el registro de los hechos que cambian el estado del sistema.
+2. **Un hecho que vive en un solo documento se busca antes de escribirlo en otro.** El P8 ya estaba
+   en el `Historial.md`; copiarlo al registro de las reglas es lo que lo deja consultable.
+3. **En la `BITACORA.md` se anota el hito con su alcance, no con su euforia.** "Se ejecuto el P8 con
+   ASEPLUS, que es empresa de prueba" es un dato; "se abrio el servicio a empresas reales" seria una
+   mentira, y esa clase de mentira es la que el expediente no puede permitirse.
+4. **Pruebas:** el hito quedo escrito el 12-nov-2026, con el cierre de la ronda documentado en
+   `Historial.md`.
+
+
+## 🐗 El día que la regla estaba escrita en el repo y el script de producción no la cumplía (2026-11-12)
+
+La prueba de la T7 (la reversión) encontró un defecto real: el borrado **por rango** de
+`limpiar-rastro-prueba.js` borra `gh_consentimientos_firma` sin borrar antes sus filas de
+`gh_consentimientos_eventos`, y la FK de la migración 010 no deja borrar el padre antes que el
+hijo. Con un consentimiento que tenga eventos —el caso normal, porque los escribe
+`src/services/consent.js`— la reversión falla con `FOREIGN KEY constraint failed`. La transacción
+revierte, así que **no se pierde nada**, pero la reversión queda bloqueada y el operador recibe una
+traza de pila en vez de un resultado.
+
+Lo interesante no es el defecto: es que **la regla correcta ya estaba escrita en el repositorio**, en
+`tests/helpers.js`, con el motivo explícito:
+
+```js
+// FASE 3 (A1.5.4-B): gh_consentimientos_eventos debe borrarse ANTES de
+// gh_consentimientos_firma porque tiene FK a ella. Si se borrara al revés,
+// el DELETE FROM gh_consentimientos_firma fallaría con FOREIGN KEY
+// constraint failed.
+```
+
+El helper de los tests borra en el orden correcto porque **alguien se encontró el fallo una vez** y
+lo anotó. El script de producción, que hace **la misma operación** sobre la misma tabla, nunca se
+corrigió: el conocimiento estaba en el repo, pero en el archivo que solo se ejecuta cuando corren
+las pruebas.
+
+Y el detalle que lo hace másauhondeante: el modo `--solo-consentimientos` del mismo script **sí lo
+hacía bien** (borra los eventos primero, línea 810). El fallo estaba **solo** en la ruta por rango. Un
+programa con dos caminos hacia el mismo borrado, uno correcto y otro no, y **nada que lo comparara**.
+
+Reglas:
+
+1. **Un control que solo se ejecuta en las pruebas no protege la operación.** El helper de los tests
+   sabía el orden correcto; el script de producción, no. El conocimiento tiene que estar donde se
+   ejecuta, no solo donde se verifica.
+2. **Un programa con dos caminos hacia la misma operacion necesita una comparacion.** Cuando dos
+   rutas borran lo mismo, la pregunta «¿las dos respeutan el mismo orden?» tiene que responderse con
+   algo, no con la memoria.
+3. **Un defecto que se encuentra probando es un regalo; un defecto que se encuentra en produccion es
+   un incidente.** Este se encontró al probar, con la base sembrada y el rastro de prueba sin
+   importancia. En producción, con 0 eventos de consentimiento, **no se habria disparado**: era
+   latente, y dormido hasta el primer flujo de firma real.
+4. **La verificacion del defecto mira el esquema, no el dato.** Con tres consentimientos y cero
+   eventos, el defecto no se ve en los datos: se ve en `PRAGMA foreign_key_list`. La consulta que
+   lo revela es «¿qué tablas apuntan a esta?», y esa es la que hay que hacer **antes** de escribir el
+   borrado, no después de que falle.
+5. **Pruebas:** el borrado por rango borra primero los eventos y después el consentimiento, en el
+   mismo orden que ya usaba el modo `--solo-consentimientos`; el recibo dice cuántos eventos de
+   consentimiento se fueron. La corrección se midió contra el esquema real de producción, que se
+   comprobó que `gh_consentimientos_eventos` es la **única** tabla con FK hacia
+   `gh_consentimientos_firma`.
+
+## 🐗 El día que la suite estaba en verde y el documento publicaba otra cifra (2026-11-12)
+
+La última corrida de la ronda dio **2 665 tests · 2 663 pass · 0 fail · 2 skipped**, con `exit 0` y
+179 archivos de prueba. La sección 7 del runbook publicaba **2 606 / 2 604**: una cifra que un día
+fue correcta y que, leída como vigente, era un **verde falso**.
+
+Lo interesante es que la corrección no era un trámite. El requisito 6.11 del cuadro canónico decía,
+en su resumen, que la sección 7 «publica una cifra vencida», y el informe de verificación que lo
+medía repetía la misma frase: **dos documentos que se copiaban el error del otro**. Y el cuadro
+canónico se genera con un script que copia literalmente el texto del informe, así que un informe
+equivocado no produce un cuadro equivocado por azar: produce un cuadro equivocado **con la
+autorización del script**.
+
+Reglas:
+
+1. **Una cifra medida es un dato con fecha, no una constante.** El runbook publica la última
+   corrida; cada vez que la suite cambia, el runbook se actualiza en la misma ronda. La §7 pasó de
+   `2606 / 2604` a `2665 / 2663` con el dato de la corrida, no con una estimación.
+2. **Un resumen que se copia de otro documento hereda sus errores.** Cuando el texto está
+   duplicado, el error está duplicado. El resumen de la sección 6 del informe tenía dos filas
+   vencidas (6.11 y 7.13) que nadie había contrastado con el cuadro canónico, donde 7.13 ya
+   estaba **CERRADO** desde el acta de esa misma ronda.
+3. **Un resumen se regenera, no se recuerda.** La tabla del cuadro canónico la produce
+   `contar-estados-checklist.js` y falla si el documento no cuadra consigo mismo; el resumen de
+   cada informe es texto de un informe, y se contrasta contra el cuadro, no contra la memoria.
+4. **Un cambio en el origen obliga a resincronizar las copias.** El canónico es copia del adjunto 09
+   del paquete del abogado: al cambiar el 6.11, el adjunto quedó desfasado y su huella en
+   `SHA256SUMS.txt` dejó de cuadrar. Se resincronizó el adjunto (copia byte a byte), se regeneró el
+   manifiesto desde los archivos reales y `verificar-sumas-paquete-abogado.js` dio **14/14**.
+5. **Pruebas:** `node scripts/actualizar-cuadro-canonico-2026-11-12.js --escribir` (idempotente:
+   la segunda corrida no escribió nada) y `node scripts/contar-estados-checklist.js --escribir`
+   (**76 cerrados / 20 pendientes / 0 no aplica, 96 en total**). Suite completa del firma-service:
+   **2 665 tests · 2 663 pass · 0 fail · 2 skipped** (Node 22.23.4, ABI 127, 317 s).
+

@@ -53,18 +53,18 @@ quince correcciones», más abajo.
 
 | Sección | Cerrados | Pendientes | No aplica | Total |
 |---|---|---|---|---|
-| 1. Integridad documental | 6 | 3 | 0 | 9 |
-| 2. Decisiones de contenido y datos | 5 | 7 | 0 | 12 |
+| 1. Integridad documental | 7 | 2 | 0 | 9 |
+| 2. Decisiones de contenido y datos | 9 | 3 | 0 | 12 |
 | 3. Conservación y supresión | 11 | 2 | 0 | 13 |
 | 4. Seguridad del flujo | 14 | 0 | 0 | 14 |
-| 5. Correo electrónico | 8 | 3 | 0 | 11 |
+| 5. Correo electrónico | 9 | 2 | 0 | 11 |
 | 6. Correspondencia y pruebas | 11 | 1 | 0 | 12 |
-| 7. Producción y despliegue | 3 | 12 | 0 | 15 |
-| 8. Constancia y cierre | 4 | 6 | 0 | 10 |
-| **TOTAL** | **62** | **34** | **0** | **96** |
+| 7. Producción y despliegue | 8 | 7 | 0 | 15 |
+| 8. Constancia y cierre | 7 | 3 | 0 | 10 |
+| **TOTAL** | **76** | **20** | **0** | **96** |
 
-Los 34 pendientes concilian: 3 de la sección 1 + 7 de la sección 2 + 2 de la sección 3 +
-3 de la sección 5 + 1 de la sección 6 + 12 de la sección 7 + 6 de la sección 8 = 34.
+Los 20 pendientes concilian: 2 de la sección 1 + 3 de la sección 2 + 2 de la sección 3 +
+2 de la sección 5 + 1 de la sección 6 + 7 de la sección 7 + 3 de la sección 8 = 20.
 
 La sección 3 incluye la reverificación del cómputo SG-SST; la sección 7 debe identificar un
 commit exacto antes de desplegar.
@@ -263,6 +263,60 @@ pendiente está en el §8 y en las fases siguientes del plan del abogado.
 
 ---
 
+## Quinta revision: la medicion del 12-nov-2026 (34 requisitos)
+
+Esta ronda **midio** los requisitos del cuadro contra el codigo y contra el servidor de
+produccion, y escribio el resultado en los informes de `verificacion-cierre/`. Este
+cuadro se pone al dia con esa medicion: la palabra de estado de cada requisito medido
+es la de hoy, y su cuerpo es el texto del informe, sin reescribirlo.
+
+**Lo que NO se hizo.** Los requisitos que nadie midio **no se tocaron**: siguen con el
+estado de la ronda del 30-oct-2026. La tabla resumen se regenera desde el conteo real
+(`firma-service/scripts/contar-estados-checklist.js`), no a mano.
+
+**Que pasa con el texto anterior.** El cuerpo de cada requisito medido **reemplaza** la
+respuesta de la ronda del 30-oct-2026: este cuadro es un documento vivo y su respuesta es
+la de hoy. Lo que decia antes no se borro de la memoria del proyecto: esta en el
+historial de git, y las correcciones de cada ronda estan al principio del documento
+(segunda, tercera, cuarta y esta quinta revision).
+
+| # | Que se cambio | Donde |
+|---|---|---|
+| **F-1** | 1.2 Resolver la discrepancia entre la copia recibida y el manifiesto anterior: estado **PENDIENTE** -> **PENDIENTE**, con la medicion del 12-nov-2026 | Este cuadro, 1.2 (evidencia en `verificacion-cierre/secciones-1-2.md`) |
+| **F-2** | 1.7 Identificar la version y documentar la decision del owner: estado **PENDIENTE** -> **CERRADO**, con la medicion del 12-nov-2026 | Este cuadro, 1.7 (evidencia en `verificacion-cierre/secciones-1-2.md`) |
+| **F-3** | 1.9 Confirmar que no quedan marcadores de borrador, campos juridicos sin resolver ni textos contradictorios: estado **PENDIENTE** -> **PARCIALMENTE**, con la medicion del 12-nov-2026 | Este cuadro, 1.9 (evidencia en `verificacion-cierre/secciones-1-2.md`) |
+| **F-4** | 2.1 El owner decide si adopta el Acuerdo v1.4: estado **PENDIENTE** -> **CERRADO**, con la medicion del 12-nov-2026 | Este cuadro, 2.1 (evidencia en `verificacion-cierre/secciones-1-2.md`) |
+| **F-5** | 2.2 El owner decide si adopta el Anexo de Encargo: estado **PENDIENTE** -> **CERRADO**, con la medicion del 12-nov-2026 | Este cuadro, 2.2 (evidencia en `verificacion-cierre/secciones-1-2.md`) |
+| **F-6** | 2.3 El owner decide si adopta el Anexo de Nube: estado **PENDIENTE** -> **CERRADO**, con la medicion del 12-nov-2026 | Este cuadro, 2.3 (evidencia en `verificacion-cierre/secciones-1-2.md`) |
+| **F-7** | 2.5 El owner decide sobre el tratamiento y las finalidades del numeral 10.3: estado **PENDIENTE** -> **CERRADO**, con la medicion del 12-nov-2026 | Este cuadro, 2.5 (evidencia en `verificacion-cierre/secciones-1-2.md`) |
+| **F-8** | 2.7 Se documenta la decision sobre Google LLC y la cuenta Gmail de consumo: estado **PENDIENTE** -> **PARCIALMENTE**, con la medicion del 12-nov-2026 | Este cuadro, 2.7 (evidencia en `verificacion-cierre/secciones-1-2.md`) |
+| **F-9** | 2.8 Se verifica el alcance de la Circular Externa 002 de 2025 y la conclusion sobre transferencias internacionales: estado **PENDIENTE** -> **PARCIALMENTE**, con la medicion del 12-nov-2026 | Este cuadro, 2.8 (evidencia en `verificacion-cierre/secciones-1-2.md`) |
+| **F-10** | 2.9 Se determina la obligacion de inscripcion en el RNBD o la excepcion aplicable: estado **PENDIENTE** -> **PENDIENTE**, con la medicion del 12-nov-2026 | Este cuadro, 2.9 (evidencia en `verificacion-cierre/secciones-1-2.md`) |
+| **F-11** | 3.1 Se valida jurídicamente la tabla supletoria de conservación: estado **PENDIENTE** -> **PENDIENTE**, con la medicion del 12-nov-2026 | Este cuadro, 3.1 (evidencia en `verificacion-cierre/secciones-3-5.md`) |
+| **F-12** | 3.2 Se aprueban o modifican los plazos generales de 10 y 5 años: estado **PENDIENTE** -> **PARCIALMENTE**, con la medicion del 12-nov-2026 | Este cuadro, 3.2 (evidencia en `verificacion-cierre/secciones-3-5.md`) |
+| **F-13** | 5.1 Se identifica la cuenta remitente real: estado **PENDIENTE** -> **CERRADO**, con la medicion del 12-nov-2026 | Este cuadro, 5.1 (evidencia en `verificacion-cierre/secciones-3-5.md`) |
+| **F-14** | 5.5 Se acredita la activación de MFA: estado **PENDIENTE** -> **PENDIENTE**, con la medicion del 12-nov-2026 | Este cuadro, 5.5 (evidencia en `verificacion-cierre/secciones-3-5.md`) |
+| **F-15** | 5.6 Se acredita el uso de contraseña de aplicación, sin incorporarla a los documentos ni al repositorio: estado **PENDIENTE** -> **PARCIALMENTE**, con la medicion del 12-nov-2026 | Este cuadro, 5.6 (evidencia en `verificacion-cierre/secciones-3-5.md`) |
+| **F-16** | 6.11 Ejecutar la bateria completa de pruebas del servicio: estado **PARCIALMENTE** -> **PARCIALMENTE**, con la medicion del 12-nov-2026 | Este cuadro, 6.11 (evidencia en `verificacion-cierre/secciones-6-7.md`) |
+| **F-17** | 7.1 Confirmar la version exacta del codigo que se va a desplegar: estado **PENDIENTE** -> **PARCIALMENTE**, con la medicion del 12-nov-2026 | Este cuadro, 7.1 (evidencia en `verificacion-cierre/secciones-6-7.md`) |
+| **F-18** | 7.3 Ejecutar las migraciones de base de datos necesarias: estado **PENDIENTE** -> **CERRADO**, con la medicion del 12-nov-2026 | Este cuadro, 7.3 (evidencia en `verificacion-cierre/secciones-6-7.md`) |
+| **F-19** | 7.4 Comprobar que las migraciones se aplicaron correctamente: estado **PENDIENTE** -> **CERRADO**, con la medicion del 12-nov-2026 | Este cuadro, 7.4 (evidencia en `verificacion-cierre/secciones-6-7.md`) |
+| **F-20** | 7.5 Verificar el estado de la base de datos y sus respaldos: estado **PENDIENTE** -> **PENDIENTE**, con la medicion del 12-nov-2026 | Este cuadro, 7.5 (evidencia en `verificacion-cierre/secciones-6-7.md`) |
+| **F-21** | 7.6 Comprobar los permisos de archivos y directorios: estado **PENDIENTE** -> **PENDIENTE**, con la medicion del 12-nov-2026 | Este cuadro, 7.6 (evidencia en `verificacion-cierre/secciones-6-7.md`) |
+| **F-22** | 7.7 Comprobar la configuracion de seguridad del servicio: estado **PENDIENTE** -> **PENDIENTE**, con la medicion del 12-nov-2026 | Este cuadro, 7.7 (evidencia en `verificacion-cierre/secciones-6-7.md`) |
+| **F-23** | 7.8 Verificar que no haya credenciales expuestas: estado **PENDIENTE** -> **CERRADO**, con la medicion del 12-nov-2026 | Este cuadro, 7.8 (evidencia en `verificacion-cierre/secciones-6-7.md`) |
+| **F-24** | 7.9 Verificar los registros y mecanismos de auditoria: estado **PENDIENTE** -> **CERRADO**, con la medicion del 12-nov-2026 | Este cuadro, 7.9 (evidencia en `verificacion-cierre/secciones-6-7.md`) |
+| **F-25** | 7.11 Ejecutar pruebas controladas de extremo a extremo: estado **PENDIENTE** -> **PENDIENTE**, con la medicion del 12-nov-2026 | Este cuadro, 7.11 (evidencia en `verificacion-cierre/secciones-6-7.md`) |
+| **F-26** | 7.12 Verificar la version y las migraciones en el servidor real: estado **PENDIENTE** -> **PARCIALMENTE**, con la medicion del 12-nov-2026 | Este cuadro, 7.12 (evidencia en `verificacion-cierre/secciones-6-7.md`) |
+| **F-27** | 7.13 Registrar el resultado de la comprobacion del servidor: estado **PENDIENTE** -> **CERRADO**, con la medicion del 12-nov-2026 | Este cuadro, 7.13 (evidencia en `verificacion-cierre/secciones-6-7.md`) |
+| **F-28** | 7.15 Autorizar expresamente la activacion del flujo: estado **PENDIENTE** -> **PENDIENTE**, con la medicion del 12-nov-2026 | Este cuadro, 7.15 (evidencia en `verificacion-cierre/secciones-6-7.md`) |
+| **F-29** | 8.1 El owner registra sus decisiones sobre el contenido: estado **PENDIENTE** -> **CERRADO**, con la medicion del 12-nov-2026 | Este cuadro, 8.1 (evidencia en `verificacion-cierre/seccion-8.md`) |
+| **F-30** | 8.3 El owner define fecha de vigencia y alcance de uso: estado **PENDIENTE** -> **CERRADO**, con la medicion del 12-nov-2026 | Este cuadro, 8.3 (evidencia en `verificacion-cierre/seccion-8.md`) |
+| **F-31** | 8.5 Se completan las verificaciones técnicas de publicación: estado **PENDIENTE** -> **PARCIALMENTE**, con la medicion del 12-nov-2026 | Este cuadro, 8.5 (evidencia en `verificacion-cierre/seccion-8.md`) |
+| **F-32** | 8.6 El representante legal firma la autorización operativa: estado **PENDIENTE** -> **PARCIALMENTE**, con la medicion del 12-nov-2026 | Este cuadro, 8.6 (evidencia en `verificacion-cierre/seccion-8.md`) |
+| **F-33** | 8.8 Se registra quién autorizó, cuándo y bajo qué resultados de pruebas: estado **PENDIENTE** -> **PARCIALMENTE**, con la medicion del 12-nov-2026 | Este cuadro, 8.8 (evidencia en `verificacion-cierre/seccion-8.md`) |
+| **F-34** | 8.10 Se actualiza la documentación del proyecto y el registro de cierre: estado **PARCIALMENTE** -> **CERRADO**, con la medicion del 12-nov-2026 | Este cuadro, 8.10 (evidencia en `verificacion-cierre/seccion-8.md`) |
+
 ## 1. Integridad y control documental (9 requisitos)
 
 **1.1 · Identificar el archivo definitivo del Acuerdo de uso — CERRADO.**
@@ -276,26 +330,32 @@ ni se ha publicado**: véase la sección E del checklist y la compuerta del mani
 Está en el árbol de trabajo, sin commitear; el commit candidato se elige en 7.1. La v1.3
 queda como histórico (ver 1.8).
 
-**1.2 · Resolver la discrepancia entre la copia recibida y el manifiesto anterior — PENDIENTE
-(falta el tamaño y hash de la copia que conserva el owner).**
-El paquete actual se reconstruyó desde las fuentes del repositorio y sus archivos se
-verificaron. La discrepancia de la copia recibida en la ronda anterior no puede atribuirse a
-una conversión sin medir esa copia. Para esta v1.3, el archivo adjunto mide **71 555 bytes**;
-si se convierte a CRLF, el aumento será de un byte por cada salto de línea (577 bytes):
+**1.2 · Resolver la discrepancia entre la copia recibida y el manifiesto anterior — PENDIENTE.**
 
-- Si tu copia mide **72 132 bytes**, podría ser la conversión a CRLF.
-- Si tu copia mide **57 187 bytes**, es el Acuerdo **v1.1** de la ronda del 27 de octubre, no
-  la v1.3.
-- Si tu copia mide **69 748 bytes**, es la **v1.2**.
-- Si tu copia mide **73 208 bytes**, es el **v1.4**, que es el texto definitivo de hoy.
+**Medicion del 12-nov-2026** (informe `verificacion-cierre/secciones-1-2.md`). Se contrasta el requisito contra el codigo y contra el servidor; lo que sigue es la medicion y su evidencia.
 
-El valor del **v1.3, que queda como histórico**, es **71 555 bytes** y
-`49eab0c5f3f0fa7e637843c50988b0f91867fe74ff31222cf8c327beabf4de12`; el del texto definitivo
-(v1.4) es **73 208 bytes** y `7298a943…c585490f`. Envíame el tamaño y el
-SHA-256 de tu copia y en un solo paso confirmo cuál de los cuatro casos es. Si prefieres
-resolverlo sin depender de mí, la forma segura de recibirlo es por Drive (descarga directa
-del archivo) y no por el cuerpo de un correo ni por WhatsApp, porque esos canales son los
-que convierten el fin de línea.
+**Que se verifico.** Se busco en todo el expediente de la firma cualquier registro de la medicion de
+la copia fisica del Acuerdo que el owner recibio en la ronda del 30-oct (tamano en bytes y SHA-256).
+Se comparo con el texto vigente de hoy.
+
+**Evidencia.** `sgsst-electron-app/docs/gestion-humana/firma-electronica/respuesta-checklist-cierre-2026-10-30.md:279-298`
+— el requisito ofrece cuatro casos (71 555 B = v1.3, 72 132 B = conversion a CRLF, 57 187 B = v1.1,
+69 748 B = v1.2, 73 208 B = v1.4) y pide al owner el tamano y el hash de su copia. Una busqueda de
+`copia recibida|72 132|57 187|69 748|discrepancia entre la copia` en
+`sgsst-electron-app/docs/gestion-humana/firma-electronica/` **solo devuelve el propio cuadro y su
+copia en el paquete (`paquete-abogado-2026-10-30/09-respuesta-al-checklist-de-cierre.md:279`)**: no
+hay ninguna medicion registrada. El texto vigente de hoy es otro:
+`sgsst-electron-app/firma-service/scripts/fixtures/acuerdo-v1.6.txt` (75 961 B, SHA-256
+`08e1eb8b09449fbc57eebdda89518482b0063285d2f0f56ed335d2977532f13e`), de modo que **ninguna de las
+cuatro cifras del cuadro corresponde hoy al texto vigente**.
+
+**Que falta.** Que el owner mida la copia que tiene en la mano y mande **bytes + SHA-256**; con eso
+la pregunta se cierra en un paso. Sin esa medicion, la discrepancia de aquella ronda no queda
+explicada en el expediente. Opcionalmente conviene registrar que el caso ya es historico: el
+Acuerdo vigente es la v1.6 y el manifiesto declara esa huella
+(`sgsst-electron-app/firma-service/legal-readiness.json:7-10`).
+
+**Quien lo tiene.** Owner (medir y enviar la cifra). No requiere codigo.
 
 **1.3 · Calcular y verificar SHA-256 del Acuerdo definitivo — CERRADO.**
 `7298a9435b94c6c6f4f4365c3818fa7e8825524c2ebd524d380c10c2c585490f` (73 208 B, fin de línea
@@ -362,13 +422,37 @@ Las huellas que viajan en el paquete, todas verificadas contra el manifiesto:
 
 El paquete no se publica ni se firma: armar el paquete no es aprobar nada.
 
-**1.7 · Identificar la versión y documentar la decisión del owner — PENDIENTE.**
-A4 es una constancia interna de versión y autorización de publicación, no una aprobación
-jurídica. Su modelo identifica el documento y reserva al representante legal el registro de
-la decisión operativa cuando las verificaciones estén completas. Los campos siguen vacíos;
-no se afirma que la publicación esté autorizada ni que el contenido haya recibido aprobación
-profesional. El owner registrará las decisiones J1-J14 en la sección E del checklist y firmará
-A4 solo si y cuando decida autorizar la publicación, con versión, huella, evidencia y fecha.
+**1.7 · Identificar la version y documentar la decision del owner — CERRADO.**
+
+**Medicion del 12-nov-2026** (informe `verificacion-cierre/secciones-1-2.md`). Se contrasta el requisito contra el codigo y contra el servidor; lo que sigue es la medicion y su evidencia.
+
+*Cambio de estado: en la ronda del 30-oct-2026 figuraba como PENDIENTE.*
+
+**Que se verifico.** La identificacion de la version (que texto se somete y con que huella) y el
+registro de la decision del owner (acta interna, Constancia de version y autorizacion, y el registro
+append-only de aprobaciones de publicacion en la base de produccion).
+
+**Evidencia.**
+- `sgsst-electron-app/legal/constancia-aprobacion-acuerdo.html:59-76` — la Constancia identifica la
+  **v1.6**, su SHA-256 `08e1eb8b...`, el responsable del registro (Javier Robles Fontalvo,
+  Representante Legal de Gesstiar S.A.S.) y la fecha **2026-11-11**.
+- `sgsst-electron-app/firma-service/legal-readiness.json:15-18` — bloque `constancia`: v1.6, huella
+  `aaf68b4e...`, `estado: "no_firmada"`.
+- `sgsst-electron-app/docs/gestion-humana/firma-electronica/paquete-abogado-2026-10-30/11-checklist-definitivo-revision-juridica-y-cierre.md:103`
+  (fila **J1**: «RESUELTO, con cambio de version») y `:115` (fila **J13**: «RESUELTO»).
+- Medicion SSH del 12-nov-2026 (13:34 h. Colombia), tabla `gh_firma_aprobaciones_publicacion`:
+  **4 filas**, y la id 4 es `v1.6` / `08e1eb8b...` / tipo `OPERATIVA` / «Javier Robles Fontalvo,
+  owner de K+AIR» / fecha `2026-11-11`. La tabla es **append-only** (disparadores `no_update` y
+  `no_delete` en el esquema), o sea el registro no se puede reescribir.
+
+**Que falta.** Nada: queda cerrado. Dos precisiones para que no se lea mal: (a) las secciones 5 y 6
+de la Constancia **siguen vacias por diseno** — la autorizacion operativa vive en
+`gh_firma_aprobaciones_publicacion`, no en el documento (misma practica que la Constancia de la
+v1.4); (b) esto **no es** aprobacion juridica del abogado: el expediente lo dice de forma expresa en
+la Constancia y en el propio encabezado del acta (`:99`).
+
+**Quien lo tiene.** Nadie (cierre del owner). Lo que sigue abierto en el expediente es la ratificacion
+externa del abogado, que ya no es de este requisito.
 
 **1.8 · Conservar las versiones anteriores como histórico, sin sobrescribir la constancia de
 la v1.1 — CERRADO.**
@@ -393,76 +477,150 @@ la v1.1 — CERRADO.**
 - El historial completo queda en git: 12 commits tocan `scripts/fixtures/`, desde `1ea32dba`
   (905) hasta `aa568023` (990).
 
-**1.9 · Confirmar que no quedan marcadores de borrador, campos jurídicos sin resolver ni
-textos contradictorios — PENDIENTE (parcial).**
-- **Acuerdo v1.4: sin marcadores.** Se buscó TODO, TBD, XXX, FIXME, `[ ]`, `<<`, `>>`,
-  PLACEHOLDER, `[fecha]`, `[nombre]`, `[...]`. Salieron **2** coincidencias de «TODO» (las
-  dos dentro de «MÉTODO DE FIRMA ELECTRÓNICA PACTADO», que es la palabra legal), **7** de
-  «pendiente» y **cero** de todo lo demás, y **se revisaron una por una**: todas son
-  palabras del texto legal, no marcadores («todos los documentos que una Empresa envíe…»,
-  «todo momento y sin costo alguno», «solicitud de copia pendiente», «hold vigente», «queda
-  pendiente de informar y validar»). Cero marcadores reales.
-- **Anexo de Encargo: sin marcadores.** Los **cero** `[PENDIENTE: …]` y las cinco filas con
-  «Base jurídica propia de la Empresa: No declarada…» que quedaban en la ronda anterior
-  están resueltos: las bases literales de J4 para 10.3(a), (b), (c) y (e) están escritas en
-  la columna «Base jurídica declarada» y el «Estado de habilitación» de esas cuatro filas
-  dice «Habilitada para la Empresa que haya suscrito el presente Anexo de Encargo y el
-  Anexo de Nube, inscrito su tabla de retención documental y designado su canal de
-  atención».
-- **Anexo de Nube: los catorce (14) marcadores diligenciables quedaron diligenciados el
-  31-oct-2026**, más una mención literal del marcador en el texto del §5, que no es un campo. El
-  propio Anexo lo dice: «Este Anexo no se firma con marcadores [PENDIENTE] pendientes». **Inventario
-  exacto, con dónde se comprueba y qué evidencia deja:**
-  - **§4, tabla del RNBD (4).** (1) naturaleza jurídica de Gesstiar S.A.S. y si es sujeto de la
-    Ley 1581 → certificado de existencia y representación de la Cámara de Comercio de Barranquilla;
-    (2) activos totales a la fecha de corte → estados financieros y balance con sus notas; (3) si
-    existe obligación de inscripción, incluida la de la base del servicio de firma → aplicación de
-    la normatividad vigente de la SIC a los puntos 1 y 2; (4) estado del registro en el RNBD y si
-    la declaración de la transferencia internacional ya está presentada y con qué causal → consulta
-    del portal de la SIC.
-  - **§5, ficha técnica del canal (10 campos y una mención).** Servidor SMTP efectivamente
-    desplegado y evidencia de que la conexión sale cifrada; remitente efectivo y su evidencia;
-    contraseña de aplicación: cuándo se generó; procedimiento y fecha de rotación; MFA
-    (verificación en dos pasos); plantilla del correo OTP; contenido mínimo: la regla escrita y su
-    evidencia; registro de errores y de envíos; escalamiento del canal, con responsables y
-    evidencia; y última revocación de credenciales, con su evidencia. (La mención literal restante
-    es la frase que explica el formato de la ficha, no un campo.)
-  - **Ninguno de ellos era un hueco de texto:** eran los catorce datos que solo el owner podía dar
-    con el servidor y la cuenta a la vista. **Ya están: el Anexo de Nube no tiene ni un marcador
-    sin diligenciar.** Lo que sigue abierto es otra cosa —cuatro decisiones del propietario, el
-    cifrado en reposo del disco y la validación del abogado—, y sin copia firmada el la compuerta C-1 está apagada hoy; el bloqueo se aplicará al activarla. Aprobar el modelo **no es** poder
-    firmar el Anexo de una Empresa.
-- **Textos contradictorios: la contradicción que el abogado señaló está del todo resuelta.** Ya no
-  conviven un capítulo que da por decidida la clasificación del canal y otro que la deja
-  pendiente: los cuatro documentos llevan la misma determinación (A1 §10.5(f), A2 §4, §5 y
-  §8, A3 §4), con la advertencia de que no hay DPA empresarial y de que el Encargado no
-  tiene facultades de supresión sobre las copias del proveedor. **En esta ronda se corrigieron
-  además los cinco pasajes que seguían diciendo «requiere validación profesional escrita» al
-  lado de esa determinación (2.7).** La correspondencia texto ↔ código (sección 6) recorre los
-  26 compromisos del Acuerdo contra el código y no encuentra ni una sola promesa sin respaldo.
+**1.9 · Confirmar que no quedan marcadores de borrador, campos juridicos sin resolver ni textos contradictorios — PARCIALMENTE.**
 
----
+**Medicion del 12-nov-2026** (informe `verificacion-cierre/secciones-1-2.md`). Se contrasta el requisito contra el codigo y contra el servidor; lo que sigue es la medicion y su evidencia.
+
+*Cambio de estado: en la ronda del 30-oct-2026 figuraba como PENDIENTE.*
+
+**Que se verifico.** Barrido de marcadores (TODO, TBD, FIXME, XXX, PLACEHOLDER, `[PENDIENTE]`,
+`[nombre`, `[fecha`, `[...]`) sobre los cuatro textos que hoy gobiernan la relacion; lectura de los
+bloques de pendientes de los dos anexos vigentes; y contraste de cada afirmacion de estado del texto
+contra la base de produccion y el manifiesto.
+
+**Evidencia.**
+- Barrido de hoy sobre los cuatro archivos: **cero marcadores de borrador**. Los unicos aciertos del
+  filtro fueron la palabra legal «todo/todos» y la palabra «M&Eacute;TODO DE FIRMA ELECTR&Oacute;NICA
+  PACTADO» (Acuerdo v1.6, lineas 75 y 77). La Constancia v1.6 no tiene ni una coincidencia.
+- `sgsst-electron-app/legal/anexo-nube-v1.3.html:133-136` — los tres campos `[nombre de la Empresa]`,
+  `[NIT de la Empresa]`, `[representante legal de la Empresa]` son **de diligenciamiento por cada
+  Empresa** en la copia que firma (el propio texto lo dice), no marcadores sin resolver.
+- **Pero hay afirmaciones del texto vigente que hoy son falsas.** `anexo-nube-v1.3.html:809` («su
+  suscripcion por ASEPLUS CARIBE S.A.S. es un acto pendiente del owner (P8)») y `:844-846` («Los dos
+  actos de esta version 1.3 estan pendientes»); `sgsst-electron-app/legal/anexo-encargo.html:535-536`
+  (paso «(ix) la suscripcion de esta version 2026-11-11 ... y su contrafirma») y `:572-574` («esa
+  version 1.3 no esta todavia suscrito ni contrafirmado»). La base dice lo contrario: suscripcion
+  Nube v1.3 FIRMADA el `2026-11-12T15:38:27.990Z` y contrafirmada el `16:13:54.106Z`; Encargo
+  2026-11-11 FIRMADA el `15:40:06.992Z` y contrafirmado el `16:14:31.105Z` (medicion SSH del 12-nov).
+- **Y el Anexo de Nube se contradice consigo mismo:** su lead-in de la ficha tecnica
+  (`anexo-nube-v1.3.html:565-568`) dice que «los apartados que dependen del estado de la cuenta de
+  Google Workspace y de la credencial del servidor ya estan verificados (P2 y P5, cerrados el 10 de
+  noviembre de 2026)» y que «los que siguen pendientes se declaran como tales (P6)», pero las filas
+  de esa misma ficha dicen «El metodo de autenticacion esta pendiente de decision y de verificacion
+  por el owner (P2)» (`:617-618`) y «Estado de la verificacion en dos pasos de la cuenta de correo de
+  salida: pendiente de verificacion por el owner (P2) ... no esta verificado» (`:636-640`).
+- Documental divergente en el expediente:
+  `sgsst-electron-app/docs/gestion-humana/firma-electronica/tabla-instrumentos-vigentes-2026-11-09.md:28`
+  y `:32` siguen diciendo «**NO suscrito**» para el Anexo de Nube v1.3 y el Anexo de Encargo
+  2026-11-11, mientras la fila P8 de esa misma tabla (corregida en el commit `91214c55`) y la base
+  dicen que los dos quedaron suscritos y contrafirmados el 12-nov.
+
+**Que falta.** (1) Una **version nueva** de los dos anexos que corrija las afirmaciones caducadas
+(«los dos actos estan pendientes», «P2 pendiente de verificacion»): la v1.4 del Anexo de Nube y una
+version nueva del Anexo de Encargo. **Un texto ya suscrito no se toca** (regla que el propio
+proyecto aplico el 11-nov con la errata: el control de alteracion es posterior a la firma, D. 1074
+art. 2.2.2.47.4 num. 2), asi que la via correcta es version nueva con huella propia y firma de
+nuevo. (2) Corregir las filas §1 de `tabla-instrumentos-vigentes-2026-11-09.md`, que hoy contradicen
+la base. (3) No queda ningun marcador de borrador ni campo juridico sin resolver de fondo: lo que
+queda son afirmaciones de estado que quedaron viejas.
+
+**Quien lo tiene.** Equipo (los scripts que generan los textos:
+`scripts/corregir-anexo-nube-v1.3.js` y `scripts/corregir-anexo-encargo-2026-11-11.js` son los
+duenos del texto) y owner (autorizar la version nueva y volver a suscribir/contrafirmar).
 
 ## 2. Decisiones de contenido y protección de datos (12 requisitos)
 
-**2.1 · El owner decide si adopta el Acuerdo v1.4 — PENDIENTE.** La revisión del
-30-oct-2026 aportó recomendaciones y correcciones C-1, C-2 y C-3, aplicadas en la v1.4
-(`7298a943…c585490f`). El representante legal documenta en la sección E si adopta el texto,
-lo condiciona o lo mantiene pendiente. A4 no registra una aprobación jurídica.
+**2.1 · El owner decide si adopta el Acuerdo v1.4 — CERRADO.**
 
-**2.2 · El owner decide si adopta el Anexo de Encargo — PENDIENTE.** Revisado y corregido
-en esta ronda: el Anexo lleva las bases literales de J4
-para 10.3(a), (b), (c) y (e), el estado «Habilitada» condicionado, el deber de la Empresa
-de comunicar la fecha de cese, la determinación de J6 y la supresión de la mención al
-calendario de Google (J5). Huella actual: `02651747…30d0f7`. Falta la decisión expresa del
-owner sobre su uso y la suscripción entre las partes antes de tratar datos por cuenta de una Empresa.
+**Medicion del 12-nov-2026** (informe `verificacion-cierre/secciones-1-2.md`). Se contrasta el requisito contra el codigo y contra el servidor; lo que sigue es la medicion y su evidencia.
 
-**2.3 · El owner decide si adopta el Anexo de Nube — PENDIENTE.** Revisado y corregido
-en esta ronda: §6 trae el texto literal de D2, §4 la
-ficha de Google conforme a J6, §11 la cita corregida de la Circular 001 de 2026, §1 la
-prevalencia en conservación, §8 la auditoría condicionada a la disponibilidad de Cloudflare
-y §10 la advertencia de no firmarlo con marcadores. Huella actual: `aec7c401…83214ca`.
-Falta la decisión expresa del owner y la suscripción por las partes antes del tratamiento cubierto.
+*Cambio de estado: en la ronda del 30-oct-2026 figuraba como PENDIENTE.*
+
+**Que se verifico.** Si la version que hoy esta aprobada es la que el cuadro evaluo, si quedo
+publicada y si existe la autorizacion operativa que la exige la compuerta.
+
+**Evidencia.**
+- La v1.4 quedo **historica**: la version vigente es la **v1.6** (`sgsst-electron-app/firma-service/
+  legal-readiness.json:7-10`; `scripts/fixtures/acuerdo-v1.6.txt`, 75 961 B, `08e1eb8b...`), publicada
+  el 11-nov-2026 con `publicado: true`.
+- `paquete-abogado-2026-10-30/11-checklist-definitivo-revision-juridica-y-cierre.md:103` — fila **J1**:
+  el owner aprueba la v1.6 y deja la v1.3, la v1.4 y la v1.5 como historico sin publicar.
+- Medicion SSH del 12-nov-2026 (13:34 h. Colombia), tabla `gh_firma_acuerdo_versiones`:
+  `v1.6` = **activa** (hash `08e1eb8b...`, `fecha_vigencia_inicio` `2026-11-11T19:51:42.036Z`,
+  `creado_por` «Javier Robles Fontalvo, owner de K+AIR»); `v1.5`, `v1.4` y `v1.0` = inactivas. En
+  `gh_firma_aprobaciones_publicacion`, la id 4 es la autorizacion operativa de la v1.6 (11-nov-2026).
+- Gate `publicacion` medido hoy: **`listo: true`**, 42 items, 40 `ok`, **0 bloqueantes pendientes**,
+  1 `aviso` (`empresas_nube`), 1 `no_aplica` (`google_dpa`).
+
+**Que falta.** Nada: queda cerrado. La adopcion esta hecha, publicada y con su autorizacion operativa
+registrada (que es lo que el sistema exige para activar una version).
+
+**Quien lo tiene.** Nadie.
+
+**2.2 · El owner decide si adopta el Anexo de Encargo — CERRADO.**
+
+**Medicion del 12-nov-2026** (informe `verificacion-cierre/secciones-1-2.md`). Se contrasta el requisito contra el codigo y contra el servidor; lo que sigue es la medicion y su evidencia.
+
+*Cambio de estado: en la ronda del 30-oct-2026 figuraba como PENDIENTE.*
+
+**Que se verifico.** Si existe la decision del owner, y si el instrumento quedo adoptado de verdad:
+suscrito por la Empresa y contrafirmado por K+AIR, sobre el texto vigente.
+
+**Evidencia.**
+- `sgsst-electron-app/firma-service/legal-readiness.json:115-116` — `anexo_encargo.estado:
+  "firmado"`, `fecha: "2026-11-12T16:14:31.105Z"`; `:128-129` — `version: "2026-11-11"`, hash
+  `6308b1f7a51007cb1e973de0210d1e5659d3b3ceb8e3e3b7a3ee52a7275b8948`.
+- Medicion SSH del 12-nov-2026: `gh_firma_anexo_encargo_suscripciones` **id 2** = `900829731`,
+  version `2026-11-11`, hash `6308b1f7...` (identico al hash del archivo medido hoy),
+  `estado FIRMADA`, `firmado_at 2026-11-12T15:40:06.992Z`, `contrafirmado_at
+  2026-11-12T16:14:31.105Z`; ficha de la empresa `anexo_encargo_firmado_at = 2026-11-12T16:14:31.105Z`.
+  La suscripcion vieja (id 1, version 2026-11-06) queda **intacta**, como exige el expediente.
+- `paquete-abogado-2026-10-30/11-checklist-definitivo-revision-juridica-y-cierre.md:114` — fila
+  **J12** con las tres versiones y la ejecucion del 12-nov.
+- La suscripcion y la contrafirma son exigidas por el codigo antes de pedir firmas:
+  `sgsst-electron-app/firma-service/src/services/empresa.js:1578` (exige `anexo_encargo_firmado_at`).
+
+**Que falta.** Nada para el requisito: la adopcion del texto y su ejecucion estan hechas. Lo que
+queda abierto no es de este requisito, sino el alta de **cada nueva Empresa**: sin su Anexo de
+Encargo suscrito y contrafirmado, el codigo no le habilita pedir firmas
+(`empresa.js:1578`, `:1613`), y ademas su canal de atencion (`canal_pqrs`) y su tabla de retencion
+documental (que el codigo **no** puede verificar: es un documento que entrega la Empresa).
+
+**Quien lo tiene.** Nadie para el requisito; para el onboarding de cada Empresa, la Empresa misma
+(por la via publica del servicio) y K+AIR (la contrafirma).
+
+**2.3 · El owner decide si adopta el Anexo de Nube — CERRADO.**
+
+**Medicion del 12-nov-2026** (informe `verificacion-cierre/secciones-1-2.md`). Se contrasta el requisito contra el codigo y contra el servidor; lo que sigue es la medicion y su evidencia.
+
+*Cambio de estado: en la ronda del 30-oct-2026 figuraba como PENDIENTE.*
+
+**Que se verifico.** Lo mismo que en 2.2, para el Anexo de Nube: decision, suscripcion y
+contrafirma sobre el texto vigente (v1.3).
+
+**Evidencia.**
+- `sgsst-electron-app/firma-service/legal-readiness.json:142-147` — `firmado: true`, `fecha:
+  "2026-11-12T15:38:27.990Z"`, `version: "1.3"`, hash `fdd10551c2106e186d62a2b70922530ff9494a8538fc67816f6f5ad5ca2b585d`,
+  `contrafirmado: true`; `:171-175` — la v1.1 suscrita el 5-nov queda como historica, sin contrafirma.
+- Medicion SSH del 12-nov-2026: `gh_firma_anexo_nube_suscripciones` **id 2** = version `1.3`, hash
+  `fdd10551...` (identico al del archivo medido hoy), `FIRMADA` el `2026-11-12T15:38:27.990Z`,
+  contrafirmada el `16:13:54.106Z`, con acta `050f223a3665cf7d...`; ficha de la empresa
+  `anexo_nube_ejecutado_at = 2026-11-12T16:13:54.106Z`.
+- `sgsst-electron-app/firma-service/legal-readiness.json:210` — `canales.transaccional.estado:
+  "migrado"`.
+
+**Que falta.** Nada para el requisito. Advertencia operativa: el codigo solo exige el Anexo de Nube
+**con la compuerta encendida** (`config.exigirAnexoNube`, `sgsst-electron-app/firma-service/src/config.js:202-203`,
+y la condicion en `empresa.js:1599-1612`). En produccion esa bandera sigue **apagada** —no se puede
+leer su valor porque `/opt/kair-firma/.env` es `600 root:root` y `sudo` pide contrasena-, y por eso
+el item `empresas_nube` sale como `aviso` y no bloqueante
+(`sgsst-electron-app/firma-service/src/services/readinessLegal.js:1960-1968`). Es decir: **hoy el
+servicio permitiria pedir firmas a una Empresa sin el Anexo de Nube**, y eso choca con el propio
+Anexo de Encargo, que obliga a suscribirlo junto con el Encargo (J12).
+
+**Quien lo tiene.** Owner (encender `FIRMA_EXIGIR_ANEXO_NUBE` cuando abra a empresas reales, con el
+riesgo de que las empresas que no lo tengan susceptibility quedan sin poder firmar) y cada Empresa
+(la suscripcion del texto vigente).
 
 **2.4 · Se valida la distribución de roles entre Responsable y Encargado — CERRADO.**
 El abogado la validó por escrito en **J5**: «Confirmo: Empresa = Responsable (arts. 1.1,
@@ -479,36 +637,38 @@ la Empresa ni la amplía, y K+AIR no usa los datos para finalidades propias no d
 ni legitimadas (numeral 10.3, taxativo)— sigue escrita. Lo que sigue pendiente es la
 decisión documentada del owner sobre el uso del Anexo (2.2), no la validación de los roles.
 
-**2.5 · El owner decide sobre el tratamiento y las finalidades del numeral 10.3 —
-PENDIENTE (ya está escrito; falta su decisión documentada).**
-El 10.3 enumera **ocho finalidades**, y la matriz las trae con nueve campos cada una:
-10.3(a) crear y gestionar la solicitud, (b) enviar el enlace y el OTP, (c) verificar la
-identidad, (d) registrar la aceptación, (e) generar y entregar la constancia, (f) conservar
-la evidencia, (g) atender PQRS y (h) cumplir obligaciones legales.
-**Las bases jurídicas que faltaban ya están escritas**: el abogado las determinó por escrito
-en **J4**, con la fórmula literal de cada una (autorización previa, expresa e informada del
-Titular para 10.3(a); deber legal de confiabilidad de la firma para 10.3(b); deber legal de
-verificar la identidad para 10.3(c); deber legal y contractual de generar y entregar la
-constancia para 10.3(e)), y el Anexo de Encargo ya las trae en la columna «Base jurídica
-declarada» (y en `config/matriz-finalidades.json`, que es la fuente única). **Grupo A:
-(a) a (g), habilitadas solo para la Empresa que cumpla las tres condiciones** (suscribir
-los dos anexos, inscribir su tabla de retención documental y designar su canal de atención).
-**Grupo B: (h), no habilitada**, pendiente de que la Empresa identifique la obligación
-concreta, su fundamento y plazo. Lo que falta es la decisión documentada del owner sobre el
-texto (2.2), no el análisis: ese está hecho.
+**2.5 · El owner decide sobre el tratamiento y las finalidades del numeral 10.3 — CERRADO.**
 
-**Corrección de esta ronda: la columna «Estado de habilitación» de (d), (f) y (g).** J4 declaró
-esas tres bases «correctas, sin cambio», pero el documento las traía todavía como «Propuesta; no
-habilitada para producción hasta que el abogado valide la base jurídica…», mientras que este
-cuadro las contaba como habilitadas de forma condicional: **el texto y esta respuesta decían cosas
-distintas sobre las mismas tres finalidades**. Se alinearon con la misma condición que (a), (b),
-(c) y (e) —«Habilitada para la Empresa que haya suscrito el presente Anexo de Encargo y el
-Anexo de Nube, inscrito su tabla de retención documental y designado su canal de atención. No
-habilitada en tanto no se cumplan esas tres condiciones»—, que es lo que corresponde a una base
-declarada y validada. El cambio se hizo **en la fuente** (`config/matriz-finalidades.json`) y el
-Anexo se regeneró con `scripts/generar-anexo-encargo.js`, que es idempotente y escribe `legal/` y
-`sitio/` a la vez; el bloque generado no se edita a mano. La finalidad 10.3(h) **no se toca**: J4
-la deja «No habilitada - pendiente de entrega de información por la Empresa» y así sigue.
+**Medicion del 12-nov-2026** (informe `verificacion-cierre/secciones-1-2.md`). Se contrasta el requisito contra el codigo y contra el servidor; lo que sigue es la medicion y su evidencia.
+
+*Cambio de estado: en la ronda del 30-oct-2026 figuraba como PENDIENTE.*
+
+**Que se verifico.** Que la matriz de finalidades (ocho finalidades, dos grupos) este escrita con sus
+bases juridicas, y que exista **la decision documentada del owner** sobre ella, que es lo que el
+cuadro pedia.
+
+**Evidencia.**
+- `sgsst-electron-app/firma-service/config/matriz-finalidades.json` — fuente unica: Grupo A
+  (10.3(a) a (g)) con la misma condicion de habilitacion en las ocho filas
+  (`:43, :56, :69, :82, :95, :108, :121`) y 10.3(h) en Grupo B con
+  `estado_habilitacion: "No habilitada - pendiente de entrega de informacion por la Empresa"`
+  (`:134`).
+- `paquete-abogado-2026-10-30/11-checklist-definitivo-revision-juridica-y-cierre.md:106` — fila **J4**:
+  el owner registra la decision («APLICADO EN EL TEXTO») y las bases las valido el abogado el 30-oct.
+- El texto que la contiene quedo adoptado: `sgsst-electron-app/legal/anexo-encargo.html:168-174`
+  (Grupo A y Grupo B, con el estado de habilitacion) y `:281-292` (las ocho filas de la matriz
+  generada), instrumento que quedo suscrito y contrafirmado (ver 2.2).
+
+**Que falta.** Nada en cuanto a la decision del owner: esta tomada, documentada y el texto que la
+lleva quedo adoptado y suscrito. Lo que queda abierto **no es de este requisito**, y conviene no
+confundirlo: (a) la **ratificacion escrita del abogado** sobre J4 (y sobre J2, J3, J10 y J11), que el
+propio acta marca «PENDIENTE la firma del asesor»; (b) los **datos de cada Empresa** (tabla de
+retencion documental, instruccion documentada y datos), que la matriz exige para habilitar el Grupo A
+y que la finalidad 10.3(h) sigue esperando; (c) la **tabla supletoria** de conservacion
+(`config/tabla-conservacion.json`, `aplicacion.activada: false`), que es J8, no 2.5.
+
+**Quien lo tiene.** Para lo que queda: el abogado (ratificacion escrita) y cada Empresa (sus datos);
+el owner, para la parte de su propia acta.
 
 **2.6 · Se valida la matriz de instrucciones de la Empresa y las finalidades del Grupo A y
 Grupo B — CERRADO.**
@@ -543,81 +703,134 @@ aceptación del Acuerdo ni el solo curso de una firma la habilitan.
   Empresa y que el sistema no puede verificar por sí solo. Queda como requisito documental
   por Empresa, no como hueco de código.
 
-**2.7 · Se documenta la decisión sobre Google LLC y la cuenta Gmail de consumo
-— PENDIENTE (la determinación escrita requiere decisión del owner y evidencia por Empresa).**
-El abogado **sí resolvió** esto por escrito, en **J6**, con la determinación literal que ya
-está incorporada a los cuatro documentos: por la operación concreta, y contrastada con los
-términos aplicables de la cuenta de consumo, Google LLC decide sobre la finalidad y los
-medios de su propio servicio y trata los datos por cuenta propia; en esta operación actúa
-como **Responsable del Tratamiento** (art. 3, literales d) y e), de la Ley 1581 de 2012) y
-el flujo constituye una **transferencia internacional** de datos personales (art.
-2.2.2.25.1.3, numeral 4, del Decreto 1074 de 2015) a un Responsable en Estados Unidos,
-país con nivel adecuado de protección (numeral 3.2 del Título V de la Circular Única); no
-existe DPA empresarial ni contrato de transmisión, y la determinación no atribuye al
-Encargado facultades de supresión sobre las copias del proveedor. Verificado en los
-archivos: A1 §10.5(f) (línea 365 de `acuerdo-v1.4.txt`), A2 §4, §5 y §8, y A3 §4.
-**Lo que sigue pendiente para el owner:** (a) registrar en E sus decisiones J1-J14 sobre
-los textos; (b) las evidencias que J6 exige
-por Empresa —acknowledgment firmado, política de la Empresa con la transferencia y ficha del
-RNBD—; y (c) la **decisión escrita y fechada de la fecha límite de migración** a una
-cuenta empresarial con acuerdo de encargo, que el abogado marca como mitigación prioritaria
-(no bloqueante, pero hoy no hay fecha). El Anexo de Nube §5 y el Anexo de Encargo §4 cubren
-buena parte del estándar de la Circular 002/2025; falta el documento que lo reúna (2.8).
-**Corrección de esta ronda: cinco pasajes que seguían diciendo «pendiente».** La determinación
-de J6 ya estaba escrita e idéntica en el Anexo de Encargo §§4, 5 y 8 y en el Anexo de Nube §4, pero
-**cinco pasajes seguían afirmando al lado que el papel de Google «requería validación profesional
-escrita»**, y uno de ellos listaba la determinación escrita entre lo que quedaba pendiente. Eso
-es un documento que afirma a la vez que la calificación está pendiente y que ya está decidida. Se
-reescribieron los cinco:
+**2.7 · Se documenta la decision sobre Google LLC y la cuenta Gmail de consumo — PARCIALMENTE.**
 
-| Documento | Pasaje | Qué dice ahora |
-|---|---|---|
-| Anexo de Encargo §5 | «La determinación de si Google actúa por cuenta propia… requieren validación profesional escrita» | El papel por operación y la calificación **están determinados** por la determinación que cierra la sección; los pasos externos que faltan no los reabren |
-| Anexo de Encargo §5 | «Lo que queda pendiente… (i) la determinación escrita del papel de Google» | La lista de pendientes queda con los cuatro pasos externos reales (evidencia de controles del canal, la evidencia que el régimen de transferencias internacionales exija a la Empresa —la Circular 002/2025 **no aplica** a este canal—, declaración en el RNBD y política que informa al Titular) y dice **explícitamente** que la determinación no forma parte de esa lista porque está escrita y archivada |
-| Anexo de Nube §1 | «El papel de Google por operación… requieren validación escrita del abogado colombiano» | La clasificación **está hecha y escrita** (Anexo de Encargo §5 y ficha del §4) y no queda pendiente de validación; los pendientes son la evidencia de controles, el RNBD y la evidencia que el régimen de transferencias internacionales exija a la Empresa (la Circular 002/2025 **no aplica** a este canal) |
-| Anexo de Nube §4 | «su papel por operación y la clasificación jurídica del flujo requieren validación profesional escrita» | No quedan pendientes de validación: **están determinados** en el §5 del Anexo de Encargo |
-| Anexo de Nube §4 (celda del DPA) | «La necesidad de un instrumento contractual… se determinan después de la validación profesional del papel de Google» | No existe contrato de transmisión: Google actúa como Responsable en esta operación, con los efectos del §5, y no se le imponen obligaciones contractuales de Encargado |
+**Medicion del 12-nov-2026** (informe `verificacion-cierre/secciones-1-2.md`). Se contrasta el requisito contra el codigo y contra el servidor; lo que sigue es la medicion y su evidencia.
 
-De paso se corrigió, en el mismo sentido, el lead-in de la tabla del §4 del Anexo de Nube, que decía
-«La tabla no presupone que Google sea Responsable, Encargado o subencargado de Gesstiar» al lado
-de una ficha que lo declara Responsable: ahora dice que la tabla **no presupone** ese papel sino
-que **lo documenta** por lo determinado en el §5 del Anexo de Encargo.
+*Cambio de estado: en la ronda del 30-oct-2026 figuraba como PENDIENTE.*
 
-**Y una desactualización que ya está corregida:** la nota `subencargados.google.nota` de
-`legal-readiness.json` seguía diciendo que el papel de Google «queda pendiente de validación
-profesional escrita» y que «no se declara una calificación jurídica cerrada». Con la determinación
-de J6 ya incorporada a los cuatro textos, esa nota contradecía al expediente: **ya está
-alineada** con la determinación, y el manifiesto sigue siendo ASCII puro y pasó la comprobación
-automática (`actualizar-manifiesto-v1.4.js --check`, código 0).
+**Que se verifico.** Los tres puntos que el cuadro dejo pendientes para el owner: (a) el registro de
+las decisiones J1-J14 en la seccion E, (b) las evidencias que J6 exige por Empresa, y (c) la
+decision escrita y fechada de la fecha limite de migracion a una cuenta empresarial con acuerdo de
+encargo. Ademas, el estado real del canal de correo (Workspace + CDPA) y lo que el texto vigente
+afirma sobre el.
 
-**2.8 · Se verifica el alcance de la Circular Externa 002 de 2025 y la conclusión sobre
-transferencias internacionales — PENDIENTE (bloqueante para publicar).**
-El abogado lo verificó en fuente oficial y concluyó en **J7** que **no aplica a este
-canal**: el ámbito de la Circular 002 de 2025 son los procesos de transferencia de
-tecnología, y usar una cuenta de correo para enviar un OTP no es eso. Por tanto no exige
-comunicación previa a la Delegatura por el solo uso de Gmail, y no se requiere Declaración
-de Conformidad (EE.UU. tiene nivel adecuado de protección, numeral 3.2). **Lo que falta es
-lo que J7 puso como condición:** si K+AIR se presenta ante sus Empresas como proveedor de
-una tecnología que permite el tratamiento de datos personales, esa operación sí cae en el
-ámbito de la Circular 002/2025 y debe documentarse —caracterización de las funcionalidades
-que tratan datos (1.1), evaluación de cumplimiento (1.2), reglas de transferencia
-internacional (1.3), mecanismos de responsabilidad demostrada (2.1-2.4), protección desde
-el diseño y por defecto (3.1-3.3) y garantías contractuales (4.1-4.4)—. El Anexo de Nube
-§5 y el Anexo de Encargo §4 cubren buena parte de esto; **falta el documento que lo reúna.**
-Es tu decisión.
+**Evidencia.**
+- (a) La seccion E del acta esta completa: `paquete-abogado-2026-10-30/11-checklist-definitivo-revision-juridica-y-cierre.md:103-116`
+  (J1 a J14 resueltos o aplicados) y `:117-122` (D7, P3, P11, C-1, P7). La fila **J6** (`:108`) dice
+  «RESUELTO, y CORREGIDO en sus dos afirmaciones previas» y delimita el papel de Google en dos planos.
+- (c) La migracion **esta ejecutada y fechada**: el CDPA fue aceptado el 10-nov-2026 y la cuenta
+  empresarial esta activa y verificada
+  (`sgsst-electron-app/docs/gestion-humana/firma-electronica/decision-regularizacion-correo-2026-11-09.md:31-35`,
+  P1/P2/P5 cerrados) y `sgsst-electron-app/firma-service/legal-readiness.json:77-99`
+  (`aceptacion` del CDPA: modo `aceptado_por_administrador`, fecha `2026-11-10`, evidencia con hash
+  `9d989067...`), `:210` (`canales.transaccional.estado: "migrado"`).
+- El Acuerdo vigente ya no dice lo que decia la v1.5: `sgsst-electron-app/firma-service/scripts/fixtures/acuerdo-v1.6.txt:322`
+  (CDPA aceptado el 10-nov), `:359-365` (§10.1 y el papel de Google en dos planos), `:452` y `:456`
+  (§10.5(f), sin atribuirle garantias no demostradas).
+- (b) **Lo que falta, por Empresa**, esta escrito: `sgsst-electron-app/legal/anexo-encargo.html:524-537`
+  enumera lo pendiente con nombre y responsable, entre ello (ii) la evidencia que el regimen de
+  transferencias internacionales exija a la Empresa como Responsable, (iii) la declaracion de la
+  transferencia en el RNBD a cargo de la Empresa, y (iv) la politica de tratamiento de la Empresa
+  que informa al Titular.
+- **Pendientes del owner en consolas, a hoy:** P3 (los tres alias `privacidad@`, `soporte@`,
+  `incidentes@` de `gesstiar.com`; `decision-regularizacion-correo-2026-11-09.md:378` y
+  `tabla-instrumentos-vigentes-2026-11-09.md:95`) y P6 (revocar las app passwords de
+  `adminkair@gmail.com`; `decision-regularizacion-correo-2026-11-09.md:381`,
+  `tabla-instrumentos-vigentes-2026-11-09.md:98`, y declarado dentro del propio texto en
+  `anexo-nube-v1.3.html:627` y `:738`).
+- La propia fila J6 (`:108`) anota dos cosas sin cerrar: el articulado del CDPA **no esta en el
+  repo** (solo su SHA-256, la captura y la constancia de aceptacion) y `fecha_efectividad_addendum`
+  del manifiesto es `null`; y la **ratificacion externa del abogado queda a cargo de Gesstiar**.
 
-**2.9 · Se determina la obligación de inscripción en el RNBD o la excepción aplicable —
-PENDIENTE (bloqueante para publicar).**
-El abogado lo determinó por escrito en **J7**: el art. 2.2.2.26.1.2 del Decreto 1074
-limita la inscripción a las sociedades con activos totales superiores a 100 000 UVT y a las
-personas jurídicas de naturaleza pública; **una S.A.S. es una sociedad comercial y sí pertenece a la categoría de sociedades del literal (a); la posible exclusión depende de que sus activos totales no superen 100.000 UVT a la fecha de corte, verificados con certificado y estados financieros**, lo que hay que confirmar con el
-certificado de existencia y representación y el balance. El Anexo de Nube deja el checklist
-del RNBD **sin declarar inscrita ni exenta**. La parte registral (naturaleza jurídica, activos
-totales y estado del registro) la verifica el owner con esos dos documentos; la declaración
-de la transferencia en el RNBD, si la Empresa está inscrita, es de la Empresa (Responsable).
-Queda pendiente de confirmar por el owner.
+**Que falta.** (1) La **ratificacion externa del abogado** sobre J6 (y las demas preguntas
+respondidas por el dictamen del 11-nov): owner + abogado. (2) Las **evidencias por Empresa**
+(acknowledgment firmado, politica de la Empresa con la transferencia y ficha del RNBD): cada Empresa,
+mas el owner en la parte registral (ver 2.9). (3) **P3 y P6**: owner, en la consola de Google.
+(4) El texto vigente del Anexo de Nube v1.3 todavia afirma que el metodo de autenticacion y la
+verificacion en dos pasos de la cuenta de salida «estan pendientes (P2)»
+(`anexo-nube-v1.3.html:617-618` y `:636-640`), cuando P2 se cerro el 10-nov: se corrige con la
+version nueva que pide 1.9.
 
-La **adenda 13** del paquete presenta para revisión la precisión normativa de que una S.A.S. sí pertenece a la categoría de sociedades; la conclusión factual sobre el umbral sigue pendiente del certificado, estados financieros y fecha de corte que determine el abogado. Se somete expresamente a su visto bueno como adenda explicativa.
+**Quien lo tiene.** Owner (P3, P6, y manages la ratificacion externa), abogado (ratificacion de
+J6/J8/J9 y de las preguntas del 11-nov), cada Empresa (sus evidencias).
+
+**2.8 · Se verifica el alcance de la Circular Externa 002 de 2025 y la conclusion sobre transferencias internacionales — PARCIALMENTE.**
+
+**Medicion del 12-nov-2026** (informe `verificacion-cierre/secciones-1-2.md`). Se contrasta el requisito contra el codigo y contra el servidor; lo que sigue es la medicion y su evidencia.
+
+*Cambio de estado: en la ronda del 30-oct-2026 figuraba como PENDIENTE.*
+
+**Que se verifico.** Si el alcance de la Circular 002/2025 quedo verificado y la conclusion escrita en
+los textos vigentes, y si existe el documento que J7 condiciono.
+
+**Evidencia.**
+- La verificacion esta hecha **en fuente oficial** y escrita: la conclusion juridica esta en
+  `sgsst-electron-app/legal/anexo-nube-v1.3.html:396-412` («Conclusion juridica: la Circular Externa
+  002 de 2025 no aplica a este canal, porque su ambito son los procesos de transferencia de
+  tecnologia y el uso de una cuenta de correo para enviar un codigo OTP no es una transferencia de
+  tecnologia»), con la misma condicion en
+  `sgsst-electron-app/legal/anexo-encargo.html:528-530`.
+- La fila **J7** del informe al asesor lo declara sin cerrar:
+  `sgsst-electron-app/docs/gestion-humana/firma-electronica/paquete-abogado-2026-10-30/10-informe-correcciones-para-asesor-juridico.md:109`
+  («**PENDIENTE:** si K+AIR se presenta como proveedor de una tecnologia que permite el tratamiento de
+  datos personales, debe documentar el cumplimiento de la Circular 002 de 2025; y el estado de
+  inscripcion de Gesstiar en el RNBD lo verifica el owner»). En el acta del owner:
+  `11-checklist-definitivo-revision-juridica-y-cierre.md:109`, **J7 = PENDIENTE**.
+- **El documento que falta no existe.** Una busqueda de
+  `responsabilidad demostrada|caracterizaci[oó]n de las funcionalidades|protecci[oó]n desde el dise[ñn]o|garant[ií]as contractuales`
+  en todo `sgsst-electron-app` solo devuelve el propio cuadro (`respuesta-checklist-cierre-2026-10-30.md:602-605`)
+  y las evaluaciones de canal de correo; **ningun documento reune las caracterizaciones** que la
+  Circular exige (1.1, 1.2, 1.3, 2.1-2.4, 3.1-3.3, 4.1-4.4).
+- El Anexo de Encargo lo dice con nombre y responsable:
+  `sgsst-electron-app/legal/anexo-encargo.html:526-527` — pendiente (i), «el documento que demuestra las
+  medidas de seguridad del canal de correo, que es la responsabilidad demostrada del parrafo primero
+  del Titulo V».
+
+**Que falta.** (1) **La decision del owner** sobre si K+AIR se presenta ante sus Empresas como
+proveedor de una tecnologia que permite el tratamiento de datos personales: de esa decision depende
+que la Circular 002/2025 entre o no en el ambito. (2) Si la respuesta es si, **el documento que reuna
+las caracterizaciones** (el "documento que lo reuna" que el propio Anexo de Nube nombra) y el
+**documento de seguridad del canal** que demuestra la responsabilidad demostrada del Titulo V.
+(3) Lo que el RNBD exija (2.9). Con lo que hay hoy, la compuerta tecnica no bloquea: el gate
+`publicacion` dio `listo: true` con 0 bloqueantes.
+
+**Quien lo tiene.** Owner (la decision de encuadre y la orden de redactar); abogado (el contenido
+juridico del documento); equipo (redaccion). No bloquea la apertura tecnica, pero es la exposicion
+juridica mas grande que queda viva en la seccion.
+
+**2.9 · Se determina la obligacion de inscripcion en el RNBD o la excepcion aplicable — PENDIENTE.**
+
+**Medicion del 12-nov-2026** (informe `verificacion-cierre/secciones-1-2.md`). Se contrasta el requisito contra el codigo y contra el servidor; lo que sigue es la medicion y su evidencia.
+
+**Que se verifico.** La tabla registral del Anexo de Nube v1.3 (los cuatro puntos que el cuadro
+dejo pendientes) y su estado real hoy.
+
+**Evidencia.**
+- `sgsst-electron-app/legal/anexo-nube-v1.3.html:414-481` — la tabla del RNBD. Punto 1 (naturaleza
+  juridica): «el certificado de existencia y representacion de la Camara de Comercio de Barranquilla
+  ... **sigue sin estar adjunto**» (`:430-434`). Punto 2 (activos totales): «Evidencia documental
+  pendiente: el balance del primer ejercicio, que aun no existe» (`:444-445`); la cifra de
+  $1.000.000 COP (19,09 UVT) es «una declaracion del owner y no sustituye los estados financieros»
+  (`:457`). Punto 4 (estado del registro): «Evidencia documental pendiente: la consulta al portal de
+  la SIC que confirme la ausencia de inscripcion, que el owner debe adjuntar» (`:470-471`).
+- `:475-481` — «**Estado del registro en el RNBD: pendiente de verificacion por el owner.** Este Anexo
+  no afirma que una transferencia este declarada en el RNBD ni que la declaracion sea o no exigible».
+- `11-checklist-definitivo-revision-juridica-y-cierre.md:109` — fila **J7 = PENDIENTE**: «falta el
+  certificado societario y los estados financieros».
+- El criterio esta escrito y es favorable si se confirma: con la UVT 2026 de $52.374, el umbral de
+  100.000 UVT del art. 2.2.2.26.1.2 del Decreto 1074 equivale a $5.237.400.000 COP y los activos
+  declarados quedan «5.237 veces por debajo» (`anexo-nube-v1.3.html:452-459`).
+
+**Que falta.** Tres documentos, todos del owner: (1) el **certificado de existencia y representacion**
+de la Camara de Comercio de Barranquilla; (2) los **estados financieros / balance** del primer
+ejercicio con sus notas, a la fecha de corte; (3) la **consulta al portal de la SIC** que confirme el
+estado del registro en el RNBD. Con (1) y (2) se cierra la excepcion por umbral; si el owner decide
+inscribirse, la **declaracion de la transferencia internacional** es de la **Empresa** como
+Responsable, no de K+AIR.
+
+**Quien lo tiene.** Owner (los tres documentos y la decision de memoria). El abogado, para la
+calificacion final del umbral. La Empresa, la declaracion de la transferencia, si aplica.
 
 **2.10 · Se valida que no se atribuyan a Google compromisos contractuales o garantías que no
 estén demostrados — CERRADO.**
@@ -673,38 +886,135 @@ cubiertos en la sección 3.
 
 ## 3. Conservación, retención y supresión (13 requisitos)
 
-**3.1 · Se valida jurídicamente la tabla supletoria de conservación — PENDIENTE (bloqueante
-para publicar).**
-La tabla vive en `firma-service/config/tabla-conservacion.json` y es la **fuente única**: de
-ella salen el plazo por defecto del código, el piso legal y el punto de inicio, y de ella se
-genera la sección 8 del Anexo de Encargo (fuente única, decisión E2 de tu especificación).
-El Anexo y el código no pueden desincronizarse porque salen del mismo archivo.
-El abogado la revisó en **J8** y la validó **con condiciones**; por eso la tabla declara hoy
-`aplicacion.activada: false` y `aplicacion.validado_por: null`. La condición es que la
-apertura es un acto expreso del owner y va después de los cuatro pasos del orden que fijó
-J8 (ver 3.2). Hasta que eso ocurra, el requisito queda pendiente de esa validación escrita.
+**3.1 · Se valida jurídicamente la tabla supletoria de conservación — PENDIENTE.**
 
-**3.2 · Se aprueban o modifican los plazos generales de 10 y 5 años — PENDIENTE (bloqueante
-para publicar).**
-El abogado los validó **con condiciones** en **J8**: 10 años (documento firmado, desde la
-firma) y 5 años (registros operativos, solicitudes, lápida y recibo) son **topes de
-custodia**, no plazos legales (art. 2.2.2.25.2.8 del Decreto 1074). Hoy **no aplican**: la
-tabla declara su propia activación (`aplicacion.activada: false`) y el código la respeta:
-no hay forma de que el sistema aplique esos plazos sin que esa fuente legal lo autorice, ni
-una actualización automática puede abrirla. Con la compuerta cerrada, el comportamiento
-legado aplica veinte (20) años desde la firma para categorías generales, con la fuente
-`catalogo_sistema`. **Esto entra en tensión con D1, que prohíbe aplicar veinte años a todos
-los documentos, y sigue pendiente de la corrección operativa**; por eso la compuerta de
-publicación y activación permanece cerrada. El respaldo congelado del código también arranca
-cerrado: si el archivo de configuración no se puede leer, el sistema conserva el plazo del
-catálogo y no aplica los de la tabla por la sola falla de leer el archivo.
-**El orden que hay que cumplir, según J8, es este y está en este orden:**
-(i) validar los plazos — hecho; (ii) alinear el catálogo legado al orden de precedencia del
-8.6(a): veinte años desde el cese para las cinco categorías del 8.6(b), *hold* sin término
-para el contrato, y el plazo de la Empresa o el supletorio para el resto — pendiente;
-(iii) reejecutar las pruebas — pendiente (6.11); (iv) **entonces** abrir la compuerta, con
-validación escrita. Abrir la compuerta es un acto expreso del owner, con la validación
-escrita del abogado encima. Los plazos 10/5 siguen, por tanto, **pendientes**.
+**Medicion del 12-nov-2026** (informe `verificacion-cierre/secciones-3-5.md`). Se contrasta el requisito contra el codigo y contra el servidor; lo que sigue es la medicion y su evidencia.
+
+**Qué se verificó.** Si la tabla supletoria de conservación está escrita y es de verdad la fuente
+única del plazo por defecto, y si existe en el expediente la validación jurídica **escrita** que el
+propio archivo declara como condición para abrir su compuerta de activación.
+
+**Evidencia.**
+- `sgsst-electron-app/firma-service/config/tabla-conservacion.json:1-12` — el archivo existe y
+  lleva su propia compuerta: `estado` = `"PROPUESTA. Los plazos de diez (10) y cinco (5) años NO se
+  activan en produccion hasta que el abogado los valide..."` (`:4`), y dentro de `aplicacion`:
+  `activada: false` (`:6`), `estado: "PROPUESTA"` (`:7`), `validado_por: null` (`:8`),
+  `validado_at: null` (`:9`). La nota del mismo bloque (`:10`) dice, literalmente, que cambiar
+  `activada` a `true` "es un acto expreso del owner, con la validacion escrita del abogado sobre
+  los plazos de diez (10) y cinco (5) anos: ni el codigo ni una actualizacion automatica lo hacen".
+- **La fuente única es real y se verificó en código, no por afirmación.** `src/services/retencion.js:414`
+  la declara "fuente ÚNICA", `:469` fija la ruta del archivo, `:518` la carga
+  (`tablaConservacion()`), `:560` y `:938` la consultan al calcular cada firma; el respaldo
+  congelado en código también arranca cerrado (`:474-487`, con `activada: false` en `:483`). La
+  sección 8 del Anexo de Encargo se genera del mismo archivo:
+  `scripts/generar-anexo-encargo.js:16` ("`config/tabla-conservacion.json` -> la tabla de
+  conservacion (E2)"), `:62` (`CONFIG_TABLA_REL`) y `:664-679` (el generador **falla** si la
+  tabla no trae sus categorías). Es decir: el Anexo y el código no pueden desincronizarse en los
+  plazos, como afirma el cuadro.
+- **Medición SSH del 12-nov-2026 (13:50 h. Colombia)** sobre
+  `/opt/kair-firma/app/config/tabla-conservacion.json`: `activada=False`, `estado=PROPUESTA`,
+  `validado_por=None`, y `DOCUMENTO_FIRMADO=3650` días. El archivo del servidor es el mismo del
+  repositorio (hash idéntico).
+- **Lo que sí existe del lado del abogado** es una validación **condicionada**, no la validación
+  final que el archivo exige:
+  `paquete-abogado-2026-10-30/00-revision-juridica-del-abogado-2026-10-30.txt:125-138` — J8 marca
+  la casilla "Validar con condiciones" (`:126`), razona que "Valido 10 y 5 años como topes de
+  custodia, no como plazos legales" (`:128`), y en `:132` pone el orden de cuatro pasos y la
+  evidencia que exige: "Evidencia: tabla de la Empresa por escrito; pruebas de cómputo desde el
+  cese, de la categoría no clasificada, del hold, de la copia pendiente y de la lápida; evidencia
+  de purga de respaldos; **confirmación escrita de la alineación del catálogo legado**" (`:138`).
+- **Pero el acta interna del owner del 11-nov sigue marcando J8 como PENDIENTE:**
+  `paquete-abogado-2026-10-30/11-checklist-definitivo-revision-juridica-y-cierre.md:110` — "Los
+  plazos de **diez (10)** y **cinco (5)** años siguen sin validarse:
+  `config/tabla-conservacion.json` está en estado `PROPUESTA` y `aplicacion.activada` es `false`,
+  así que **no se activan en producción** hasta que el asesor los valide por escrito". La fila T9
+  (`:95`) exige verificar `aplicacion.activada` en `false` "hasta completar decisiones y
+  evidencias", y el plan del 31-oct lo repite.
+- La ratificación externa que el expediente pide sobre J8 sigue abierta:
+  `docs/gestion-humana/firma-electronica/dictamen-legal-errata-textos-2026-11-11.md:215-218`
+  (J6, J8 y J9 pendientes de ratificación externa).
+- **Esto no bloquea la apertura técnica.** El gate `readinessLegal.js` no tiene ningún ítem que
+  mida la compuerta: el control del grupo n86 mide el texto y el código del piso de veinte años
+  (`src/services/readinessLegal.js:1562-1601`, ítems `codigo_20` en `:1564` y `texto_20` en
+  `:1587`), y `_codigoRetencion` (`:508-529`) es un control **textual** sobre `retencion.js`
+  (expresiones regulares: `ANIOS_CUSTODIA = 20`, `2.2.4.6.13`, `hold: true`) que **no lee**
+  `aplicacion.activada`. Medición SSH del 12-nov con copia consistente de la base (los tres
+  archivos `.sqlite`, `-wal` y `-shm`): gate `publicacion` → `listo=true`, 42 ítems, 40 ok, 0
+  pendientes, 0 bloqueantes pendientes; gate `primera_firma` → idéntico.
+
+**Qué falta.** (1) La **validación escrita del abogado** sobre los plazos de diez (10) y cinco (5)
+años que la propia nota del archivo exige, con la evidencia que el mismo J8 enumera (`:138`): la
+tabla de retención documental de la Empresa, las pruebas de cómputo desde el cese, la categoría no
+clasificada, el hold, la copia pendiente, la lápida y la purga de respaldos. (2) El **acto expreso
+del owner** que pone `aplicacion.activada` en `true` y llena `validado_por` y `validado_at` con
+datos reales (hoy los dos son `null`). (3) La **ratificación externa** de J8/J9. Ninguno de los
+tres es un desarrollo: son actos y documentos.
+
+**Quién lo tiene.** Owner (el acto expreso sobre la compuerta y la gestión de la validación
+externa) y abogado externo (la validación escrita y la ratificación). El equipo solo puede
+acompañar con la evidencia técnica ya reunida.
+
+**3.2 · Se aprueban o modifican los plazos generales de 10 y 5 años — PARCIALMENTE.**
+
+**Medicion del 12-nov-2026** (informe `verificacion-cierre/secciones-3-5.md`). Se contrasta el requisito contra el codigo y contra el servidor; lo que sigue es la medicion y su evidencia.
+
+*Cambio de estado: en la ronda del 30-oct-2026 figuraba como PENDIENTE.*
+
+**Qué se verificó.** Si los plazos generales de diez (10) y cinco (5) años están escritos en la
+tabla, si el abogado los validó, y si el **orden de cuatro pasos que fijó J8** está cumplido. Y en
+particular: si el comportamiento legado de veinte (20) años desde la firma que el cuadro describe
+como vigente **sigue existiendo en el código**.
+
+**Evidencia.**
+- **Los plazos están escritos y el abogado los validó con condiciones.** En
+  `config/tabla-conservacion.json`: `DOCUMENTO_FIRMADO` con `plazo_dias: 3650` y `punto_inicio:
+  fecha_firma` (`:17-19`), y las tres categorías de cinco (5) años con `plazo_dias: 1825`
+  (`:40-42` registro de operaciones, `:51-53` solicitudes y comunicaciones, `:61-65` lápida y
+  recibo). El abogado: "Valido 10 y 5 años como topes de custodia, no como plazos legales"
+  (`00-revision-juridica-del-abogado-2026-10-30.txt:128`).
+- **El paso (ii) del orden de J8 ya está hecho en el código, y el cuadro canónico describe mal la
+  situación.** J8 (`:132`) exigía "alinear el catálogo legado al orden de precedencia del 8.6(a)"
+  porque, con la compuerta cerrada, se aplicaban veinte (20) años desde la firma a todo, con
+  fuente `catalogo_sistema`. Hoy:
+  - Búsqueda de `catalogo_sistema` en todo `firma-service/src/`: **0 coincidencias**. El catálogo
+    legado de veinte años **ya no existe en el código**.
+  - `src/services/retencion.js:1021-1026` — la rama de compuerta cerrada dice literalmente: "La
+    tabla supletoria no está activada. Se conserva temporalmente con fecha de supresión nula; **no
+    se inventa el fallback histórico de 20 años desde la firma** ni se adelanta la tabla pendiente
+    de aprobación", y fija `fuente = 'tabla_supletoria_pendiente'`.
+  - El orden de precedencia que J8 pedía está implementado en `retencion.js:963-1008`: (b) piso
+    legal → (c) plazo declarado por la Empresa → (d) tabla supletoria; el piso de veinte años del
+    SG-SST se cuenta desde el cese (`:986-997`), y el registro sin categoría clasificable queda
+    retenido, no con plazo por defecto.
+  - **Medición SSH del 12-nov-2026** sobre `/opt/kair-firma/data/firma.sqlite` (sqlite3 en modo
+    `ro`): distribución de `plazo_conservacion_fuente` en `gh_firmas_electronicas` =
+    `[(None, 4), ('tabla_supletoria_pendiente', 1)]`. **Cero filas con `catalogo_sistema`**: en
+    producción no se aplicó nunca el comportamiento que el cuadro describe.
+  - Residuo de texto: el comentario de `retencion.js:949-951` todavía afirma que en el camino de
+    compuerta cerrada "el plazo corre desde la firma (que es lo que hace el catálogo)", frase que el
+    propio `:1023` contradice. Es un comentario, no comportamiento, pero es lo que llevó a escribir
+    el texto del cuadro.
+- **Consecuencia documental:** las afirmaciones del cuadro en
+  `respuesta-checklist-cierre-2026-10-30.md:902-905` ("Con la compuerta cerrada, el comportamiento
+  legado aplica veinte (20) años desde la firma para categorías generales, con la fuente
+  `catalogo_sistema`") y `:976` (el paso (ii) "pendiente") **hoy son falsas**. El 3.6 del mismo
+  cuadro repite la misma premisa.
+- **Lo que falta del orden de J8:** el paso (iii), reejecutar las pruebas (requisito 6.11), no
+  está acreditado en el expediente —en esta verificación no se corrió la suite del `firma-service`,
+  por límite de alcance—; y el paso (iv), abrir la compuerta con validación escrita, está
+  incumplido por lo que dice 3.1.
+
+**Qué falta.** (1) La **aprobación** de los plazos: el J8 del acta del 11-nov sigue PENDIENTE
+(`11-checklist-definitivo...:110`), la compuerta está apagada y no hay acto del owner ni
+validación escrita del abogado. (2) La **reejecución de las pruebas** del 6.11 después del cambio
+del código de retención, con su registro. (3) La **apertura de la compuerta** con
+`validado_por` y `validado_at` reales, que es el paso (iv) y el único que puede hacer que los
+plazos 10/5 apliquen. (4) **Corregir el texto del cuadro canónico** (3.2 y 3.6), que describe un
+comportamiento que el código ya no tiene: si alguien lo usa como mapa, va a buscar un catálogo
+que no existe.
+
+**Quién lo tiene.** Owner (la decisión y el acto de apertura) y abogado externo (la validación
+escrita). El equipo, para la reejecución de las pruebas y para corregir el cuadro.
 
 **3.3 · Se conserva el mínimo legal de 20 años para los registros SG-SST que correspondan —
 CERRADO.**
@@ -906,11 +1216,73 @@ control de presencia y ausencia de la tabla de correspondencia.
 
 ## 5. Seguridad del correo electrónico (11 requisitos)
 
-**5.1 · Se identifica la cuenta remitente real — PENDIENTE (es del owner y no viaja en los
-documentos).**
-La cuenta vive como variable de entorno en el servidor (`SMTP_FROM_EMAIL`,
-`SMTP_FROM_NAME`). No está en el repositorio ni en ninguno de los nueve adjuntos, y no debe
-ir: la evidencia se entrega al expediente, no al documento compartido.
+**5.1 · Se identifica la cuenta remitente real — CERRADO.**
+
+**Medicion del 12-nov-2026** (informe `verificacion-cierre/secciones-3-5.md`). Se contrasta el requisito contra el codigo y contra el servidor; lo que sigue es la medicion y su evidencia.
+
+*Cambio de estado: en la ronda del 30-oct-2026 figuraba como PENDIENTE.*
+
+**Qué se verificó.** Cuál es la cuenta remitente real del canal transaccional, si está identificada
+en el expediente, si es la que el código y el servidor usan, y si su dominio tiene lo publicado
+para que un correo de ella sea autenticable por el receptor.
+
+**Evidencia.**
+- **La cuenta es `kair@gesstiar.com`** (Google Workspace), y está escrita en cuatro lugares que
+  hoy gobiernan la relación:
+  - `sgsst-electron-app/firma-service/legal-readiness.json:204-212` — bloque `canales.transaccional`:
+    `cuenta: "kair@gesstiar.com"` (`:206`), `proveedor: "Google Workspace (Gmail),
+    smtp.gmail.com:587 con STARTTLS"` (`:207`), `rol: "subencargado"` (`:208`), `estado: "migrado"`
+    (`:210`), y la nota (`:211`) que declara P2, P4 y P5 cerrados el 10-nov y deja P11 y P3
+    abiertos.
+  - `sgsst-electron-app/legal/anexo-nube-v1.3.html:50-54` (el resumen del Anexo), `:159-171`
+    (el §3: "el canal de correo del servicio es una **cuenta empresarial de Google Workspace**,
+    la `kair@gesstiar.com`"), `:543-549` y `:594-597` ("Remitente declarado para este canal:
+    `kair@gesstiar.com`, con el nombre «K+AIR Firma Electrónica»").
+  - `sgsst-electron-app/legal/anexo-encargo.html:539-543` (el paso (vi) del §5: "la cuenta
+    empresarial está activa... comprobada con un envío real desde `kair@gesstiar.com`, con su
+    Message-ID y su `Authentication-Results`").
+  - `docs/gestion-humana/firma-electronica/decision-regularizacion-correo-2026-11-09.md:31-34`
+    (tabla de estado medido al 10-nov: P2, P4 y P5 cerrados con su evidencia).
+- **El manifiesto en el servidor es el mismo del repositorio.** Medición SSH del 12-nov:
+  `sha256sum /opt/kair-firma/app/legal-readiness.json` =
+  `191c08b837b41069de4e2d25d7158fd90a7c3ce5f93b22696d2d7050f8a4013f`, idéntico al hash local del
+  `legal-readiness.json`. En ese manifiesto, `mail_provider.cuenta` = `workspace`, `rol` =
+  `subencargado`, `dpa` = `true`, `aceptacion.aceptada` = `true`, `aceptacion.fecha` = `2026-11-10`
+  (`legal-readiness.json:70-107`, con la evidencia de la captura en `:86-106`).
+- **El código la usa y la publica.** `src/config.js:72-80` lee `SMTP_HOST`, `SMTP_PORT` (587 por
+  defecto), `SMTP_SECURE` (`false`, es decir STARTTLS), `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM_NAME`
+  y `SMTP_FROM_EMAIL`; `src/services/mailer.js:36` obliga a `requireTLS: true`, de modo que el
+  canal no puede degradar a texto claro.
+- **El dominio tiene lo publicado y medido desde este equipo (12-nov):** MX de `gesstiar.com` →
+  `smtp.google.com`; SPF `v=spf1 include:_spf.google.com ~all`; DKIM `google._domainkey` presente;
+  DMARC `v=DMARC1; p=none; rua=mailto:kair@gesstiar.com`.
+- **El envío real está probado:** `anexo-nube-v1.3.html:603-606` — remitente `kair@gesstiar.com`,
+  `Message-ID <5db3377d-4565-e49b-0b64-cd0b5ce2b4ca@gesstiar.com>` y
+  `Authentication-Results: dkim=pass; spf=pass; dmarc=pass`. Y hay envíos reales del 12-nov con la
+  credencial nueva: eventos `CODIGO_ENVIADO` (15:38:09 y 15:39:11) y `CONTRAFIRMA_CODIGO_ENVIADO`
+  (15:40:32 y 16:12:54) en la base de producción.
+- **Medición SSH del 12-nov:** la tabla `gh_firma_empresas_cuenta_envio` tiene **0 filas**; es decir,
+  ninguna Empresa ha configurado cuenta propia de envío, y el remitente efectivo de todo el
+  servicio es hoy el de K+AIR.
+- **Contraste con el cuadro:** `respuesta-checklist-cierre-2026-10-30.md:1117-1121` afirma que la
+  cuenta "vive como variable de entorno en el servidor", que "no está en el repositorio ni en
+  ninguno de los nueve adjuntos, y no debe ir". **Hoy esa afirmación es falsa**: la cuenta está en
+  el manifiesto, en el Anexo de Nube v1.3 y en el Anexo de Encargo, los dos ya suscritos y
+  contrafirmados por ASEPLUS CARIBE S.A.S. el 12-nov. Lo que el cuadro quería preservar —que el
+  **secreto** no viaje— sí se respeta (ver 5.6).
+
+**Qué falta.** Nada para este requisito: la cuenta remitente real está identificada, documentada
+en los instrumentos que la gobiernan, publicada en DNS y verificada con un envío real. Dos
+precisiones que **no** son de este requisito, para que no se lea mal: (a) el remitente efectivo de
+hoy es el de K+AIR para todos, porque `gh_firma_empresas_cuenta_envio` está vacía; (b) sigue
+abierto **P3** (los alias `privacidad@`, `soporte@` e `incidentes@` de `gesstiar.com` no existen:
+la medición DNS del 12-nov devuelve NXDOMAIN para `privacidad.gesstiar.com`,
+`soporte.gesstiar.com` e `incidentes.gesstiar.com`), con excepción documentada en
+`legal-readiness.json:213-232` y en `src/config.js:103-111` y `:127-135`. P3 afecta los canales de
+derechos, PQRS e incidentes, no el remitente transaccional.
+
+**Quién lo tiene.** Nadie (cierre del owner). La evidencia es pública y verificable; lo que queda
+abierto (P3) es del owner, pero no es de este requisito.
 
 **5.2 · Se documenta si el envío se realiza mediante Gmail de consumo o una cuenta
 corporativa — CERRADO.**
@@ -949,14 +1321,128 @@ del art. 2.2.2.47.4 num. 1 del Decreto 1074»). En el ambiente de pruebas el tra
 `jsonTransport` y no envía nada. **Pendiente de confirmar en el servidor:** el host real y
 que el puerto STARTTLS está efectivamente en uso.
 
-**5.5 · Se acredita la activación de MFA — PENDIENTE (es del owner).**
-No se trae en el paquete, por decisión propia: es evidencia de la cuenta, no del producto.
+**5.5 · Se acredita la activación de MFA — PENDIENTE.**
 
-**5.6 · Se acredita el uso de contraseña de aplicación, sin incorporarla a los documentos ni
-al repositorio — PENDIENTE (es del owner).**
-La contraseña existe solo como variable de entorno en el servidor. **Verificado hoy: no
-aparece en ninguno de los nueve adjuntos ni en el repositorio.** No se incorpora a los
-documentos ni se transcribe en el expediente.
+**Medicion del 12-nov-2026** (informe `verificacion-cierre/secciones-3-5.md`). Se contrasta el requisito contra el codigo y contra el servidor; lo que sigue es la medicion y su evidencia.
+
+**Qué se verificó.** Si existe **evidencia primaria** (captura de consola y/o acta) de que la
+cuenta de salida `kair@gesstiar.com` tiene la verificación en dos pasos activada, y si los
+instrumentos suscritos son coherentes entre sí sobre ese punto.
+
+**Evidencia.**
+- **No hay evidencia primaria para el MFA.** El expediente tiene captura y acta **solo** para el
+  CDPA: `sgsst-electron-app/firma-service/scripts/fixtures/captura-consola-cdpa-i-accept-2026-11-10.png`
+  y `.../scripts/fixtures/aceptacion-cdpa-p1-2026-11-10.json`, referenciadas en
+  `legal-readiness.json:86-106`. Para el 2SV no hay captura ni acta: lo que hay es la **declaración
+  del owner recogida en los documentos**, a partir de
+  `decision-regularizacion-correo-2026-11-09.md:31` ("P2 | ✅ Cerrado | `kair@gesstiar.com` activa,
+  con verificación en dos pasos y autenticación por app password").
+- **El Anexo de Nube v1.3 se contradice a sí mismo, y la contradicción está en el instrumento
+  firmado.** El §1 (`anexo-nube-v1.3.html:96-109`) declara, entre los pendientes que "no están
+  cumplidos", que los demás "están cumplidos y este Anexo los declara con su evidencia", y en
+  `:103-104` afirma que "**P2**, `kair@gesstiar.com` está activa, con verificación en dos pasos y
+  autenticación por app password". Pero la ficha técnica del §5, en el mismo archivo, dice lo
+  contrario:
+  - `:635-646` (fila **MFA**): "Estado de la verificación en dos pasos de la cuenta de correo de
+    salida: **pendiente de verificación por el owner (P2)**... su estado de verificación en dos
+    pasos **no está verificado**: no se afirma ni que esté activa ni que no lo esté".
+  - `:547-549` (cuerpo del §5): "El método de autenticación (contraseña de aplicación u OAuth2) y la
+    **habilitación de la verificación en dos pasos de esa cuenta están pendientes de verificación
+    por el owner (P2)**".
+- **La evidencia que el propio §1 promete no existe:** el §1 dice que "P2" está cerrado "con su
+  evidencia", y remite a la ficha técnica del §5; la ficha técnica en la fila de MFA dice que no hay
+  verificación. La promesa de evidencia no tiene a qué fila apuntar.
+- **El parcheo de los textos firmados no tocó esas filas.**
+  `sgsst-electron-app/firma-service/scripts/corregir-anexo-nube-v1.3.js` (22 bloques de parche)
+  intervino los bloques de estado (`:126`, `:145`, `:163`), pero **ninguno** toca la fila de MFA ni
+  la de contraseña de aplicación de la ficha técnica del §5. El resultado es que el Anexo que
+  ASEPLUS firmó el 12-nov dice, en dos lugares del mismo documento, que el MFA está cerrado y en
+  otro que no está verificado.
+- Lo que el propio expediente ya sabía: la fila **T5** del acta del 31-oct
+  (`11-checklist-definitivo-revision-juridica-y-cierre.md:91`) ya había dejado uno de los cuatro
+  puntos abiertos de la ficha del canal: "la fecha de generación de la contraseña de aplicación".
+  Y la fila **J6/J8/J9** sigue pidiendo ratificación externa.
+
+**Qué falta.** (1) La **evidencia primaria del 2SV**: una captura de la consola de Workspace
+(Cuenta → Seguridad → Verificación en dos pasos) con su hash, y el acta que la registre, con el
+mismo formato que la del CDPA (`aceptacion-cdpa-p1-2026-11-10.json` +
+`captura-consola-cdpa-i-accept-2026-11-10.png`). Sin eso, el MFA está declarado, no acreditado.
+(2) **Una versión nueva del Anexo de Nube** (v1.4) que corrija las dos filas que hoy contradicen
+al §1: el Anexo v1.3 **ya está suscrito y contrafirmado** y un texto suscrito no se toca; eso
+arrastra versión nueva del Anexo de Encargo y actualización del manifiesto con las huellas
+nuevas. (3) La ratificación externa que el expediente pide para J6/J8/J9.
+
+**Quién lo tiene.** Owner (captura y acta de la consola de Workspace; es un acto suyo, la
+consola no es accesible al servicio) y equipo (redacción de la v1.4 del Anexo y su regeneration).
+
+**5.6 · Se acredita el uso de contraseña de aplicación, sin incorporarla a los documentos ni al repositorio — PARCIALMENTE.**
+
+**Medicion del 12-nov-2026** (informe `verificacion-cierre/secciones-3-5.md`). Se contrasta el requisito contra el codigo y contra el servidor; lo que sigue es la medicion y su evidencia.
+
+*Cambio de estado: en la ronda del 30-oct-2026 figuraba como PENDIENTE.*
+
+**Qué se verificó.** Dos cosas por separado: (a) que el **método de autenticación** por contraseña
+de aplicación esté acreditado, y (b) que el **secreto no esté** en los documentos ni en el
+repositorio. La segunda es una obligación de no hacer; la primera, una de acreditar.
+
+**Evidencia.**
+- **El secreto no está en ninguna parte: verificado.**
+  - Barrido con el detector del propio repo
+    (`sgsst-electron-app/main/detector-secretos.js`, `escanear()` sobre los archivos versionados):
+    **3891 archivos leídos, 0 hallazgos**.
+  - Medición SSH del 12-nov sobre `/opt/kair-firma/.env`: permisos `-rw-------` y propietario
+    `root root` — el usuario de servicio no lo puede leer. Se midió **presencia y longitud** de
+    `SMTP_PASS`; **su valor no fue leído ni impreso en ningún momento**, ni en los comandos, ni en
+    los logs, ni en este documento.
+  - Los dos anexos lo dicen y lo cumplen: `anexo-nube-v1.3.html:614-616` ("Las credenciales no se
+    documentan en este Anexo ni en ningún documento del expediente") y `:621-622` ("El secreto no
+    se documenta en este Anexo ni en ningún documento del expediente: vive únicamente en el archivo
+    de entorno del servidor").
+- **El método está declarado, pero en el instrumento firmado se contradice.**
+  - `decision-regularizacion-correo-2026-11-09.md:31` — "autenticación por app password
+    (`kair-firma-smtp`, creada el 10-nov-2026)".
+  - `anexo-nube-v1.3.html:101-104` — "**P2**, `kair@gesstiar.com` está activa, con verificación en
+    dos pasos y **autenticación por app password**"; y `:164-165` — "la cuenta está activa, con
+    verificación en dos pasos, y hay un envío real con ese remitente".
+  - Pero la fila **Contraseña de aplicación** de la ficha técnica del §5
+    (`anexo-nube-v1.3.html:613-632`) sigue diciendo: "El método de autenticación **está pendiente de
+    decisión y de verificación por el owner (P2)**: si la consola de Workspace tiene habilitadas
+    las app passwords y la cuenta tiene verificación en dos pasos, la credencial es una app
+    password; si no, la opción es OAuth2, que exige cambio en el código del servicio y variables
+    nuevas".
+- **La fecha de generación sí consta en el expediente, y el Anexo firmado afirma lo contrario.**
+  `anexo-nube-v1.3.html:623-625` dice que "La fecha de generación de la credencial vigente **no
+  consta**" y que "el proveedor de correo no expone la fecha de creación de una app password y el
+  expediente no la registra". Pero `decision-regularizacion-correo-2026-11-09.md:31` **sí** la
+  registra: "creada el 10-nov-2026". La afirmación del Anexo v1.3 es anterior al dato y no se
+  actualizó.
+- **Faltan el procedimiento de rotación y la revocación de la credencial anterior.**
+  `anexo-nube-v1.3.html:628-629` — "Procedimiento y periodicidad de rotación: **aún no hay
+  procedimiento definido**, y el owner lo declara pendiente el 31-oct-2026"; y P6/P11 — revocar las
+  app passwords de la cuenta de correo anterior (`anexo-nube-v1.3.html:99-101`, `:627-628`;
+  `decision-regularizacion-correo-2026-11-09.md:381`;
+  `11-checklist-definitivo-revision-juridica-y-cierre.md:119`, fila **P11**: "**PENDIENTE**, y no
+  bloquea la firma. Revocar las app passwords de la cuenta de correo anterior del Encargado y
+  verificar que no queda ninguna en el archivo de entorno del servidor").
+- **Lo que sí se verificó del lado del servidor:** la credencial instalada es la de la cuenta nueva
+  (el `.env` tiene `SMTP_PASS` y el servicio está `active`, `NRestarts=0`, activo desde
+   2026-11-12 09:30:23 -05) y hubo envíos reales el 12-nov con ella. La **ausencia de
+  `gh_firma_empresas_cuenta_envio`** (0 filas) confirma que no hay una segunda credencial de envío
+  configurada por Empresa.
+
+**Qué falta.** (1) **Una versión nueva del Anexo de Nube** que alinee las tres afirmaciones que
+hoy se contradicen (el §1 da P2 por cerrado; la ficha técnica lo da por pendiente; y la fecha de
+generación que el Anexo declara inexistente y el expediente sí tiene) — el texto está suscrito y
+no se toca. (2) **El procedimiento de rotación** de la credencial, con su periodicidad, que el
+propio Anexo declara inexistente y que el acta del 31-oct ya listaba como pendiente (fila T5).
+(3) **P6/P11**: revocar las app passwords de la cuenta anterior (`adminkair@gmail.com`) y
+verificar que no queda ninguna en el `.env` del servidor. (4) La **evidencia primaria** del 2SV que
+la app password presupone (misma acta y captura que en 5.5), porque la contraseña de aplicación
+solo existe si el 2SV está activo.
+
+**Quién lo tiene.** Owner (la revocación en la consola y el procedimiento de rotación), equipo
+(redacción de la v1.4 del Anexo de Nube y del Anexo de Encargo que la remite, con huellas nuevas en
+el manifiesto). Ningún trabajo de código: el secreto está y debe seguir en el servidor.
 
 **5.7 · Se verifica que los mensajes OTP no incluyan datos sensibles ni documentos
 laborales completos — CERRADO.**
@@ -1044,62 +1530,70 @@ CERRADO.**
 Las rutas `tests/…` citadas en la tabla existen. La batería de 6.11 se ejecutó el 3-nov-2026 en
 el árbol de trabajo local; su reproducción desde clon limpio, asociada al commit T3, sigue pendiente.
 
-**6.11 · Ejecutar la batería completa de pruebas del servicio — PARCIALMENTE.**
-Ejecutada el 3-nov-2026 en el árbol de trabajo; la reproducción desde un clon limpio y su vínculo
-al commit T3 siguen pendientes (no hay todavía commit candidato).
-La corrida anterior, del 30-oct-2026 a las 21:37 (precede a la corrección del cálculo cuando
-falta la fecha real de cese) había reportado **2 033 pruebas · 2 030 verdes · 1 roja · 2
-omitidas · 148,3 segundos**; no acreditaba el estado de esta versión. La del 30-oct-2026 por
-la tarde, sobre el candidato v1.4, reportó **2 062 pruebas · 2 059 verdes · 1 roja · 2
-omitidas** (dos corridas independientes con el mismo resultado, según el registro histórico).
-**Corrida ejecutada el 3-nov-2026 en el árbol de trabajo** con `npm --prefix firma-service test`:
-**2 096 pruebas · 2 094 verdes · 0 rojas · 2 omitidas · 94,8 segundos**. La cifra coincide con
-el reporte previo del equipo. La reconciliación informada sigue siendo 2 062 +16 por el canal
-de fecha de terminación = 2 078; +12 por el control de huellas = 2 090; +6 por el test de menciones de marcador = 2 096 (**+34** total). El test
-`ADVE6.7`, que había sido una falla en una corrida anterior, se corrigió en el test y no era un
-defecto de código (detalle en el punto siguiente). **La ejecución no se hizo desde un clon
-limpio ni está asociada a T3**, porque todavía no hay commit candidato.
-La suite cubre lo que el abogado exige en **T1**: el cómputo desde el cese, las cinco
-categorías del 8.6(b), la fecha de cese desconocida, el hold del contrato, la solicitud de
-copia pendiente, la lápida y el recibo, la no-recalculación histórica y el alineamiento del
-catálogo legado (`tests/conservacion-purga.test.js`, `tests/conservacion-8-6-h.test.js`,
-`tests/services/conservacion-supletoria.test.js`, `tests/conservacion-deber-legal.test.js`,
-`tests/recibo-supresion.test.js`), más el canal de la fecha de terminación
-(`tests/fecha-terminacion-canal.test.js`). El resultado es de esta corrida local; su reproducción
-desde un clon limpio y su vínculo al commit candidato T3 siguen pendientes.
+**6.11 · Ejecutar la bateria completa de pruebas del servicio — PARCIALMENTE.**
 
-- **La única roja era `ADVE6.7: zod acepta "5" (coerce)` y ya está corregida**
-  (`tests/_adversary-e6e7.test.js:58`): esperaba 201 y recibía 422. **No era un defecto de
-  código**: el 422 no venía del `consent_id` que el test mide, sino del control
-  `declaracion_datos_sensibles`, que la ruta exige **desde el commit `5534aca7` (📦978)** y
-  que el test no mandaba. El arreglo fue **en el test**: se le agregó la declaración, y
-  **se conservaron** `version_kair`, `consent_id:'5'` y `assert.equal(r.status, 201)`, que es
-  lo que el caso sigue comprobando. **El archivo sí se modificó en esta ronda**; lo que no se
-  modificó fue el código de producción.
-- **Las dos omitidas, con su razón escrita en el propio test:**
-  (a) `internalServerLimiter: Capa 1 (id_empresa) 429 incluye headers IETF` — «Capa 1 con
-  720 requests es muy lento; ver internalServerLimiter.test.js para test de isolation, y
-  test de Capa 4 más abajo para headers IETF».
-  (b) `§4.2: cliente omite document_hash del metadata → SKIP (zod schema lo requiere)` —
-  «zod schema requiere document_hash; no se puede omitir sin cambiar el schema (fuera de
-  scope)».
-- Ninguna omisión oculta un defecto del producto: son, respectivamente, una prueba de
-  rendimiento y una prueba de esquema que quedó fuera de alcance.
-- **Corrección de esta ronda, reejecutada.** El archivado de los anexos de la firma
-  (`manifiestoLegal.js`) llegaba a tumbar **33 firmas** con un 409 que el C-1 no manda: el
-  C-1 bloquea por el **Anexo de Nube** y solo cuando esa Empresa no lo ha suscrito, y esa
-  regla va detrás de la compuerta `exigirAnexoNube` (encendida) porque el Anexo de Nube v1.0
-  sigue siendo un modelo sin publicar. El bloqueo del **Anexo de Encargo** en el archivado se
-  retiró: esa suscripción ya es requisito de **crear** la solicitud (`empresa.js`), con su
-  excepción auditable, y una firma otorgada por una vía legítima no se deshace. Además, la
-  composición de la evidencia —que con C-2 pasó de 17 a 26 campos— estaba duplicada en cinco
-  pruebas y cada copia era una receta distinta: ahora vive en **una sola** función
-  (`buildEvidenciaFirma`, `tests/helpers.js`), que es la receta de recomputación por terceros.
-- **Observación para la ronda siguiente (no es un defecto):** el plan interno de retención
-  sigue devolviendo `anios: 20` cuando no hay plazo aplicable (compuerta cerrada, sin fecha de
-  cese). Verificado: ese número **no llega a ningún texto** —la rama que lo usaría dice la
-  verdad y no menciona años—, así que no hay nada que corregir en el 8.6. Se deja anotado
-  para que nadie lo reutilice como si fuera un plazo.
+**Medicion del 12-nov-2026** (informe `verificacion-cierre/secciones-6-7.md`). Se contrasta el requisito contra el codigo y contra el servidor; lo que sigue es la medicion y su evidencia.
+
+**Que se verifico.** El texto canonico del requisito y su estado, y las tres fuentes que reportan
+la ultima corrida de la suite: el runbook de despliegue (cifra del 11-nov), el `Historial.md` de
+la ronda del 12-nov (cifra con el arbol de dependencias nuevo) y el informe del abogado, donde T1
+sigue marcado como pendiente de T3.
+
+**Lo que se resolvio el 12-nov-2026 (T1).** La bateria se ejecuto **completa, tres veces, desde un
+clon limpio del repositorio** (`verificacion-cierre/t1-corrida-desde-clon-limpio.md`):
+
+| Corrida | tests | pass | fail | skipped |
+|---|---|---|---|---|
+| A (14:53) | 2 624 | 2 622 | **0** | 2 |
+| B (15:03) | 2 630 | 2 628 | **0** | 2 |
+| C (15:13) | 2 650 | 2 648 | **0** | 2 |
+
+Las tres corrieron en un clon con `npm ci` desde cero (Node 22, ABI 127) y **sin `.env`**, y sus
+conjuntos de nombres de prueba coinciden **exactamente** con las corridas del arbol del owner
+(comparacion cerrada en los dos casos: 14:34 y 15:02). `npm ci` en el clon: `added 139 packages`,
+exit 0, **0 vulnerabilidades**; los devDependencies no se perdieron y `better-sqlite3` carga bajo
+Node 22. El clon final quedó **byte a byte idéntico** al arbol del owner (4 780 de 4 780 archivos
+versionados) y con el mismo `git status --porcelain`.
+
+**Un hallazgo que hay que dejar escrito.** El primer clon se hizo con la configuracion del sistema
+(`core.autocrlf = true`) y **no reproducia el arbol del owner**: materializo 2 697 de los 4 781
+archivos versionados con CRLF, cuando los blobs los tienen en LF. El repo del owner tiene
+`core.autocrlf = false` en su `.git/config` local, que pisa al del sistema. El clon tiene que
+hacerse con `git -c core.autocrlf=false clone`, y `git reset --hard` **no** reescribe los archivos
+que el indice ya da por buenos. Sin eso, un clon "limpio" en esta maquina **no** es el arbol del
+owner, y cualquier prueba que mire bytes puede dar un resultado distinto.
+
+**La corrida final del arbol del owner.** Con el arbol de dependencias ya corregido (las dos altas
+de `npm audit` resueltas) y los tests nuevos de esta ronda, la suite completa se corrio una vez mas
+sobre el arbol de trabajo del owner:
+
+```
+tests 2665 | pass 2663 | fail 0 | cancelled 0 | skipped 2 | todo 0
+duration_ms 317044
+```
+
+179 archivos de prueba, `exit 0`, sin bloques `not ok`. **Esta es la cifra que publica ahora la
+seccion 7 del runbook** (`sgsst-electron-app/docs/MIGRACION-SERVIDOR-FIRMA.md`); la de 2 606 / 2 604
+que publicaba antes ya no era vigente.
+
+**Evidencia.**
+`sgsst-electron-app/docs/gestion-humana/firma-electronica/verificacion-cierre/t1-corrida-desde-clon-limpio.md`
+(el acta, con la salida literal de cada corrida);
+`sgsst-electron-app/docs/gestion-humana/firma-electronica/paquete-abogado-2026-10-30/10-informe-correcciones-para-asesor-juridico.md:132`
+- T3 ("fijar el candidato de codigo") sigue **PENDIENTE: lo tiene el owner**.
+`sgsst-electron-app/docs/MIGRACION-SERVIDOR-FIRMA.md:1232` - "[ ] Correr los tests en el
+servidor. La suite completa nunca se ha corrido ahi". Medido por SSH hoy: `/opt/kair-firma/app/tests`
+**no existe** en el servidor.
+
+**Que falta.** Una sola cosa, y **no es correr mas pruebas**: **vincular la corrida a un commit
+candidato**, que sigue sin existir porque T3 (y el commit) lo tiene el owner. Las otras dos que
+faltaban ya estan: la reproduccion desde un clon limpio (hecha, tres veces, 0 fallos) y la seccion 7
+del runbook (actualizada con la cifra vigente, 2 665 / 2 663 / 0 / 2). Queda una salvedad
+declarada: la corrida se hizo sobre `HEAD` **mas** el trabajo sin commitear de la ronda, que hubo
+que trasladar a mano al clon; la corrida sobre el estado commiteado es la que falta, y es la que
+dara el vinculo.
+
+**Quien lo tiene.** Owner (fijar T3 y autorizar el commit) y equipo (reejecutar sobre el commit).
 
 **6.12 · Documentar los errores preexistentes, pruebas omitidas y resultados nuevos —
 CERRADO.**
@@ -1141,22 +1635,56 @@ corregidos (1.6).
 
 ## 7. Producción y despliegue (15 requisitos)
 
-**7.1 · Confirmar la versión exacta del código que se va a desplegar — PENDIENTE.**
-El checklist anterior reportó el commit **`e1d10728`** (📦993) en la rama `Dev-Pc`, pero
-esta corrección está en el árbol de trabajo sin commit. Se debe elegir y verificar el commit
-que contenga los cambios antes de preparar un despliegue. No se publica ni activa desde este
-paquete.
-Los commits relevantes del árbol de trabajo son: `bd7113a0` (989, conservación con trazabilidad y compuerta), `aa568023`
-(990, Acuerdo v1.3 y anexos), `ede74ebf` (991, despliegue con `config/` y compuerta),
-`2805ef98` (992, limpieza) y `e1d10728` (993, cierre de la limpieza). El paquete se armó con
-`git archive` **de ese commit**, de modo que solo lleva lo commiteado.
-**A 30-oct-2026 el commit candidato todavía no se puede fijar**, y por dos razones que el
-propio abogado escribió (T3): (i) los textos corregidos (Acuerdo v1.4, Anexos y Constancia)
-existen en el árbol de trabajo pero **sin commitear**; (ii) el **paquete** se está
-regenerando en esta misma ronda (el manifiesto ya está en la v1.4, ver 7.2). La diferencia
-entre el paquete y el árbol de trabajo no es cosmética: el `01-acuerdo-uso-v1.3.txt` que
-viaja en el paquete es la copia del árbol de trabajo (71 555 B, `49eab0c5…`), no la que está
-commiteada en `aa568023` (73 056 B, `2f8884c3…`).
+**7.1 · Confirmar la version exacta del codigo que se va a desplegar — PARCIALMENTE.**
+
+**Medicion del 12-nov-2026** (informe `verificacion-cierre/secciones-6-7.md`). Se contrasta el requisito contra el codigo y contra el servidor; lo que sigue es la medicion y su evidencia.
+
+*Cambio de estado: en la ronda del 30-oct-2026 figuraba como PENDIENTE.*
+
+**Que se verifico.** Como se puede identificar hoy el codigo que corre en produccion: el servidor
+no tiene git, no tiene marcador de version, y el endpoint de salud no anuncia version real. Se
+midieron por hash los archivos clave del arbol desplegado y se compararon con el arbol del repo
+en el commit `264d08df`. Se reviso tambien el estado de la sesion de commits.
+
+**Evidencia.**
+`/health` (medido por SSH el 12-nov 13:31) - `{"status":"ok","version":"0.1.0","kair_version":"compatible-0.1.189","uptime_seconds":14441,"checks":{"db":"ok","smtp":"configured"}}`.
+`sgsst-electron-app/firma-service/src/routes/health.js:45` - `kair_version: 'compatible-' + (config.env === 'production' ? '0.1.189' : 'dev')`: es un **valor fijo**, no dice que codigo corre. Por eso la comprobacion tiene que ser por disco, tal como dice el canonico
+(`respuesta-checklist-cierre-2026-10-30.md:1241`).
+Medido por SSH (`sha256sum` en `/opt/kair-firma/app` frente al hash del repo en `264d08df`):
+
+| Archivo | Servidor | Repo `264d08df` | |
+|---|---|---|---|
+| `src/server.js` | `73947e2d...ff90` | `73947e2d...ff90` | igual |
+| `src/services/readinessLegal.js` | `3f453ed2...2d9` | `3f453ed2...2d9` | igual |
+| `config/tabla-conservacion.json` | `9c81a175...a61b` | `9c81a175...a61b` | igual |
+| `legal-readiness.json` | `191c08b8...4013f` | `191c08b8...4013f` | igual |
+| `scripts/fixtures/acuerdo-v1.6.txt` | `08e1eb8b...2f13e` | `08e1eb8b...2f13e` | igual |
+| `package.json` | `0a25dbe8...e424` | `ca60b002...b55ca` | **distinto** |
+
+Medido por SSH: `grep -n '"express"' /opt/kair-firma/app/package.json` devuelve `"express":
+"^4.21.0"`, mientras el repo ya declara el piso `^4.22.3` (paquete 1051). El `package-lock.json`
+desplegado fija `express 4.22.2`, `proxy-addr 2.0.7`, `qs 6.15.3` (lineas 551, 1141 y 1164 del lock
+en disco).
+`Historial.md:24` - el tar del despliegue habilitante fue `kair-deploy.tar.gz` (1 180 396 B,
+sha256 `dc4c6936...97bc6`), armado con el codigo commiteado del paquete 1047 mas el manifiesto
+corregido.
+`Historial.md:8777` - los commits de la sesion (`91214c55` paquete 1050 y `dfc403b0` paquete 1051)
+**no han salido del PC** y el paquete 1051 **no esta desplegado**.
+`Historial.md:8781` - la cola del owner ya dice: "desplegar el 1051 en el servidor (el bump de
+dependencias viaja en el paquete de despliegue, asi que sin desplegar la produccion sigue con las
+versiones viejas)".
+
+**Que falta.** Dos cosas. (a) Para el **proximo** despliegue no hay commit candidato declarado:
+T3 sigue pendiente y el owner no ha fijado uno. (b) El estado desplegado es **mixto**: el codigo
+fuente (`src/`) y el manifiesto coinciden con la punta del repo, pero los archivos de dependencias
+en disco son los anteriores al paquete 1051. Es decir: **hoy no hay un commit unico que describa
+lo que corre**, porque el codigo es de una epoca y el lock de otra. Ningun requisito pide
+controlar eso, pero sin resolverlo la "version exacta" se responde por hash y no por nombre.
+Ningun archivo del servidor declara la version: `package.json` dice `"version": "0.1.0"`
+(constante) y no hay `.git` ni archivo de build.
+
+**Quien lo tiene.** Owner (fijar el commit candidato, con el "dale" que autoriza commit) y
+equipo (desplegar el 1051 con `npm ci --omit=dev`, paso que ya esta documentado).
 
 **7.2 · Confirmar que el manifiesto corresponde a esa versión — CERRADO.**
 `firma-service/legal-readiness.json` es el manifiesto que viaja dentro del paquete, y
@@ -1176,46 +1704,273 @@ lo que pedía el punto 5 de J14.
 `subencargados.google.dpa: false` sigue declarado como tal, sin que el texto afirme lo
 contrario.
 
-**7.3 · Ejecutar las migraciones de base de datos necesarias — PENDIENTE (bloqueante para
-publicar; es la última milla).**
-Las nuevas de esta línea son `047_prueba_aceptacion_supresion`,
-`048_prueba_aceptacion_append_only` y `049_conservacion_supletoria`, **más**
-`050_anexo_nube_por_empresa` y `051_alcance_aceptacion`, que son de esta ronda (la 051
-registra el alcance de la aceptación de C-2: versión y huella de los dos anexos, versión y
-huella de la matriz, medio de disposición y fecha de disposición). **Deben correr con el
-servicio parado.** La 048 es append-only y, en el ambiente de pruebas, las migraciones
-append-only se omiten por directiva de ambiente (`skipEnv: test`) y se prueban por
-separado; en el servidor se aplican.
+**7.3 · Ejecutar las migraciones de base de datos necesarias — CERRADO.**
 
-**7.4 · Comprobar que las migraciones se aplicaron correctamente — PENDIENTE.**
-Se comprueba en disco sobre el servidor, después de migrar.
+**Medicion del 12-nov-2026** (informe `verificacion-cierre/secciones-6-7.md`). Se contrasta el requisito contra el codigo y contra el servidor; lo que sigue es la medicion y su evidencia.
 
-**7.5 · Verificar el estado de la base de datos y sus respaldos — PENDIENTE (el procedimiento
-está escrito; la comprobación es en el servidor).**
-Está declarado en el manifiesto (`infraestructura.respaldos`): copia automatizada diaria a
-las 22:00 hora de Colombia de la base de datos y de la evidencia en PDF, **cifradas en
-reposo** con una frase de paso que el owner conserva **fuera del servidor**; retención de 30
-días de las **copias**, no de los registros; verificación de cada copia con
-`PRAGMA integrity_check` y **prueba de restauración mensual**; la supresión del 8.6 alcanza
-a las copias que siguen existiendo mediante una purga periódica que descifra, suprime,
-recifra y reemplaza cada copia de forma atómica. RTO 4 horas, RPO 24 horas.
+*Cambio de estado: en la ronda del 30-oct-2026 figuraba como PENDIENTE.*
+
+**Que se verifico.** Las migraciones que el canonico pedia (`047`, `048`, `049`, `050`, `051`) y las
+tres que se agregaron despues (`060` contrafirma del Anexo de Nube, `061` registro de poderes del
+Encargado, `062` su rastro append-only), contra la tabla real de migraciones de la base de
+produccion, y la correspondencia uno a uno con los archivos de migracion del repo.
+
+**Evidencia.**
+Medido por SSH: `SELECT COUNT(*) FROM gh_firma_schema_migrations` devuelve **61**, y las tres
+ultimas filas son `060_anexo_nube_contrafirma`, `061_encargado_poderes` y
+`062_encargado_poderes_append_only`, las tres con `applied_at = 2026-11-11 18:52:10` UTC, es
+decir **13:52:10 hora de Colombia**, dentro de la ventana de la reparacion que quedo registrada en
+`Historial.md:74` (13:38-13:52).
+Comparacion 1:1 con el repo: `sgsst-electron-app/firma-service/src/db/schema/` tiene **61**
+archivos `.sql` y el servidor tiene **61** migraciones aplicadas; la diferencia de los dos
+conjuntos (hecha con `Compare-Object`) es **cero en ambos sentidos**: no hay migracion del repo sin
+aplicar ni aplicada que no exista en el repo.
+`Historial.md:74` - las migraciones las aplico **el propio servicio** al arrancar
+(`src/server.js:251`), no un script aparte, con el entorno que le da systemd.
+
+**Que falta.** Nada: queda cerrado. La comprobacion de que quedaron bien aplicadas es el 7.4.
+
+**Quien lo tiene.** - (cerrado por el equipo en la reparacion del 11-nov-2026).
+
+**7.4 · Comprobar que las migraciones se aplicaron correctamente — CERRADO.**
+
+**Medicion del 12-nov-2026** (informe `verificacion-cierre/secciones-6-7.md`). Se contrasta el requisito contra el codigo y contra el servidor; lo que sigue es la medicion y su evidencia.
+
+*Cambio de estado: en la ronda del 30-oct-2026 figuraba como PENDIENTE.*
+
+**Que se verifico.** En disco y sobre la base de produccion: que las tablas, columnas y disparadores
+que traen las tres migraciones nuevas existen de verdad, que la base esta integra, y que las rutas
+que dependen de esas migraciones existen en el codigo que corre (un 404 significa codigo viejo).
+
+**Evidencia.**
+Medido por SSH contra `/opt/kair-firma/data/firma.sqlite`:
+- `060`: la tabla `gh_firma_anexo_nube_suscripciones` tiene **15 columnas `contrafirma*`**
+  (`contrafirmado_at`, `contrafirma_actor`, `contrafirma_motivo`, `contrafirma_codigo_enviado_at`,
+  `contrafirma_canal`, `contrafirma_otp_hash`, `contrafirma_otp_intentos`,
+  `contrafirma_otp_envios`, `contrafirma_estado`, `contrafirma_ip`, `contrafirma_user_agent`,
+  `contrafirma_evidencia`, `contrafirma_acta_hash`, `contrafirma_acta_bytes`,
+  `contrafirma_acta_archivo`); la ficha de empresa tiene las **5** columnas `anexo_nube*`
+  (`anexo_nube_firmado_at`, `_version`, `_hash`, `_evidencia`, `anexo_nube_ejecutado_at`).
+- `061` y `062`: existen `gh_firma_encargado_poderes` y `gh_firma_encargado_poderes_eventos`.
+- Disparadores append-only: **36** disparadores `trg_*_no_delete` / `trg_*_no_update`, entre ellos
+  `trg_firma_eventos_no_delete`, `trg_aprobaciones_publicacion_no_delete`,
+  `trg_anexo_nube_eventos_no_delete`, `trg_encargado_poderes_eventos_no_delete`.
+- `PRAGMA integrity_check` devuelve **ok**.
+- Rutas que dependen del codigo nuevo: `POST` sin llave a las cuatro rutas de deshacer los actos
+  devuelven **401** (existen), mientras una ruta inexistente devuelve **404**
+  (medido por SSH el 12-nov 13:41).
+
+**Que falta.** Nada: queda cerrado.
+
+**Quien lo tiene.** - (cerrado por la reparacion del 11-nov-2026, verificado hoy por SSH).
+
+**7.5 · Verificar el estado de la base de datos y sus respaldos — PENDIENTE.**
+
+**Medicion del 12-nov-2026** (informe `verificacion-cierre/secciones-6-7.md`). Se contrasta el requisito contra el codigo y contra el servidor; lo que sigue es la medicion y su evidencia.
+
+**Que se verifico.** El estado de la base de produccion, el ciclo de respaldo diario (cifrado,
+integridad, retencion), la existencia de una copia fuera del servidor, y si la **prueba de
+restauracion mensual** que el propio manifiesto promete se ha ejecutado alguna vez. Ademas: si los
+cuatro actos del P8 estan en algun respaldo.
+
+**Evidencia.**
+Medido por SSH:
+- Base de produccion: `/opt/kair-firma/data/firma.sqlite` (872 448 B) con su WAL y SHM del
+  12-nov 11:14; `PRAGMA integrity_check` = **ok**; 1 empresa (`900829731`), 2 suscripciones del
+  Anexo de Nube y 2 del Anexo de Encargo.
+- Ciclo de respaldo: `/etc/cron.d/kair-firma-backup` = `0 22 * * * root /opt/kair-firma/backup-firma.sh`.
+  El log `backups/backup.log` del 11-nov 22:00 dice: "Backup OK: firma-20261111-220001.sqlite.enc
+  (164714 B, sha256 `de14e3f4b3c94c32eb690ae9215c111cdc1b450c963726eac54bd5192ebde20a`, integrity
+  ok, cifrado gpg) + storage-20261111-220001.tar.gz.enc". La frase de paso vive en
+  `/opt/kair-firma/backup.passphrase` (600 root:root).
+- **El ultimo respaldo es del 11-nov a las 22:00.** Los cuatro actos del P8 (12-nov 15:38 a
+  16:14) **no estan en ningun respaldo todavia**: al momento de esta medicion (12-nov 13:35) el
+  respaldo de hoy todavia no se habia hecho. Esto ya lo reporta el propio equipo en
+  `Historial.md:8788`.
+- **No hay copia fuera del servidor**: los 52 archivos `.enc` viven en `/opt/kair-firma/backups`, y
+  `df -h` dice que `/opt` esta en `/dev/mapper/ubuntu--vg-ubuntu--lv` (11 % usado, 91 GB libres) -
+  el **mismo disco** que la base. No existe `/opt/kair-firma/backups-offsite`, no hay `/mnt/*` ni
+  `/media/*`, y no hay `rclone` instalado. El propio runbook lo lista como pendiente:
+  `sgsst-electron-app/docs/MIGRACION-SERVIDOR-FIRMA.md:1154` ("[ ] Copia **off-site** de los
+  respaldos (hoy viven en el mismo servidor que los datos)").
+- **La prueba de restauracion mensual nunca se ha ejecutado**: `/etc/cron.d/kair-firma-restauracion`
+  esta en `0 4 1 * *` y escribe en `/opt/kair-firma/backups/restauracion.log`, archivo que **no
+  existe** (los crons se instalaron el 6-nov, despues del 1 de noviembre, y el 1 de diciembre
+  todavia no llega). Es decir: el manifiesto promete "una prueba de restauracion mensual"
+  (`sgsst-electron-app/firma-service/legal-readiness.json:47`) y esa prueba **nunca ha corrido una
+  vez**.
+
+**Que falta.** Tres cosas, y la primera es la unica urgente: (a) **el respaldo de hoy (12-nov 22:00)
+debe correr y verificarse**, porque hasta entonces los cuatro actos del P8 -la evidencia de los
+actos que el propio expediente declara como ejecutados- **no estan en ninguna copia**: un fallo de
+disco hasta las 22:00 los pierde. (b) **La copia off-site**, que es la brecha mas grande del plan de
+continuidad y la mas facil de cerrar. (c) **Ejecutar y registrar una prueba de restauracion** al
+menos una vez, para que la frase "se verifica mensualmente que el respaldo se restaura
+correctamente" del Anexo de Nube no sea una promesa sin un solo respaldo restaurado nunca.
+
+**Quien lo tiene.** Equipo (correr y verificar el respaldo de hoy; instalar la copia off-site) y
+owner (la cuenta y el destino de la copia off-site).
 
 **7.6 · Comprobar los permisos de archivos y directorios — PENDIENTE.**
-`sudo chown -R kairfirma:kairfirma /opt/kair-firma/app /opt/kair-firma/legal`.
 
-**7.7 · Comprobar la configuración de seguridad del servicio — PENDIENTE.**
-En el servidor: claves de entorno, llaves de API y rutas del túnel.
+**Medicion del 12-nov-2026** (informe `verificacion-cierre/secciones-6-7.md`). Se contrasta el requisito contra el codigo y contra el servidor; lo que sigue es la medicion y su evidencia.
 
-**7.8 · Verificar que no haya credenciales expuestas — PENDIENTE (en el repositorio: cerrado).**
-**Verificado en el repositorio:** no hay ninguna credencial en el código ni en los ocho
-adjuntos. Las llaves se leen del entorno (`ADMIN_API_KEY` e `INTERNAL_API_KEY`) y en el
-servidor viven en `/opt/kair-firma/admin-key.txt` e `internal-key.txt`. Falta verificar en
-el servidor que esos dos archivos tienen permisos restringidos y no los lee nadie más.
+**Que se verifico.** Los permisos reales del arbol desplegado, contra lo que el propio runbook
+exige. Se midieron el directorio de la app, sus subdirectorios, los archivos, y cuantos archivos y
+directorios quedan con permiso de escritura para cualquiera.
 
-**7.9 · Verificar los registros y mecanismos de auditoría — PENDIENTE (el mecanismo está
-cerrado).**
-El mecanismo está construido y probado: bitácora de solo anexado con disparadores de base
-de datos. Falta la comprobación en el servidor.
+**Evidencia.**
+Medido por SSH (`ls -ld` / `ls -l` en `/opt/kair-firma`):
+
+```
+drwxrwxrwx  8 kairfirma kairfirma  4096 nov 11 13:52 /opt/kair-firma/app
+drwxrwxrwx  9 kairfirma kairfirma  4096 nov 11 13:52 /opt/kair-firma/app/src
+-rw-rw-rw-  1 kairfirma kairfirma 11796 nov 11 07:04 /opt/kair-firma/app/src/server.js
+-rw-rw-rw-  1 kairfirma kairfirma  1171 nov 11 07:04 /opt/kair-firma/app/package.json
+drwxr-xr-x  2 kairfirma kairfirma  4096 nov 11 14:01 /opt/kair-firma/legal
+```
+
+Conteo: **236 archivos** y **18 directorios** bajo `/opt/kair-firma/app` con bit de escritura para
+otros (`-perm -0002`).
+`sgsst-electron-app/docs/MIGRACION-SERVIDOR-FIRMA.md:768` - lo que el runbook exige: "`drwxr-x---`
+en `app/`, `drwxr-xr-x` en `app/src/`, `-rw-r--r--` en los archivos".
+`sgsst-electron-app/docs/MIGRACION-SERVIDOR-FIRMA.md:279` - el paso 2b del despliegue
+(`chmod -R u=rwX,go=rX` y `chmod 750` sobre `app/` y `legal/`) **no se aplico**: el script de
+reparacion del 11-nov (`kair-reparar-produccion-v2.sh`, `Historial.md:74`) repuso `node_modules` y
+aplico las migraciones, pero no normalizo permisos.
+`sgsst-electron-app/docs/MIGRACION-SERVIDOR-FIRMA.md:735` - el abogado ya lo habia marcado el
+31-oct-2026: "con permisos 777, cualquier usuario de la maquina puede escribir el codigo que corre
+el servicio, y eso no es 'minimo privilegio'".
+Medido por SSH: `id javier` -> `uid=1000(javier) gid=1000(javier) groups=1000(javier),4(adm),24(cdrom),27(sudo),30(dip),46(plugdev),101(lxd)`. La cuenta de servicio corre como `kairfirma`
+(`/etc/systemd/system/kair-firma.service`), y con `app/` en 777 una cuenta local cualquiera puede
+**reemplazar el codigo que despues se ejecuta como `kairfirma`**: es una via de escalamiento, no
+solo un desorden de permisos.
+Lo que **si** esta bien: el paso 2c no aplica (no existe `/opt/kair-firma/app/data`, ni
+`app/data/test.sqlite`; medido: "cannot access"), y los secretos **no** viven en `app/`:
+`sgsst-electron-app/docs/MIGRACION-SERVIDOR-FIRMA.md:771`.
+
+**Que falta.** Aplicar el paso 2b del runbook (`chmod -R u=rwX,go=rX` mas `chmod 750` sobre `app/` y
+`legal/`), que es una operacion de root y no la hizo el despliegue. Es el unico punto de esta
+seccion que el propio abogado habia marcado como bloqueante y que sigue igual cuatro meses de
+despues.
+
+**Quien lo tiene.** Owner (ejecutar el `chmod` con su clave de sudo); el procedimiento ya esta
+escrito y es de una sola linea.
+
+**7.7 · Comprobar la configuracion de seguridad del servicio — PENDIENTE.**
+
+**Medicion del 12-nov-2026** (informe `verificacion-cierre/secciones-6-7.md`). Se contrasta el requisito contra el codigo y contra el servidor; lo que sigue es la medicion y su evidencia.
+
+**Que se verifico.** Como esta expuesto el servicio (puertos, entrada, proxy), como esta endurecida
+la unidad de systemd, que versiones de dependencias corre de verdad el proceso, con que runtime, y
+si el disco esta cifrado.
+
+**Evidencia.**
+Medido por SSH:
+- **Superficie**: `ss -ltn` muestra el servicio escuchando **unicamente en `127.0.0.1:3001`**. No
+  hay 80 ni 443 abiertos, no hay `nginx` ni `caddy` instalados. La unica entrada es
+  `/etc/cloudflared/config.yml`: `firma.kair.fyi -> http://127.0.0.1:3001`. La VM corre ademas
+  Cockpit (4330) y un agente de Tailscale, que son superficies por revisar aparte.
+- **Unidad systemd** (`/etc/systemd/system/kair-firma.service`): `User=kairfirma`,
+  `EnvironmentFile=/opt/kair-firma/.env`, `NoNewPrivileges=true`, `PrivateTmp=true`,
+  `ProtectSystem=full`, `ReadWritePaths=/opt/kair-firma`, `LimitNOFILE=65536`.
+- **Proxy de confianza**: `sgsst-electron-app/firma-service/src/config.js:58` ->
+  `trustProxy: process.env.TRUST_PROXY || 'loopback'`, aplicado en
+  `sgsst-electron-app/firma-service/src/server.js:67` -> `app.set('trust proxy', config.trustProxy)`.
+  El valor por defecto es `'loopback'` y el codigo nunca usa `'true'`
+  (`sgsst-electron-app/firma-service/deploy/README-DESPLIEGUE.md:45`). El valor real vive en el
+  `.env` (600 root), que esta cuenta no puede leer: **esa comprobacion puntual queda del owner**.
+- **Dependencias que corre el proceso** (leidas de `node_modules` en el servidor):
+  `express 4.22.2`, `proxy-addr 2.0.7`, `qs 6.15.3`, `nodemailer 6.10.1`, `zod 3.25.76`. Es decir,
+  **produccion sigue con la version CRITICA de `proxy-addr` (2.0.7) y con las dos ALTAS**
+  (`nodemailer`, `zod`). El repo ya las corrigio (`Historial.md:8735`: `proxy-addr` 2.0.8, `qs`
+  6.16.2, `express` 4.22.3), pero **ese cambio no esta desplegado**
+  (`sgsst-electron-app/docs/MIGRACION-SERVIDOR-FIRMA.md:346`).
+- **Runtime**: `/usr/bin/node --version` -> **v20.20.2** (Node 20, EOL 2026-04-30). La decision del
+  owner del 11-nov es Node 22 (`sgsst-electron-app/docs/MIGRACION-SERVIDOR-FIRMA.md:1186`), y el
+  propio runbook avisa de que subirlo obliga a recompilar `better-sqlite3` antes de arrancar.
+- **Cifrado en reposo**: `/dev/mapper` solo tiene `ubuntu--vg-ubuntu--lv` (sin `crypt`), y
+  `/swap.img` es un archivo plano de 3,7 GB. El disco **no esta cifrado**, ya registrado como
+  pendiente en `sgsst-electron-app/docs/MIGRACION-SERVIDOR-FIRMA.md:776`.
+
+**Que falta.** (a) **Desplegar el paquete 1051 con `npm ci --omit=dev`**, que es lo que deja de
+correr `proxy-addr` 2.0.7 y `qs` 6.15.3: hasta ese dia, el proceso ejecuta la version critica
+aunque el repo ya la haya corregido. (b) **La decision del runtime**: Node 22, con su recompilacion
+de `better-sqlite3` (ABI 127) antes de arrancar. (c) **El cifrado en reposo del disco**, que no es
+un parche sino una decision del owner con el abogado. (d) La lectura del `TRUST_PROXY` real, que
+solo puede hacer el owner porque el `.env` es 600 root.
+
+**Quien lo tiene.** Equipo (desplegar el 1051 y recompilar el binario); owner (Node 22, cifrado en
+reposo, lectura del `.env`).
+
+**7.8 · Verificar que no haya credenciales expuestas — CERRADO.**
+
+**Medicion del 12-nov-2026** (informe `verificacion-cierre/secciones-6-7.md`). Se contrasta el requisito contra el codigo y contra el servidor; lo que sigue es la medicion y su evidencia.
+
+*Cambio de estado: en la ronda del 30-oct-2026 figuraba como PENDIENTE.*
+
+**Que se verifico.** Que los archivos de credenciales del servidor tengan permisos restringidos y que
+no los pueda leer nadie mas; que no haya material de clave dentro del arbol de codigo desplegado;
+y que el repositorio este limpio de credenciales.
+
+**Evidencia.**
+Medido por SSH (`stat`): `/opt/kair-firma/.env` **600 root:root**; `/opt/kair-firma/admin-key.txt`
+**600 kairfirma:kairfirma**; `/opt/kair-firma/internal-key.txt` **600 kairfirma:kairfirma**;
+`/opt/kair-firma/backup.passphrase` **600 root:root**. La cuenta de verificacion (`javier`,
+uid 1000) **no puede leer ninguno de los cuatro** (el `grep` del `.env` responde "Permission
+denied" y el `grep -o '^[A-Z_]*='` no imprime ni un nombre).
+Barrido del arbol desplegado (`src`, `config`, `scripts`, `web`) con patrones de clave privada,
+`sk_live_`, `ghp_` y `xox*`: **sin coincidencias**.
+Barrido del repositorio (`firma-service`, 361 archivos `.js/.json/.txt/.html` sin `node_modules`) con
+los mismos patrones: **sin coincidencias**.
+`sgsst-electron-app/docs/gestion-humana/firma-electronica/respuesta-checklist-cierre-2026-10-30.md:1209`
+- el canonico ya daba por cerrado el lado del repositorio y dejaba pendiente solo la comprobacion en
+el servidor de los permisos de los dos archivos de llave: **esa comprobacion esta hecha**.
+`Historial.md:8756` - "Barrido de secretos: limpio" en la ronda del 12-nov.
+
+**Que falta.** Nada respecto de las credenciales: queda cerrado. **Reserva que no pertenece a este
+requisito pero se deja dicha porque es su vecina:** el arbol de codigo esta en 777 (7.6), o sea que
+el riesgo residual no es "una credencial expuesta" sino "un codigo reemplazado". Se corrige en el
+7.6, no aqui.
+
+**Quien lo tiene.** - (cerrado: verificacion de solo lectura del 12-nov-2026).
+
+**7.9 · Verificar los registros y mecanismos de auditoria — CERRADO.**
+
+**Medicion del 12-nov-2026** (informe `verificacion-cierre/secciones-6-7.md`). Se contrasta el requisito contra el codigo y contra el servidor; lo que sigue es la medicion y su evidencia.
+
+*Cambio de estado: en la ronda del 30-oct-2026 figuraba como PENDIENTE.*
+
+**Que se verifico.** Que las tablas de bitacora existen y tienen contenido, que los disparadores
+append-only estan instalados, y que los actos del P8 (12-nov) quedaron con rastro.
+
+**Evidencia.**
+Medido por SSH:
+- `gh_firma_eventos`: **55 filas**, con el desglose por evento: `CREATED 5`,
+  `IDENTIFICATION_COMPLETED 4`, `INVITE_SENT 4`, `OPENED 4`, `OTP_SENT 4`, `OTP_VERIFIED 4`,
+  `PAPER_OPTION_AVAILABLE 4`, `CONSENT_ACCEPTED 2`, `SIGN_COMMITTED 2`,
+  `PAPER_SIGNATURE_REGISTERED 1`, `ELECTRONIC_FLOW_CANCELLED 1`, `OTP_FAILED 1`, y otros.
+- **36 disparadores append-only** instalados, entre ellos `trg_firma_eventos_no_delete` y
+  `trg_firma_eventos_no_update`, `trg_aprobaciones_publicacion_no_delete/update`,
+  `trg_anexo_nube_eventos_no_delete/update`, `trg_anexo_encargo_eventos_no_delete/update`,
+  `trg_encargado_poderes_eventos_no_delete/update`, `trg_empresas_auditoria_no_delete/update`,
+  `trg_firma_purga_registro_no_delete/update`.
+- Rastro de los actos del P8: `gh_firma_anexo_nube_eventos` con **15** filas (las ultimas:
+  `CONTRAFIRMA_CODIGO_INVALIDO` 15:41:11, `CONTRAFIRMA_CODIGO_ENVIADO` 16:12:54,
+  `CONTRAFIRMA_FACULTAD_VERIFICADA` 16:13:54, `CONTRAFIRMA_FIRMADA` 16:13:54,
+  `CONTRAFIRMA_ACTA_GENERADA` 16:13:54 con `hash=050f223a...4a501`) y
+  `gh_firma_anexo_encargo_eventos` con **20** filas (`REPRESENTANTE_VERIFICADO` 15:40:32,
+  `CONTRAFIRMA_FIRMADA` 16:14:31, acta `5dcb2149...4b062`).
+- `gh_firma_aprobaciones_publicacion` con **4** filas, todas de tipo `OPERATIVA` y con
+  `aprobado_por` = Javier Robles Fontalvo (v1.0, v1.4, v1.5, v1.6), y `gh_firma_empresas_auditoria`
+  con su disparador de solo anexado.
+- Bitacora del sistema: `journalctl -u kair-firma` responde y el monitor de salud cada 5 minutos
+  deja log en `/opt/kair-firma/logs/health-check.log` (409 619 B al 12-nov 13:35).
+
+**Que falta.** Nada: queda cerrado.
+
+**Quien lo tiene.** - (cerrado: mecanismo construido y probado por el equipo, verificado hoy por
+SSH en produccion).
 
 **7.10 · Comprobar que el feature flag permanezca desactivado hasta la autorización —
 CERRADO, y no por un flag sino por la fuente legal.**
@@ -1231,27 +1986,115 @@ promete ningún plazo de custodia. El abogado fijó en **J8** el orden en que es
 → alinear el catálogo legado → reejecutar pruebas → **entonces** abrir la compuerta, con
 validación escrita (ver 3.2).
 
-**7.11 · Ejecutar pruebas controladas de extremo a extremo — PENDIENTE (la última milla).**
-`scripts/smoke-produccion.js --e2e --confirmar-e2e`, y después
-`scripts/limpiar-rastro-prueba.js --solo-firmas` para retirar el rastro de la prueba.
-**Referencia:** ese mismo script corrió contra `https://firma.kair.fyi` el 26-oct-2026 con
-**12 comprobaciones y 0 fallas**, abriendo el enlace que él mismo acababa de crear y
-resolviendo el token.
+**7.11 · Ejecutar pruebas controladas de extremo a extremo — PENDIENTE.**
 
-**7.12 · Verificar la versión y las migraciones en el servidor real — PENDIENTE, y es el
-punto que no se puede cerrar desde este equipo.**
-El endpoint `/health` del servidor **responde, pero no anuncia versión ni migraciones**:
-devuelve `kair_version: "compatible-0.1.189"`, que es un valor fijo y no dice qué código
-está corriendo. Por eso la comprobación tiene que ser **por disco**: la huella de
-`/opt/kair-firma/app/config/tabla-conservacion.json` y de
-`/opt/kair-firma/app/scripts/fixtures/acuerdo-v1.4.txt` (el texto candidato es ahora la
-v1.4, con `7298a943…c585490f`), y la verificación de las
-migraciones aplicadas. No hay acceso SSH desde el equipo portátil, así que esta verificación
-se hace por el panel de control del servidor.
+**Medicion del 12-nov-2026** (informe `verificacion-cierre/secciones-6-7.md`). Se contrasta el requisito contra el codigo y contra el servidor; lo que sigue es la medicion y su evidencia.
 
-**7.13 · Registrar el resultado de la comprobación del servidor — PENDIENTE.**
-Es el acta del despliegue. El documento que la recoge es
-`docs/MIGRACION-SERVIDOR-FIRMA.md`, sección 5.1.
+**Que se verifico.** Si el flujo electronico completo se ha ejercitado en produccion contra el
+codigo que hoy corre, y si el caso real que el abogado pidio (buzon corporativo rechazado) ha
+ocurrido alguna vez.
+
+**Evidencia.**
+Medido por SSH:
+- Las **cinco** firmas de la base de produccion: `SIGN-2026-734698` (26-oct, OPENED),
+  `SIGN-2026-827084` (26-oct, OTP_VERIFIED), `SIGN-2026-927141` (26-oct, SIGNED),
+  `SIGN-2026-738564` (06-nov, SIGNED) y `SIGN-2026-016820` (06-nov, CANCELLED). La **ultima
+  firma electronica completa es del 6 de noviembre**: despues del despliegue del 11-nov y de los
+  cuatro actos del P8 del 12-nov **no se ha ejercitado el flujo de firma**.
+- El evento mas reciente de la bitacora es del 06-nov 20:25:34Z (`ELECTRONIC_FLOW_CANCELLED`).
+- Los dos programas que el canonico exige estan en el servidor
+  (`/opt/kair-firma/app/scripts/smoke-produccion.js` y `limpiar-rastro-prueba.js`, ambos del
+  11-nov 07:04), pero **no se han corrido** contra el codigo actual.
+- El caso real rechazado **no ha ocurrido**: hay **0 eventos `OTP_MEDIO_CORPORATIVO`** en la base.
+  Esto es T6 del abogado y sigue abierto:
+  `sgsst-electron-app/docs/gestion-humana/firma-electronica/paquete-abogado-2026-10-30/10-informe-correcciones-para-asesor-juridico.md:135`.
+- La referencia historica que el propio canonico cita
+  (`respuesta-checklist-cierre-2026-10-30.md:1237`) es del **26-oct-2026** con 12 comprobaciones y
+  0 fallas: contra el codigo de esa fecha, no contra el de hoy.
+- `sgsst-electron-app/docs/MIGRACION-SERVIDOR-FIRMA.md:1123` - el pendiente del runbook:
+  "[ ] Correr los tests de extremo a extremo con datos reales: crear sign request, enviar la
+  invitacion por correo, firmar desde el celular y descargar la constancia".
+
+**Que falta.** Una corrida controlada de extremo a extremo **contra el codigo desplegado hoy**:
+crear la solicitud, enviar la invitacion, firmar desde el celular y descargar la constancia, y
+despues retirar el rastro con `limpiar-rastro-prueba.js --solo-firmas`. Con eso se cierra 7.11 y
+ademas el T6 del abogado (el caso del buzon corporativo rechazado, que es el que la compuerta C-1
+debe ver ocurrir en la vida real antes de encenderse para empresas que no tengan el Anexo de Nube).
+Es el unico pendiente de esta seccion que exige **una persona con un celular**, no un script.
+
+**Quien lo tiene.** Owner (firma desde el celular y descarga de la constancia) con el equipo
+(smoke, limpieza del rastro y acta).
+
+**7.12 · Verificar la version y las migraciones en el servidor real — PARCIALMENTE.**
+
+**Medicion del 12-nov-2026** (informe `verificacion-cierre/secciones-6-7.md`). Se contrasta el requisito contra el codigo y contra el servidor; lo que sigue es la medicion y su evidencia.
+
+*Cambio de estado: en la ronda del 30-oct-2026 figuraba como PENDIENTE.*
+
+**Que se verifico.** Las dos mitades del requisito, por separado: las migraciones en el servidor real
+y la version del codigo que corre en el servidor real.
+
+**Evidencia.**
+*Migraciones: verificadas* (mismo detalle que en 7.3 y 7.4): 61 de 61 aplicadas, 1:1 con el repo,
+`integrity_check` ok, tablas, columnas y disparadores presentes, y las cuatro rutas que dependen de
+las migraciones respondiendo 401 y no 404.
+*Version: no se puede leer del servicio.* `sgsst-electron-app/firma-service/src/routes/health.js:45`
+devuelve `kair_version: 'compatible-' + (config.env === 'production' ? '0.1.189' : 'dev')`, un
+valor fijo. Medido por SSH: `/opt/kair-firma/app` **no tiene `.git`** y su `package.json` declara
+`"version": "0.1.0"`, tambien fijo. El canonico ya lo anticipaba:
+`respuesta-checklist-cierre-2026-10-30.md:1243` ("responde, pero no anuncia version ni
+migraciones"), y por eso la comprobacion tiene que ser por disco.
+*Por disco si se puede, y da un resultado que no es limpio:* los hashes de `src/server.js`,
+`src/services/readinessLegal.js`, `config/tabla-conservacion.json`, `legal-readiness.json` y
+`scripts/fixtures/acuerdo-v1.6.txt` **coinciden con el repo en `264d08df`**; los de
+`package.json` y `package-lock.json` **no** (el deployed lock fija `express 4.22.2`,
+`proxy-addr 2.0.7`, `qs 6.15.3`).
+El manifiesto de produccion si esta verificado byte a byte: `sha256sum
+/opt/kair-firma/app/legal-readiness.json` = `191c08b837b41069de4e2d25d7158fd90a7c3ce5f93b22696d2d7050f8a4013f`,
+que es el hash canonico del repo.
+
+**Que falta.** La mitad de migraciones esta resuelta. La de version queda a medias: (a) **no hay
+sello de version en el servidor** (ni git, ni build, ni version leida del manifiesto), asi que
+responder "que version corre" obliga a comparar hashes archivo por archivo; y (b) el arbol
+desplegado es **mixto** (codigo de la punta del repo, dependencias de antes del paquete 1051), de
+modo que **ningun commit unico describe lo que corre ahora mismo**. Resolverlo es lo mismo que
+desplegar el 1051 y dejar el sello de version.
+
+**Quien lo tiene.** Equipo (desplegar el 1051 con `npm ci --omit=dev` y dejar el sello de version);
+owner (decidir si el sello se lee del manifiesto o del hash de un archivo de build).
+
+**7.13 · Registrar el resultado de la comprobacion del servidor — CERRADO.**
+
+**Medicion del 12-nov-2026** (informe `verificacion-cierre/secciones-6-7.md`). Se contrasta el requisito contra el codigo y contra el servidor; lo que sigue es la medicion y su evidencia.
+
+*Cambio de estado: en la ronda del 30-oct-2026 figuraba como PENDIENTE.*
+
+**Que se verifico.** Que el resultado de la comprobacion del servidor quedara **escrito en el
+documento que el canonico designa**, y no solo medido. Antes de esta medicion, la seccion 5.1 del
+runbook era **solo el procedimiento** (parar, copiar, normalizar permisos, verificar hashes, migrar,
+arrancar, verificar) y el resultado vivia disperso en el `Historial.md` y en los informes. Ahora el
+resultado esta en la seccion 5.1 del runbook, en un apartado propio.
+
+**Evidencia.**
+`sgsst-electron-app/docs/MIGRACION-SERVIDOR-FIRMA.md`, seccion **5.1.4 «El resultado medido de la
+comprobacion del servidor (12-nov-2026)»**: la medicion completa, con el commit de referencia
+(`264d08df`), el estado del servicio, las migraciones, las cuatro huellas, los permisos, los logs, la
+red, los respaldos y el resultado del preflight; mas la comparacion archivo por archivo del arbol
+desplegado (247 archivos en comun, 6 diferentes, 0 sobrantes) y el comando para reproducirla.
+Las actas completas, con la salida integra de cada comando, estan en
+`verificacion-cierre/acta-comprobacion-servidor-2026-11-12.md` (esta comprobacion) y
+`verificacion-cierre/acta-despliegue-2026-11-12.md` (el despliegue, requisito 8.8).
+La medicion se hizo el 12-nov-2026, 19:52Z a 19:57Z, por SSH en modo de solo lectura: la base se
+midio con `sqlite3 -readonly` y el unico script que necesita abrirla (el preflight) se corrio contra
+una **copia** hecha con `.backup`, que es consistente; la original no se abrio en escritura.
+
+**Que falta.** Nada del requisito: el resultado quedo registrado en el lugar que el canonico
+designa, con el commit, las huellas, las migraciones, lo verificado y lo que quedo abierto con su
+dueno. **Lo que el acta deja abierto es de otros requisitos** (7.5, 7.6, 7.7, 7.15 y el despliegue del
+📦1051), y esos no se cierran por escribir un acta.
+
+**Quien lo tiene.** Equipo (medir y escribir el acta). La parte que queda es del owner y esta
+nombrada en el propio apartado 5.1.4.
 
 **7.14 · Preparar un procedimiento de reversión o suspensión — CERRADO.**
 - **Suspensión inmediata:** `sudo systemctl stop kair-firma` (deja de atender con el código
@@ -1263,17 +2106,80 @@ Es el acta del despliegue. El documento que la recoge es
   revierte antes de tocar nada; la restauración de la base se hace con el respaldo de las 22:00 del
   día anterior.
 
-**7.15 · Autorizar expresamente la activación del flujo — PENDIENTE (bloqueante para
-publicar; corresponde al owner después de completar las verificaciones).**
+**7.15 · Autorizar expresamente la activacion del flujo — PENDIENTE.**
 
----
+**Medicion del 12-nov-2026** (informe `verificacion-cierre/secciones-6-7.md`). Se contrasta el requisito contra el codigo y contra el servidor; lo que sigue es la medicion y su evidencia.
+
+**Que se verifico.** Que exista un acto expreso del owner autorizando la activacion del flujo, y
+cual es el estado real de las compuertas que hoy gobiernan la apertura.
+
+**Evidencia.**
+Medido por SSH, `gh_firma_aprobaciones_publicacion` (4 filas): las cuatro autorizaciones
+registradas son de tipo `OPERATIVA` y se refieren a **publicar el Acuerdo** (v1.0, v1.4, v1.5,
+v1.6), con `aprobado_por` = Javier Robles Fontalvo. **Ninguna de las cuatro es una autorizacion
+de activacion del flujo.**
+Estado real de las compuertas, medido:
+- `sgsst-electron-app/firma-service/config/tabla-conservacion.json:6` -> `"activada": false`, con
+  `"validado_por": null` y `"estado": "PROPUESTA"`: la compuerta de conservacion **esta cerrada a
+  proposito** (es el orden J8 del abogado: validar, alinear, reejecutar pruebas y solo entonces
+  abrir).
+- `sgsst-electron-app/firma-service/src/config.js:203` ->
+  `exigirAnexoNube: process.env.FIRMA_EXIGIR_ANEXO_NUBE === 'true'`: el interruptor C-1 **esta
+  apagado** (y el propio codigo exige un orden escrito antes de encenderlo).
+- `sgsst-electron-app/firma-service/legal-readiness.json:10` -> `"publicado": true`; linea 142
+  `"firmado": true`; linea 147 `"contrafirmado": true`; lineas 115 y 137 `"estado": "firmado"`.
+  La compuerta tecnica esta en verde: `Historial.md:8694` ("42 items cada uno, 40 `ok`, 0
+  pendientes, **0 bloqueantes**") y `sgsst-electron-app/docs/MIGRACION-SERVIDOR-FIRMA.md:1318` (la
+  compuerta `primera_firma` en `listo: true`).
+- Pero la base tiene **una sola empresa** (medido: `900829731`, ASEPLUS CARIBE S.A.S.), que es la
+  empresa de prueba: `Historial.md:8714` ("lo que no esta hecho es abrirlo a una empresa real: en
+  la base de produccion hay UNA sola empresa, ASEPLUS CARIBE S.A.S., que es la de prueba").
+- `.../paquete-abogado-2026-10-30/10-informe-correcciones-para-asesor-juridico.md:137` - **T8**
+  ("Decision operativa del representante legal, identificando version/huella y verificaciones")
+  sigue **Pendiente**.
+
+**Que falta.** El **acto expreso del owner que autorice abrir el flujo a empresas reales**, con la
+version, la huella y las verificaciones que lo sostienen (T8). Lo que hoy existe es otra cosa y hay
+que distinguirla con cuidado: (a) la autorizacion de **publicar el Acuerdo v1.6**, que ya esta
+registrada (fila 4 de `gh_firma_aprobaciones_publicacion`); (b) los **cuatro actos del P8**, que
+se ejecutaron sobre la **empresa de prueba**; y (c) el hecho de que la compuerta tecnica este en
+verde con 0 bloqueantes. **Ninguna de las tres cosas es la autorizacion de abrir el flujo**, y
+ademas esa apertura tiene dos compuertas de proposito que hoy estan cerradas
+(`aplicacion.activada: false` y `FIRMA_EXIGIR_ANEXO_NUBE` apagado): la de la tabla de conservacion
+por decision del owner con el abogado (J8), y la del Anexo de Nube, que el codigo exige no
+encender sin validar y reejecutar pruebas.
+
+**Quien lo tiene.** Owner (el acto mismo, con su responsable y sus verificaciones), con el abogado
+para la validacion de la compuerta de conservacion (J8) y la ratificacion externa (J6 y J7).
 
 ## 8. Constancia y cierre formal (10 requisitos)
 
-**8.1 · El owner registra sus decisiones sobre el contenido — PENDIENTE.**
-Las preguntas J1-J14 siguen abiertas hasta que el owner documente una respuesta, condición
-o estado pendiente para cada una. Las recomendaciones del abogado se conservan atribuidas a
-su autor y no se sustituyen por una firma de A4.
+**8.1 · El owner registra sus decisiones sobre el contenido — CERRADO.**
+
+**Medicion del 12-nov-2026** (informe `verificacion-cierre/seccion-8.md`). Se contrasta el requisito contra el codigo y contra el servidor; lo que sigue es la medicion y su evidencia.
+
+*Cambio de estado: en la ronda del 30-oct-2026 figuraba como PENDIENTE.*
+
+**Que se verifico.** La seccion E del acta interna de decisiones del owner
+(`paquete-abogado-2026-10-30/11-checklist-definitivo-revision-juridica-y-cierre.md`) tiene las 14
+filas de J1 a J14, y cada una trae decision o estado pendiente explicito, fundamento y fecha. Se
+verifico ademas que el archivo esta en el repositorio y versionado, y que la fila de la seccion E
+sobre "Autorizacion operativa independiente" sigue vacia.
+
+**Evidencia.**
+- `sgsst-electron-app/docs/gestion-humana/firma-electronica/paquete-abogado-2026-10-30/11-checklist-definitivo-revision-juridica-y-cierre.md:103` (J1) a `:116` (J14) — las 14 filas del acta, cada una con decision, fundamento o evidencia y fecha (30-oct, 11-nov).
+- `:109` (J7, pendiente), `:110` (J8, pendiente), `:111` (J9, pendiente) — tres puntos que el owner dejo **expresamente** pendientes, con su responsable. Es decir: registrados, no resueltos.
+- `:124-125` — el bloque de firma del acta ("Nombre y cargo", "Firma", "Fecha") esta **en blanco**.
+- `sgsst-electron-app/docs/gestion-humana/firma-electronica/plan-cierre-abogado-2026-10-31.txt:105` — el criterio del propio plan para «aprobado para produccion» es "Seccion E **firmada**, con version y hash de A1-A4".
+- `git log -- 11-checklist-definitivo-revision-juridica-y-cierre.md` — ultimo commit `91214c55` (P8): el acta esta versionada, no es un borrador local.
+
+**Que falta.** Solo el acto: la firma del acta (lineas 124-125 en blanco). El contenido de las 14
+decisiones esta completo y fechado. En el fondo siguen abiertos tres puntos que el owner registro
+como pendientes, cada uno con su responsable: J7 (certificado societario y estados financieros para
+la Circular Externa 002 de 2025 y el RNBD), J8 (validacion escrita de los plazos de 10 y 5 anos) y
+J9 (validacion del procedimiento de la fecha de cese y del alcance del `hold`).
+
+**Quien lo tiene.** Owner (la firma del acta) y abogado externo (J7, J8, J9).
 
 **8.2 · Se registra la huella SHA-256 de la versión identificada — CERRADO como dato del manifiesto.**
 El manifiesto declara `acuerdo.hash: 7298a943…c585490f` (v1.4). A4 permite al owner
@@ -1281,9 +2187,34 @@ identificar la misma versión en su registro; ello no equivale a una aprobación
 activa `publicado`. La publicación requiere la ruta operativa correspondiente y las demás
 condiciones aplicables.
 
-**8.3 · El owner define fecha de vigencia y alcance de uso — PENDIENTE.** La fecha de vigencia
-la declara el owner antes de publicar; no se inventa ni se confunde con la fecha de registro
-de A4. Los anexos contractuales requieren sus propias suscripciones por las partes.
+**8.3 · El owner define fecha de vigencia y alcance de uso — CERRADO.**
+
+**Medicion del 12-nov-2026** (informe `verificacion-cierre/seccion-8.md`). Se contrasta el requisito contra el codigo y contra el servidor; lo que sigue es la medicion y su evidencia.
+
+*Cambio de estado: en la ronda del 30-oct-2026 figuraba como PENDIENTE.*
+
+**Que se verifico.** Que la fecha de vigencia la declaro el owner y no se invento ni se confundo con
+la fecha de registro de la autorizacion; que el texto publicado y la base de produccion coinciden
+con esa fecha; y que el alcance de uso es el del texto que el owner aprobo con version y huella.
+
+**Evidencia.**
+- `sgsst-electron-app/firma-service/scripts/fixtures/acuerdo-v1.6.txt:5` — "Fecha de vigencia: 11 de noviembre de 2026." (el texto publicado, no una nota al pie).
+- `sgsst-electron-app/firma-service/scripts/fixtures/acuerdo-v1.6.txt:7-11` — la clausula "Alcance": regula el uso del mecanismo de firma electronica de K+AIR y aplica a todos los documentos que una Empresa envie a firma de sus trabajadores por esa via.
+- `sgsst-electron-app/docs/gestion-humana/firma-electronica/paquete-abogado-2026-10-30/11-checklist-definitivo-revision-juridica-y-cierre.md:103` — decision del owner del 11-nov-2026: aprueba la v1.6 con huella `08e1eb8b...f13e`, 75 961 B y "fecha de vigencia 11-nov-2026".
+- `sgsst-electron-app/firma-service/legal-readiness.json:8-10` — `version: "v1.6"`, `fecha: "2026-11-11"`, `publicado: true`.
+- SSH, 12-nov: `SELECT fecha_vigencia_inicio FROM gh_firma_acuerdo_versiones` (version activa) → `2026-11-11T19:51:42.036Z`. **Coincide** con la fecha declarada: no hay desalineacion entre el texto y la base, que era la trampa de `plan-cierre-abogado-2026-10-31.txt:101` (decision D, "fecha cierta, anterior a la publicacion").
+- SSH, 12-nov: `gh_firma_aprobaciones_publicacion` id 4 → `fecha_creacion = 2026-11-11T19:46:11.639Z`, es decir la autorizacion operativa quedo registrada **5 minutos antes** de la activacion, que es el orden que exige la barrera de publicacion.
+- El anexo contractual por su lado: `legal-readiness.json:114-129` (`anexo_encargo.estado = "firmado"`, 2026-11-12T16:14:31.105Z, huella `6308b1f7...b8948`) y `:141-151` (`anexo_nube.firmado = true`, v1.3, contrafirmado 2026-11-12T16:13:54.106Z). Las dos partes suscribieron, que es lo que el propio requisito pedia.
+
+**Que falta.** Nada del requisito. Aclaracion de alcance: el "alcance de uso" declarado por el owner
+es el **contractual**, el de la clausula "Alcance" del Acuerdo v1.6 (aplica a toda Empresa que lo
+suscriba, documento por documento). El alcance **operativo** (a que empresas reales y desde cuando
+se abre el servicio) no esta declarado por el owner y no se maneja en este requisito: se maneja en la
+decision C del plan de cierre (`plan-cierre-abogado-2026-10-31.txt:89` y `:100`), que sigue abierta
+y se reporta en 8.5 y en la conclusion.
+
+**Quien lo tiene.** Owner (ya ejecuto el 11-nov-2026); las partes, en las suscripciones de los
+anexos.
 
 **8.4 · Se comprueba que los anexos aprobados sean los mismos que utiliza el servicio —
 CERRADO.**
@@ -1299,11 +2230,80 @@ El Anexo de Encargo **se genera** desde `config/matriz-finalidades.json` y
 paquete de despliegue; el Anexo de Nube viaja en `legal/`. No hay una copia del Anexo que
 pueda quedar desalineada del código: si cambia la fuente, cambia el Anexo.
 
-**8.5 · Se completan las verificaciones técnicas de publicación — PENDIENTE.**
-Son las de la sección 7, en el servidor.
+**8.5 · Se completan las verificaciones técnicas de publicación — PARCIALMENTE.**
 
-**8.6 · El representante legal firma la autorización operativa — PENDIENTE.** Se documenta
-en A4 solo después de completar y verificar las condiciones de publicación.
+**Medicion del 12-nov-2026** (informe `verificacion-cierre/seccion-8.md`). Se contrasta el requisito contra el codigo y contra el servidor; lo que sigue es la medicion y su evidencia.
+
+*Cambio de estado: en la ronda del 30-oct-2026 figuraba como PENDIENTE.*
+
+**Qué se verificó.** La compuerta `publicacion` medida contra el codigo desplegado en el servidor; el
+estado de las migraciones en la base de produccion; la salud del servicio; las huellas de los tres
+textos en disco; y el cruce con la lista de verificaciones tecnicas T1 a T9 y la compuerta G4 del
+plan de cierre. La tabla de la seccion 7 del cuadro canonico (30-oct) esta desactualizada: lo que
+manda es el estado medido.
+
+**Evidencia.**
+- SSH, 12-nov 18:33Z: `node scripts/auditar-readiness-legal.js --gate=publicacion` contra el codigo de `/opt/kair-firma/app` → "Gate: publicacion — LISTO · Items: 42 · OK: 40 · Pendientes: 0 · Avisos: 1 · N/A: 1", con `bloqueantes_pendientes: 0`. El JSON del reporte: `resumen = {"total_items":42,"ok":40,"pendientes":0,"avisos":1,"no_aplica":1,"bloqueantes":20,"bloqueantes_pendientes":0}`.
+- El mismo reporte, item "Aprobacion operativa de la version vigente": **OK** — "La version v1.6 tiene autorizacion operativa (aprobada por Javier Robles Fontalvo, owner de K+AIR el 2026-11-11)". El gate `primera_firma` da el mismo resumen (42 · 40 ok · 0 pendientes · 0 bloqueantes).
+- SSH, 12-nov: `SELECT COUNT(*), MAX(version) FROM gh_firma_schema_migrations` → `61 | 062_encargado_poderes_append_only`. Las migraciones 060, 061 y 062 (las del P8) estan aplicadas.
+- SSH, 12-nov: `systemctl is-active kair-firma` → `active`; `is-enabled` → `enabled`; `GET http://127.0.0.1:3001/health` → `{"status":"ok","db":"ok","smtp":"configured","uptime_seconds":14629}`.
+- SSH, 12-nov: `sha256sum` en disco → `acuerdo-v1.6.txt` `08e1eb8b...f13e`, `legal/anexo-nube-v1.3.html` `fdd10551...b585d`, `legal/anexo-encargo.html` `6308b1f7...b8948`. Coinciden con `legal-readiness.json:7`, `:145` y `:129`.
+- SSH, 12-nov: `sha256sum /opt/kair-firma/app/legal-readiness.json` → `191c08b837b41069de4e2d25d7158fd90a7c3ce5f93b22696d2d7050f8a4013f`, byte a byte igual al del repositorio (medido tambien en el PC). `sha256sum /opt/kair-firma/legal/constancia-aprobacion-acuerdo.html` → `aaf68b4e7df5e2757d5885840056218d97a0cbb1c9fa624bf7861962c8d0b413`.
+- Suite, registrada en el expediente: `sgsst-electron-app/docs/MIGRACION-SERVIDOR-FIRMA.md` §7 (12-nov: **2 665 pruebas, 2 663 verdes, 0 rojas, 2 omitidas**) y `verificacion-cierre/t1-corrida-desde-clon-limpio.md` (tres corridas desde clon limpio, 0 fallos).
+
+**Que falta.** Cuatro cosas, todas con dueño, y ninguna es un problema del texto publicado. **Lo que se
+resolvio el 12-nov-2026** esta al final; lo que sigue abierto, antes:
+
+1. **T6, el E2E con el caso real de buzon corporativo rechazado.** El camino esta probado por la suite, pero **el caso real no ha ocurrido**: la base de produccion tiene **0** eventos `OTP_MEDIO_CORPORATIVO` (`Historial.md:8729-8733`). El requisito de T6 es "E2E controlado con el caso... limpieza del rastro y acta" (`paquete-abogado-2026-10-30/10-informe-correcciones-para-asesor-juridico.md:135`).
+2. **T7, la reversion probada, no descrita.** Los programas existen; la prueba y su evidencia no (`10-informe-correcciones-para-asesor-juridico.md:136`). Sigue en la cola del 12-nov (`Historial.md:8783-8784`).
+3. **T1, la corrida reproducible desde clon limpio ligada a un commit candidato.** Sigue pendiente en el informe del 30-oct/11-nov (`10-informe-correcciones-para-asesor-juridico.md:130`), y la suite completa **nunca se ha corrido en el servidor** (`sgsst-electron-app/docs/MIGRACION-SERVIDOR-FIRMA.md:1121-1122`).
+4. **El respaldo que cubra los actos del P8.** El ultimo respaldo es del 11-nov 22:00 (`/opt/kair-firma/backups`, medido por SSH el 12-nov 13:40), o sea que **los cuatro actos del 12-nov todavia no estan en ningun respaldo**; el de hoy 22:00 los incluye. El respaldo off-site sigue pendiente (`Historial.md:8788-8790`).
+
+**Lo que se resolvio el 12-nov-2026 (medicion de esta misma ronda).**
+- **T4**: cerrado con `acta-comprobacion-servidor-2026-11-12.md` y `acta-despliegue-2026-11-12.md`.
+- **T7**: **probada de verdad** — 58 OK, 3 avisos, 0 fallas, exit 0, con el volcado canonico de la base restaurada identico al de origen y produccion intacta. La prueba **encontro un defecto real** (el borrado por rango de `gh_consentimientos_firma` sin borrar antes sus eventos, que la FK bloqueaba), **corregido y medido con un A/B**: el programa desplegado aborta con `FOREIGN KEY constraint failed` y exit 3; el corregido borra con exit 0. Falta **desplegar la correccion** y la **restauracion cifrada real** (root). Acta: `verificacion-cierre/t7-reversion-probada.md`.
+- **T1**: **tres corridas desde un clon limpio** (`npm ci` desde cero, Node 22, sin `.env`): 2 624/2 622/0/2, 2 630/2 628/0/2 y 2 650/2 648/0/2. Los conjuntos de nombres de prueba coinciden **exactamente** con las corridas del arbol del owner, y el clon final quedo byte a byte identico (4 780 de 4 780 archivos). Falta la corrida **sobre el commit** (T3 lo tiene el owner) y la suite **en el servidor** (`/opt/kair-firma/app/tests` no existe). Acta: `verificacion-cierre/t1-corrida-desde-clon-limpio.md`.
+- **T6**: con la evidencia registrada (`verificacion-cierre/t6-caso-buzon-corporativo.md` y `scripts/probar-t6-medio-corporativo.js`), con la salvedad de que el caso real **no ha ocurrido en produccion**.
+
+La compuerta G4 del plan (`plan-cierre-abogado-2026-10-31.txt:82`) exige T4, T6 y T7 con evidencia
+registrada y T8 firmada: **T4, T6 y T7 tienen evidencia registrada; T8 no esta firmada** (y es un acto
+de voluntad que solo el owner puede hacer).
+
+**Quien lo tiene.** Equipo (desplegar la correccion de T7, la fila T7 del informe, T1 sobre el commit);
+owner (T8 firmada, el respaldo off-site, la decision de abrir).
+
+**8.6 · El representante legal firma la autorización operativa — PARCIALMENTE.**
+
+**Medicion del 12-nov-2026** (informe `verificacion-cierre/seccion-8.md`). Se contrasta el requisito contra el codigo y contra el servidor; lo que sigue es la medicion y su evidencia.
+
+*Cambio de estado: en la ronda del 30-oct-2026 figuraba como PENDIENTE.*
+
+**Que se verifico.** Tres cosas: (a) la autorizacion operativa de la publicacion de la v1.6, que esta
+registrada en el servicio; (b) el documento A4 (la Constancia de version y autorizacion de
+publicacion), que es donde el propio requisito dice que debe quedar; y (c) lo que el expediente
+decidio sobre donde vive esa autorizacion.
+
+**Evidencia.**
+- SSH, 12-nov: `gh_firma_aprobaciones_publicacion` id 4 → `tipo = OPERATIVA`, `version = v1.6`, `hash = 08e1eb8b...f13e`, `aprobado_por = "Javier Robles Fontalvo, owner de K+AIR"`, `fecha = 2026-11-11`, `fecha_creacion = 2026-11-11T19:46:11.639Z`, con `garantia`, `resultado_verificaciones` y `responsable_despliegue` diligenciados. Registro append-only: no se reescribe.
+- `sgsst-electron-app/legal/constancia-aprobacion-acuerdo.html:143-172` — la seccion 5, "Constancia de la autorizacion operativa", tiene **las cinco celdas de valor vacias** (`<td></td>` en las lineas 153, 157, 161, 165 y 169): version y huella autorizadas, garantia tecnica verificada, persona que autoriza, fecha y observaciones.
+- `sgsst-electron-app/legal/constancia-aprobacion-acuerdo.html:174-189` — la seccion 6, "Firma del representante legal", tiene la fila de decision con nombre, firma y fecha **vacios**.
+- `sgsst-electron-app/firma-service/legal-readiness.json:17` — `constancia.estado = "no_firmada"`. `:20` — la nota que declara que la autorizacion operativa "no se documenta en este documento sino en el registro append-only de aprobaciones de publicacion del servicio (`gh_firma_aprobaciones_publicacion`, tipo OPERATIVA)" y que quedo registrada el 11-nov-2026.
+- `sgsst-electron-app/docs/MIGRACION-SERVIDOR-FIRMA.md:1062-1065` — el mismo criterio escrito en el plan de despliegue: la seccion 5 y la seccion 6 "siguen vacias **por diseno**: la autorizacion vive en el registro de aprobaciones del servicio, no en el documento".
+- `sgsst-electron-app/docs/gestion-humana/firma-electronica/plan-cierre-abogado-2026-10-31.txt:80` — T8: "Autorizacion operativa independiente del owner... **Documento firmado**, distinto de la Constancia. ESTE si es un acto de voluntad: la firma es la prueba". `:82` — compuerta G4: "T8 firmada, porque es un acto de voluntad y no una constancia". `:109` — "T8 firmada por el owner, separada de la aprobacion juridica" es criterio de «aprobado para produccion».
+- `sgsst-electron-app/docs/gestion-humana/firma-electronica/paquete-abogado-2026-10-30/10-informe-correcciones-para-asesor-juridico.md:137` — T8 sigue como "Pendiente".
+- `Historial.md:8783-8784` — la cola del 12-nov deja T8 abierto.
+
+**Que falta.** El **documento firmado**. El registro del servicio tiene toda la sustancia que T8
+pide (version, huella, garantia, resultados de las verificaciones, responsable del despliegue) y es
+append-only, pero una fila en la base no es el acto de voluntad firmado que el plan exige para T8 ni
+lo que el requisito pide ("firma"). La Constancia esta publicada en `kair.fyi` con las secciones 5 y
+6 vacias, y el manifiesto lo declara (`no_firmada`). Aparte, y como acto distinto: no existe
+autorizacion operativa para la **apertura** del servicio a empresas reales (la decision C, ver
+8.5 y la conclusion); la autorizacion del 11-nov es solo de publicacion y su propia nota dice que
+"la compuerta `FIRMA_EXIGIR_ANEXO_NUBE` sigue APAGADA por decision escrita del owner".
+
+**Quien lo tiene.** Owner (representante legal de Gesstiar S.A.S.). Es un acto suyo: nadie mas lo
+puede firmar.
 
 **8.7 · Se registra la versión y huella que se publicará — CERRADO.**
 `legal-readiness.json` → `acuerdo.version: "v1.4"`, `acuerdo.hash: 7298a943…c585490f`,
@@ -1312,25 +2312,71 @@ en A4 solo después de completar y verificar las condiciones de publicación.
 `scripts/publicar-acuerdo-legal.js`, que además exige que el texto publicado coincida con
 el del manifiesto.
 
-**8.8 · Se registra quién autorizó, cuándo y bajo qué resultados de pruebas — PENDIENTE.**
-Es el acta. El resultado disponible del servicio es el de 6.11 (corrida local 3-nov-2026, aún
-sin vínculo a T3); la cifra de la app (146 · 140 · 6) corresponde a la línea base registrada.
-El acta debe fijar los resultados reproducidos para el commit y el despliegue que finalmente se autoricen.
+**8.8 · Se registra quién autorizó, cuándo y bajo qué resultados de pruebas — PARCIALMENTE.**
+
+**Medicion del 12-nov-2026** (informe `verificacion-cierre/seccion-8.md`). Se contrasta el requisito contra el codigo y contra el servidor; lo que sigue es la medicion y su evidencia.
+
+*Cambio de estado: en la ronda del 30-oct-2026 figuraba como PENDIENTE.*
+
+**Que se verifico.** El registro append-only de aprobaciones de publicacion (que es donde el
+servicio deja esos tres datos), las actas de los cuatro actos del P8, y si existe un acta que fije
+los resultados para un commit y un despliegue identificados.
+
+**Evidencia.**
+- SSH, 12-nov: `gh_firma_aprobaciones_publicacion` id 4 — **quien**: `aprobado_por = "Javier Robles Fontalvo, owner de K+AIR"`, `responsable_despliegue = "Javier Robles Fontalvo"`; **cuando**: `fecha = 2026-11-11`, `fecha_creacion = 2026-11-11T19:46:11.639Z`; **bajo que resultados**: `resultado_verificaciones` (la huella del texto en el servidor coincide con la del manifiesto y con la archivada; el orden autorizacion → publicacion; las migraciones 060, 061 y 062 aplicadas; con la v1.6 activa el reporte de auditoria legal no reporta bloqueantes) y `garantia` (tope del texto, barrera de publicacion con huella, Constancia `aaf68b4e...d0b413`, suite del 11-nov con 2 577 pruebas / 2 575 verdes / 0 rojas / 2 omitidas, 61 migraciones aplicadas, `/health` en ok, compuerta de publicacion sin bloqueantes).
+- Actas de los cuatro actos del P8, en el servidor (`ls /opt/kair-firma/storage/pdfs/actas`, 12-nov): `acta-2-anexo-encargo.pdf` (7 693 B), `acta-2-contrafirma-anexo-nube.pdf` (7 167 B), `acta-2-contrafirma-anexo-encargo.pdf` (7 405 B), con sus SHA-256 en `legal-readiness.json:117`, `:146` y `:151`.
+
+**Que falta.**
+1. El despliegue en produccion **no esta al dia**: el bump de dependencias (`dfc403b0`) **no se ha desplegado**, o sea que produccion sigue corriendo el arbol viejo de dependencias (`Historial.md:8781-8783`). Lo que se autorizo el 11-nov no es exactamente lo que corre hoy.
+2. **La corrida reproducible desde clon limpio (T1) no existe** (ver 8.5).
+3. **El 📦1051 sigue sin desplegarse**, y es lo que separa "el commit que se autorizo" de "el despliegue que corre".
+
+**Lo que se resolvieron el 12-nov-2026 (medicion de esta misma ronda).**
+- **Ya hay acta de despliegue**, escrita con el commit, las huellas, las migraciones y los resultados: `verificacion-cierre/acta-despliegue-2026-11-12.md`, con el resumen en `MIGRACION-SERVIDOR-FIRMA.md` §5.1.4.
+- **Ya se sabe con certeza que codigo corre**, y no por inferencia: la comparacion por sha256 de los 247 archivos desplegables da **6 diferencias y 0 sobrantes**, y las 6 son `package.json`, `package-lock.json`, dos scripts auxiliares y dos archivos de despliegue. Todo `src/` es byte a byte el de `264d08df`. El control es reproducible: `firma-service/scripts/comparar-despliegue.js`, que sale con codigo 1 nombrando los archivos mientras haya diferencias.
+- **Quien y cuando** ya estaban en el registro id 4 (append-only), y **el manifiesto** es byte a byte igual entre el repositorio y produccion.
+
+**Quien lo tiene.** Equipo (acta de despliegue con commit — **hecha** —, corrida limpia, despliegue del `dfc403b0`); owner (la firma y la decision de autorizar).
 
 **8.9 · Se conserva la constancia como evidencia histórica — CERRADO en el diseño.**
 `scripts/fixtures/acuerdo-ARCHIVO.json` ya funciona así con la v1.0: versión inmutable, con
 `fecha_archivado`, `verificado_el` y la nota de que cambiar el texto exige publicar una
 versión nueva con su propia huella, y que los consentimientos ya aceptados no se tocan.
 
-**8.10 · Se actualiza la documentación del proyecto y el registro de cierre — PARCIALMENTE.**
-Ya está actualizado: `Historial.md` (entradas del 30-oct, tarde y noche), `PROMPT.md`
-(reglas 5.19 a 5.23 y trampas 105 a 109), `sgsst-electron-app/BITACORA.md` (las dos
-entradas del 30-oct) y `sgsst-electron-app/CONTEXT.md` (el hito de la v1.3 y el de la
-compuerta). **Falta** el acta de cierre de este checklist, que se escribe cuando los
-pendientes estén resueltos. A 30-oct-2026, con el cuadro reconciliado (D4), falta además
-registrar en la bitácora la publicación de la v1.4 y sus huellas nuevas.
+**8.10 · Se actualiza la documentación del proyecto y el registro de cierre — CERRADO.**
 
----
+**Medicion del 12-nov-2026** (informe `verificacion-cierre/seccion-8.md`). Se contrasta el requisito contra el codigo y contra el servidor; lo que sigue es la medicion y su evidencia.
+
+*Cambio de estado: en la ronda del 30-oct-2026 figuraba como PARCIALMENTE.*
+
+**Que se verifico.** Los cuatro documentos que el requisito nombra (`Historial.md`, `PROMPT.md`,
+`BITACORA.md`, `CONTEXT.md`), el estado del cuadro canonico de 96 requisitos, y si existe el acta de
+cierre de este checklist.
+
+**Que se cerro el 12-nov-2026 (esta misma ronda).** Los cuatro huecos que se senalaban estan
+cerrados, cada uno con su documento:
+
+| Hueco | Como quedo |
+|---|---|
+| (1) El acta de cierre del checklist de 96 requisitos | `verificacion-cierre/acta-cierre-checklist-2026-11-12.md`: el **registro de cierre** del §5 del plan de cierre, con version, hashes, commit, resultados de T1 a T9, decisiones A, B y C, fecha y responsable, y la lista de los 22 pendientes con su dueño |
+| (2) Una entrada de `BITACORA.md` con el hito de la v1.6 y del P8 | `BITACORA.md`, entradas del 12-nov-2026: el hito (P8 ejecutado con ASEPLUS, que es **empresa de prueba**; Acuerdo v1.6 publicado; compuerta en `listo: true`), mas los dos hallazgos de la ronda (el preflight que decide si se puede abrir, y la comparacion del arbol desplegado) |
+| (3) Actualizar `CONTEXT.md`, que describia un estado que ya no existe | `CONTEXT.md`: bloque de estado al tope con lo que hay hoy, lo que no hay, la meta, los diez bloqueos duros y lo que el owner debe hacer |
+| (4) El "registro de cierre" del plan (T1 a T9 y decisiones A, B y C por escrito con su fecha) | El mismo `acta-cierre-checklist-2026-11-12.md`, seccion 3 (T1 a T9 con su evidencia) y seccion 4 (A aplicada, B tomada con la compuerta cerrada, C decidida el 5-nov) |
+
+**Evidencia.**
+- `Historial.md` **al dia**: la novena ronda (`Historial.md:8579`) documenta los cuatro actos del P8 con sus horas y huellas (`:8600-8610` el manifiesto `191c08b8...f8a4013f` y la compuerta en `listo: true`), y la decima ronda (`Historial.md:8687`) responde la pregunta de produccion con medidas (`:8694-8699` los dos gates, `:8710-8716` la respuesta honesta, `:8718-8727` los dos interruptores). La onceava ronda empalma el estado de esta ronda.
+- `PROMPT.md` **al dia**: la regla 5.30 (`:997-1022`) fija la palabra clave del estado de un requisito y la 5.19 (`:718`) el control que compara contra una constante.
+- `sgsst-electron-app/BITACORA.md` — tres entradas del 12-nov-2026: el hito v1.6/P8, el preflight de la compuerta y la comparacion del arbol desplegado. Cada una con su "por que se rompio" y sus reglas. **Ademas se corrigio una filtracion de caracteres CJK que venia de una ronda anterior** (4 caracteres en una entrada vieja): el barrido de caracteres prohibidos ahora da cero en el archivo.
+- `sgsst-electron-app/CONTEXT.md` — el bloque de estado del 12-nov-2026 esta al tope.
+- El cuadro canonico esta reconciliado con la medicion de hoy: **76 cerrados / 20 pendientes / 96**, con la tabla regenerada por `scripts/contar-estados-checklist.js` y los 34 requisitos medidos actualizados por `scripts/actualizar-cuadro-canonico-2026-11-12.js` (el texto sale literal del informe que lo midio).
+- `plan-cierre-abogado-2026-10-31.txt:91` — el "registro de cierre" del plan **no es condicion de produccion**: "Lo que bloquea es que falte la evidencia a la que el registro apunta (T4, T6, T7, T8 y T9)". Por eso el registro se escribe con evidencia registrada y no con firmas.
+
+**Que falta.** Nada del requisito. **Lo que el registro deja abierto es de otros requisitos** (T8, que
+es un acto de voluntad del owner, y T1, T6 y T7, que estan en curso o con su salvedad declarada), y
+quedan nombrados con su dueño en el propio registro de cierre.
+
+**Quien lo tiene.** Equipo (la documentacion y el registro: hechos). Owner (las decisiones A, B y C
+por escrito —las tres estan tomadas— y el acto de voluntad de la T8).
 
 ## Nota final
 

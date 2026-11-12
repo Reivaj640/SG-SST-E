@@ -57,10 +57,11 @@ const registrarPoderBody = z.object({
     .min(1, 'nombre es requerido: sin saber a quien se le da la facultad no hay nada que acreditar')
     .max(200, 'nombre demasiado largo (max 200 chars)'),
   cargo: textoOpcional(200),
+  // M.13 (zod 3 -> zod 4): el `errorMap` por esquema ya no existe; zod 4 lo
+  // ignora en silencio y el mensaje pasa a ser el generico ("Invalid option:
+  // expected one of ..."). El equivalente es `error`.
   tipo: z.enum(['PODER', 'DELEGACION', 'REPRESENTACION'], {
-    errorMap: () => ({
-      message: 'tipo tiene que ser PODER, DELEGACION o REPRESENTACION',
-    }),
+    error: 'tipo tiene que ser PODER, DELEGACION o REPRESENTACION',
   }),
   instrumento_ref: z
     .string()

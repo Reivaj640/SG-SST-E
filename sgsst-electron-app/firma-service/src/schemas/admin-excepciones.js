@@ -58,8 +58,19 @@ const crearExcepcionBody = z.object({
     .min(1, 'autorizacion_ref es requerido (donde queda el documento escrito)')
     .max(500, 'autorizacion_ref demasiado largo (max 500 chars)')
     .transform((s) => s.trim()),
+  // M.13 (zod 3 -> zod 4): `invalid_type_error` ya NO existe en zod 4: se
+  // ignora en silencio y el mensaje pasa a ser el generico ("Invalid input:
+  // expected number, received string"), que pierde la razon del error.
+  // El equivalente es `error`. Se usa la forma de FUNCION para que el
+  // mensaje propio salga SOLO cuando el tipo no es el esperado (que es lo
+  // que `invalid_type_error` hacia) y no tambien cuando el campo falta:
+  // si falta, el mensaje por defecto ya dice "received undefined".
   alcance_firmas_max: z
-    .number({ invalid_type_error: 'alcance_firmas_max tiene que ser un numero' })
+    .number({
+      error: (issue) => (issue.input === undefined
+        ? undefined
+        : 'alcance_firmas_max tiene que ser un numero'),
+    })
     .int('alcance_firmas_max tiene que ser un entero')
     .min(1, 'alcance_firmas_max tiene que ser al menos 1')
     .max(1000, 'alcance_firmas_max no puede pasar de 1000'),
@@ -68,8 +79,12 @@ const crearExcepcionBody = z.object({
     .min(1, 'ruta_papel es requerida (como se firma en papel mientras tanto)')
     .max(500, 'ruta_papel demasiado largo (max 500 chars)')
     .transform((s) => s.trim()),
+  // M.13 (zod 3 -> zod 4): `invalid_type_error` -> `error` (misma razon que
+  // en `alcance_firmas_max`, mas arriba).
   ruta_papel_operativa: z.boolean({
-    invalid_type_error: 'ruta_papel_operativa tiene que ser true o false',
+    error: (issue) => (issue.input === undefined
+      ? undefined
+      : 'ruta_papel_operativa tiene que ser true o false'),
   }),
   plazo_hasta: fecha,
   piloto_autorizado: z.boolean().optional().default(false),

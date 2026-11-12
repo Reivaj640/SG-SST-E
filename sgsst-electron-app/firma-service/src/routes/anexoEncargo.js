@@ -89,12 +89,21 @@ const suscribirBody = z.object({
   otp: z.string().trim().regex(/^\d{6}$/, 'el código son 6 dígitos'),
   // La aceptación del Anexo con su cláusula del mecanismo y la declaración de
   // representación.
-  acepta: z.boolean({ required_error: 'acepta es requerido' }),
+  //
+  // M.13 (zod 3 -> zod 4): `required_error` ya no existe; zod 4 lo ignora en
+  // silencio y el mensaje pasa a ser el generico. El equivalente es `error`,
+  // y la forma de FUNCION mantiene el sentido de `required_error`: el mensaje
+  // propio sale SOLO cuando el campo FALTA.
+  acepta: z.boolean({
+    error: (issue) => (issue.input === undefined ? 'acepta es requerido' : undefined),
+  }),
   // La aceptación de la información sobre el tratamiento de los datos
   // personales. Es una casilla aparte porque responde a una obligación
   // distinta: la del artículo 12 de la Ley 1581 (informar), no la del
   // artículo 7 del Decreto 2364 (acordar el mecanismo).
-  acepta_tratamiento: z.boolean({ required_error: 'acepta_tratamiento es requerido' }),
+  acepta_tratamiento: z.boolean({
+    error: (issue) => (issue.input === undefined ? 'acepta_tratamiento es requerido' : undefined),
+  }),
   datos_empresa: datosS11Body,
   representante: representanteBody,
 }).strict();

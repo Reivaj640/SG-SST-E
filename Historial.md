@@ -8792,3 +8792,324 @@ externa del abogado (J6/J8/J9 y la pregunta de la errata).
 > sube el runtime); (8) las **2 altas** que quedan de `npm audit` (`nodemailer` y `zod`), que exigen
 > revisar codigo, no un parche; (9) decidir, con el abogado, si la **v1.1 del Nube** (suscrita, sin
 > contrafirma) se contrafirma retroactiva o queda como registro historico.
+
+---
+
+## Onceava ronda — 12-nov-2026 (tarde): la META para abrir a empresas reales, trazada y verificada; el cuadro canonico reconciliado con lo que se midio.
+
+> **La pregunta y el encargo.** El owner pregunto si el servicio de firma electronica esta listo para
+> produccion, y la respuesta que quedo escrita fue: **lista para operar, no abierta**. Despues pidio
+> tres cosas: **listar los puntos que hoy bloquean el servicio para trazar la meta** que permita abrirlo
+> a empresas reales, **trabajar claramente sobre lo que se debe sin tocar nada que afecte a la app**, y
+> **trabajar en loop con el equipo, sin pedir interacciones, cerrando todo**. Se trabajo con
+> autorizacion total y con una sola condicion: **ni commit ni push sin «dale» / «pushea»**.
+
+> **El documento que responde la pregunta: la META.** `docs/gestion-humana/firma-electronica/
+> meta-para-abrir-a-empresas-reales-2026-11-12.md` lista **27 puntos** concretos en tres secciones:
+> **10 bloqueos duros**, **8 condiciones de apertura** y **9 riesgos y deuda**. De ellos, **1 esta
+> CERRADO y 26 pendientes**. Cada bloque dice cuatro cosas —**que se verifico**, **con que evidencia**,
+> **que falta** y **quien lo tiene**— y declara **su origen** (la fila del cuadro canonico, del
+> informe al abogado o de la decision de correo de la que sale): un bloque sin origen no es trazable, y
+> este mapa existe para ser trazado.
+>
+> **El estado es una palabra y la tabla no se escribe a mano.** La palabra de estado va tras el ultimo
+> raya largo (`CERRADO`, `PENDIENTE`, `PARCIALMENTE`, `No aplica`; `PARCIALMENTE` cuenta como
+> pendiente) y la tabla resumen **la regenera** `firma-service/scripts/contar-estados-meta-apertura.js`,
+> un script que **falla** si el documento no cuadra con su propio conteo. Tiene su test (7/7).
+
+> **Como se midio: el equipo, en paralelo, contra el codigo y contra el servidor.** Cuatro informes en
+> `docs/gestion-humana/firma-electronica/verificacion-cierre/`: **secciones-1-2.md** (10 requisitos),
+> **secciones-3-5.md** (5 requisitos), **secciones-6-7.md** (13) y **seccion-8.md** (6), mas el acta de
+> **T6**. Cada informe trae la evidencia con su comando y su salida. Los hallazgos que **cambiaron el
+> mapa** (y que no habian salido en las rondas anteriores):
+>
+> - **El codigo que corre es escribible por cualquiera**: `app/` y `app/src/` en **777**, con **236
+>   archivos** y 18 directorios escribibles por otros, y el servicio corre como `kairfirma`. Es una via
+>   de escalamiento, y es **el unico punto que el abogado habia marcado como bloqueante** el 31-oct y
+>   que seguia igual cuatro meses despues. **Subio de «deuda» a «bloqueo duro».**
+> - **El flujo electronico completo nunca se ha ejercitado contra el codigo de hoy**: la ultima firma
+>   electronica de la base es del **6 de noviembre**, y despues del despliegue del 11-nov y de los
+>   cuatro actos del P8 el flujo no se ha corrido. Los dos programas existen en el servidor; la
+>   corrida y el acta, no. **Bloqueo duro nuevo.**
+> - **Los logs no rotan, no tienen retencion y su directorio lo lee cualquiera**: no hay `logrotate` para
+>   `kair-firma`, `health-check.log` crecia sin rotar (409 619 B) y `/opt/kair-firma/logs` es `755`. Las
+>   tres casillas del `SECURITY.md` §7.4 **no se cumplen**.
+> - **No hay sello de version del despliegue**: `/health` devuelve una version fija (`compatible-0.1.189`),
+>   el arbol desplegado no tiene `.git`, y por disco el codigo coincide con el repo pero el lock **no**
+>   (el arbol desplegado es **mixto**): no se puede saber con certeza que codigo corre.
+> - **`BITACORA.md` y `CONTEXT.md` describen un estado que ya no existe** (el P8 «pendiente», el Anexo de
+>   Nube vigente «v1.2»), y faltan tres actas: la de la comprobacion del servidor, la del despliegue con
+>   commit y la de cierre del checklist.
+> - **Los dos anexos ya suscritos dicen cosas que la realidad desmintio** (afirman que sus propios actos
+>   estan «pendientes», y el Anexo de Nube v1.3 **se contradice a si mismo** sobre la MFA y la contrasena
+>   de aplicacion): un texto suscrito no se toca, asi que **hace falta una v1.4 del Nube y el Encargo que
+>   la remite**. Condicion de apertura nueva.
+> - **5.1 esta cerrado, no pendiente**: la cuenta remitente `kair@gesstiar.com` **si viaja** en los
+>   documentos (manifiesto y los dos anexos suscritos), con DNS publicado y un envio real con
+>   `dkim=pass; spf=pass; dmarc=pass`. El cuadro decia lo contrario.
+
+> **El cuadro canonico, reconciliado con lo medido (62 -> 74 cerrados).** El cuadro de 96 requisitos
+> seguia con la foto del 30-oct. Se actualizo **por script**
+> (`scripts/actualizar-cuadro-canonico-2026-11-12.js`): el cuerpo de cada requisito medido **se copia
+> literalmente** del informe que lo midio (el cuadro no dice nada que el informe no sostenga), la palabra
+> de estado se actualiza, y los requisitos que nadie midio **no se tocan**. **34 requisitos medidos**:
+> la tabla resumen **la regenera** `scripts/contar-estados-checklist.js` (no se escribe a mano). De 62
+> cerrados / 34 pendientes a **74 cerrados / 22 pendientes**.
+
+> **Dos defectos reales del propio mecanismo, encontrados y cerrados (esto es lo que mas cuesta).**
+>
+> 1. El test del verificador de la meta **pasaba en falso**: llevaba los numeros de la tabla **escritos
+>    a mano** en el propio test, y cuando el mapa cambio de tamano el `replace` **no encontro nada**:
+>    el test de «tabla editada a mano» dejo de comprobar nada y el de idempotencia **comprobaba una
+>    cadena que nunca se habia escrito**. Ahora la fila se **deriva del documento en tiempo de ejecucion**
+>    y el test **falla si la alteracion no ocurrio**. (PROMPT §5.14: un check que reconoce la redaccion
+>    de un bug no verifica el comportamiento.)
+> 2. El script que actualiza el cuadro canonico **no era idempotente**: en la primera version
+>    reemplazaba **solo el encabezado** y dejaba el cuerpo anterior debajo del nuevo, de modo que el
+>    documento **decia lo mismo dos veces** y la segunda corrida lo **duplicaba** (104 KB -> 190 KB -> 267
+>    KB). Ademas recalculaba el estado anterior contra el documento ya actualizado y escribia
+>    «CERRADO -> CERRADO». Ahora reemplaza **el bloque entero**, **conserva** la linea de «Cambio de
+>    estado» que ya esta y **recupera** el estado anterior de la tabla previa: correrlo dos veces no
+>    cambia ni un byte.
+
+> **El paquete del abogado, sincronizado.** El adjunto **09** (la respuesta al checklist) es copia byte
+> a byte del canonico, asi que se resincronizo, se actualizo su fila en la nota al abogado (tamano y
+> huella) y se regenero el `SHA256SUMS.txt`: **las 14 sumas coinciden**. **`armar-paquete-abogado.js` NO
+> se ejecuto**: esta congelado en la ronda de la v1.4 (adjunto 01 = Acuerdo v1.4, 02 = anexo de encargo,
+> 03 = Anexo de Nube v1.0, 04 = constancia de la v1.4) y correrlo hoy volveria a copiar textos que ya no
+> son los vigentes. Ademas se escribio **una guardia**: `scripts/verificar-sumas-paquete-abogado.js` (con
+> su test, 6/6) que **detecta la deriva** del manifiesto de sumas nombrando el archivo, y **no escribe**.
+
+> **T6: el caso del buzon corporativo, PRODUCIDO contra el codigo desplegado.** Con una instancia propia
+> del servicio en otro puerto y una **copia aislada** de la base: el **caso A** (buzon corporativo) dio
+> `HTTP 400` con `MEDIO_OTP_CORPORATIVO` y **quedo asentado** (`gh_firma_eventos`, evento id 151,
+> `2026-11-12T18:57:58.217Z`), y el codigo **no salio** (`OTP_SENT = 0`); el **caso B** (medio personal)
+> dio `HTTP 200` con `OTP_SENT` y `MEDIO_PERSONAL_CONFIRMADO` y `OTP_VERIFIED`. Salida: `30 OK · 0
+> avisos · 0 fallas`. **Produccion intacta y demostrado**: el volcado canonico de produccion es
+> **identico** antes y despues (`firmas = 5`, `eventos = 55`, `otp_corporativo = 0`), `MainPID` sin
+> cambio y `NRestarts = 0`. Lo que **falta** es que el caso ocurra **en produccion**, con una persona de
+> verdad: ahi sigue habiendo **0** eventos `OTP_MEDIO_CORPORATIVO`. El script tiene su test (5/5), que
+> comprueba el **guard de produccion** (que se niega a correr y **no escribe ni un byte**).
+
+> **El respaldo off-site, escrito y validado en el servidor.** `deploy/backup-offsite.sh` copia los `.enc`
+> **ya cifrados** a rsync/scp/rclone, **nunca borra la copia local**, **no se da por buena la copia hasta
+> que el hash del destino coincide**, y sin destino configurado sale 0 con aviso. La §8.4 del runbook
+> documenta la instalacion, la configuracion, el cron y la verificacion. En el ensayo se encontraron dos
+> fallos: el selector por nombre elegia el archivo de pre-despliegue (la «p» ordena despues del «2») y el
+> glob tenia 10 digitos en vez de 8; ahora selecciona **por mtime** y con patron exacto.
+
+> **El estado del servicio, al cierre de esta ronda.** Los **dos gates** dan `listo: true`, con 42 items,
+> 40 `ok` y **0 bloqueantes**; el servicio esta `active` con `NRestarts = 0`; el Acuerdo v1.6 esta
+> publicado y los dos anexos estan suscritos y contrafirmados; el sitio publico sirve exactamente las
+> huellas suscribidas; la **suite** da **2 624 tests · 2 622 pass · 0 fail · 2 skipped**. **Eso NO es
+> «abierto»**: la meta tiene **10 bloqueos duros** abiertos, y los dos que mas pesan son los que el
+> abogado habia marcado: los **777** del codigo desplegado y el **Anexo de Nube v1.3 que se contradice a
+> si mismo**. La **compuerta `FIRMA_EXIGIR_ANEXO_NUBE`** sigue apagada: hoy el item `empresas_nube` es un
+> `aviso` y no bloquea, y encenderlo es **el acto de apertura**, con su lista de-Empresas por regularizar.
+
+> **Cola** — (1) el **push** de lo que ya esta commiteado, esperando el «pushea»; (2) el **commit** de
+> esta ronda, esperando el «dale» (PROMPT §5.1: «procede» autoriza editar, **no** commitear); (3)
+> **desplegar** el 📦1051 con el paso de instalacion (`npm ci --omit=dev`): produccion sigue con
+> `proxy-addr 2.0.7` (la critica) y `express 4.22.2`; (4) el **`chmod`** de los 777 (una linea con
+> `sudo`); (5) **T7** (la reversion probada con acta); (6) **T8** y la firma de A4 (la Constancia sigue
+> `no_firmada`); (7) la **version nueva de los anexos** (Nube v1.4 y el Encargo que la remite); (8) la
+> **ratificacion externa del abogado**: J6, J7 y J8; (9) **P3** (los tres alias de Workspace) y **P6**
+> (revocar la credencial anterior); (10) el **destino** del respaldo off-site; (11) **Node 22** en el
+> servidor (hoy corre Node 20 y funciona; si se sube, hay que recompilar `better-sqlite3`); (12) las
+> **2 altas** que quedan de `npm audit` (`nodemailer` y `zod`): exigen revisar codigo, no un parche; (13)
+> el **sello de version** del despliegue; (14) `logrotate` y el acceso restringido a los logs; (15) las
+> **actas** que faltan (comprobacion del servidor, despliegue con commit, cierre del checklist); (16) la
+> entrada de `BITACORA.md` con el hito de la v1.6 y del P8, y `CONTEXT.md` al dia; (17) decidir, con el
+> abogado, si la **v1.1 del Nube** (suscrita, sin contrafirma) se contrafirma retroactiva o queda como
+> registro historico; (18) la **cuenta real de una empresa** (hoy la unica es ASEPLUS, que es de
+> prueba).
+
+## Doceava ronda — 12-nov-2026 (tarde): el preflight que decide si se puede abrir dio OK
+
+La ronda anterior dejo tres cosas a medio camino: los cuatro workers en vuelo (T7, M.13, M.17,
+M.24/M.23/M.21), el mapa de la meta con 24 pendientes, y el cuadro canonico en 74 cerrados / 22
+pendientes. Esta ronda los integra y, sobre todo, **cambia el estado de uno de los diez bloqueos
+duros**: el que mas pesa.
+
+### 1. El preflight de la compuerta del Anexo de Nube dio OK
+
+El mapa de la meta de apertura (bloque M.2) decia: «La compuerta del Anexo de Nube sigue apagada y
+**falta la validacion escrita que el codigo exige**». Esa frase era una hipotesis, y era falsa.
+
+La validacion escrita **existia** y era del **5-nov-2026**: la decision C del owner («ENCENDERLA»,
+con su orden obligatorio) esta en `plan-cierre-abogado-2026-10-31.txt` §8 linea 100, en el
+encabezado del plan (linea 5) y su guion de encendido esta en el §13, paso a paso. Y la validacion
+que el **codigo** exige no es un documento: es un control, `scripts/preflight-anexo-nube.js`, que
+existe desde el 5-nov, que **aborta con codigo 5** si no hay ninguna Empresa activa con el Anexo de
+Nube suscrito **y contrafirmado** sobre el texto vigente, y que **nunca se habia corrido contra
+produccion**.
+
+Se corrio el 12-nov-2026 a las 19:56Z, contra una **copia** de la base hecha con `.backup` (la
+original no se abrio en escritura) y con el codigo **real** del servidor:
+
+```
+ok: true
+motivo: "hay al menos una Empresa activa con el Anexo de Nube suscrito y contrafirmado sobre el texto vigente"
+texto: legal/anexo-nube-v1.3.html | 85 143 B | hash del archivo == hash del manifiesto
+empresas: 1 activa | 1 suscrito | 1 sobre el texto vigente | 1 EJECUTADO
+  - 900829731 ASEPLUS CARIBE S.A.S. :: suscrito=true vigente=true ejecutado=true v1.3
+    fecha 2026-11-12T15:38:27.990Z | contrafirmado 2026-11-12T16:13:54.106Z
+compuerta: FIRMA_EXIGIR_ANEXO_NUBE = (no definida)
+PREFLIGHT_EXIT=0
+```
+
+Consecuencia para el mapa: **de la decision y de la validacion no falta nada; falta el acto.**
+Encender la variable y reiniciar. El bloque M.2 quedo reescrito con esta evidencia y con los tres
+actos que si quedan, y el orden del §13 con su comando literal.
+
+### 2. «Que codigo corre» ya se puede responder, y no por inferencia
+
+El despliegue es por **copia de archivos** y el servidor **no tiene `.git`**; el `/health` devuelve
+`kair_version: "compatible-0.1.189"`, un valor fijo. Durante una ronda entera se dio por hecho que
+el 📦1051 (el bump de `proxy-addr` a 2.0.8) estaba desplegado, y no lo estaba: produccion corria
+`proxy-addr 2.0.7`, que es la critica que ese commit arregla.
+
+La respuesta se armo comparando el sha256 de cada archivo desplegable del repositorio con el de los
+mismos archivos en el servidor: **247 archivos en comun, 6 diferentes, 0 sobrantes**. Los 6 son
+`package.json`, `package-lock.json`, dos scripts auxiliares y dos archivos de despliegue: **todo
+`src/` que corre es byte a byte el de `264d08df`**, y lo unico que falta es el bump de dependencias.
+
+Eso quedo como control reproducible, no como una medicion de un dia: `firma-service/scripts/
+comparar-despliegue.js`, que sale con codigo 1 **nombrando** los archivos mientras haya diferencias
+(`tests/scripts/comparar-despliegue.test.js`, 6/6, que comprueba que detecta una diferencia
+nombrandola, que detecta un sobrante, que da el visto bueno cuando todo cuadra y que **no escribe
+ni un byte** en lo que compara).
+
+Una hipotesis se cayo por el camino: se creyo que el arbol desplegado era el del repo porque el
+directorio `app/` tiene fecha del 11-nov; se comprobó archivo por archivo y la fecha era del
+directorio, no del contenido. El codigo de runtime si estaba al dia, copiado el 12-nov a las 09:30.
+
+### 3. Las tres actas que no existian, con su commit y sus resultados
+
+El canonico pedia tres actas (requisitos 7.13 y 8.8, y el registro de cierre que nombra 8.10). Hoy
+existen, cada una donde el canonico las designa:
+
+- `verificacion-cierre/acta-comprobacion-servidor-2026-11-12.md` (7.13), con el resumen **en el
+  runbook**, en la seccion **5.1.4** que se acaba de crear: `MIGRACION-SERVIDOR-FIRMA.md` §5.1 era
+  solo el procedimiento; ahora tiene el resultado medido.
+- `verificacion-cierre/acta-despliegue-2026-11-12.md` (8.8): que commit esta desplegado, con que
+  resultados se midio, y que queda abierto.
+- `verificacion-cierre/acta-cierre-checklist-2026-11-12.md` (8.10 y el «registro de cierre» del §5
+  del plan): version, hashes, commit, resultados de **T1 a T9**, decisiones **A, B y C** con su
+  fecha, responsable y fecha.
+
+Con eso, el cuadro canonico sube de **74 a 76 cerrados** (20 pendientes sobre 96): el 7.13 y el 8.10
+pasan a CERRADO. El texto sale **literal del informe** que lo midio
+(`scripts/actualizar-cuadro-canonico-2026-11-12.js`, idempotente) y la tabla la regenera
+`scripts/contar-estados-checklist.js`.
+
+### 4. T7: la reversion probada, y un defecto real que la prueba encontro y que quedo corregido y medido
+
+El worker de T7 entrego `scripts/probar-reversion.js` y su acta
+`verificacion-cierre/t7-reversion-probada.md`, con la corrida real en el servidor y **sin tocar
+produccion**: **58 OK, 3 avisos, 0 fallas**, exit 0; el volcado canonico de la base restaurada es
+identico al de origen; la reversion se niega con exit 4 sin `--forzar-hold` y borra con exit 0
+con `--forzar-hold --ejecutar`; produccion intacta al cierre (hash y `mtime` de la base iguales,
+`MainPID` sin cambio, `NRestarts = 0`, `journalctl` sin entradas).
+
+La prueba encontro un **defecto real**: `limpiar-rastro-prueba.js:1119` (el borrado **por rango**)
+borra `gh_consentimientos_firma` sin borrar antes sus filas de `gh_consentimientos_eventos`, y la FK
+de la migracion 010 no deja borrar el padre antes que el hijo. Con un consentimiento que tenga
+eventos —el caso normal, porque los escribe `src/services/consent.js`— la reversion falla con
+`FOREIGN KEY constraint failed`: la transaccion revierte (no se pierde nada) pero la reversion queda
+**bloqueada**. El modo `--solo-consentimientos` si lo hacia bien (linea 810); el fallo estaba solo en
+la ruta por rango. En produccion hay 3 consentimientos y 0 eventos, asi que era **latente**.
+
+**Corregido** el 12-nov (+22 lineas): se borran primero los eventos y despues el consentimiento, y
+el recibo dice cuantos eventos de consentimiento se fueron. Y **medido con un A/B sobre la misma base
+sembrada**: el programa **desplegado** (el viejo) aborta con `FOREIGN KEY constraint failed` y exit 3
+sin borrar nada; el **corregido** borra con exit 0, `integridad=ok`, `llaves_rotas=0`. El arbol del
+despliegue **todavia no trae la correccion**: desplegarla es un acto del owner.
+
+Un detalle que importa: la regla correcta **ya estaba escrita en el repo**, en `tests/helpers.js`, que
+borra en el orden correcto. Lo que faltaba era que el script de produccion la cumpliera.
+
+### 5. T1: la corrida desde un clon limpio, tres veces
+
+El worker de T1 clono el repositorio, lo instalo desde cero (`npm ci`, Node 22, ABI 127), **sin
+`.env`** y con los devDependencies intactos (`added 139 packages`, exit 0, **0 vulnerabilidades**), y
+corrio la suite completa tres veces:
+
+| Corrida | tests | pass | fail | skipped |
+|---|---|---|---|---|
+| A (14:53) | 2 624 | 2 622 | **0** | 2 |
+| B (15:03) | 2 630 | 2 628 | **0** | 2 |
+| C (15:13) | 2 650 | 2 648 | **0** | 2 |
+
+Los conjuntos de nombres de prueba coinciden **exactamente** con las corridas del arbol del owner, y
+el clon final quedo **byte a byte identico** (4 780 de 4 780 archivos versionados). El acta:
+`verificacion-cierre/t1-corrida-desde-clon-limpio.md`.
+
+**La corrida final del arbol del owner.** Con el arbol de dependencias ya corregido (las dos
+altas de `npm audit`) y los tests nuevos de la ronda, la suite completa se corrio una vez mas
+sobre el arbol de trabajo del owner: **2 665 tests · 2 663 pass · 0 fail · 2 skipped**,
+179 archivos de prueba, `exit 0`, 317 s (Node 22.23.4, ABI 127).
+
+**La seccion 7 del runbook publicaba 2 606 / 2 604**: una cifra que un dia fue correcta y que,
+leida como vigente, era un verde falso. Se corrigio a la cifra medida. El 6.11 del cuadro
+canonico queda **PARCIALMENTE** y no se puede pasar a CERRADO mientras la corrida no este
+vinculada a un commit candidato: T3 lo tiene el owner.
+
+**El hallazgo que produjo:** un clon limpio hecho con la configuracion del Git del sistema
+(`core.autocrlf = true`) **no es el arbol del owner**: materializa 2 697 de los 4 781 archivos con
+CRLF, cuando los blobs los tienen en LF. El repo tiene `core.autocrlf = false` en su `.git/config`
+local, y `git reset --hard` **no** reescribe los archivos que el indice ya da por buenos. La trampa
+quedo escrita como la **155** del `PROMPT.md`: la suite daba verde en los dos arboles, asi que el
+defecto **no se veia en los tests**.
+
+### 6. Documentacion
+
+- `BITACORA.md`: **nueve entradas del 12-nov** (el hito v1.6/P8, el preflight, la comparacion del
+  arbol desplegado, el defecto de la FK, y las cinco sobre los verificadores automaticos y la
+  cifra de la suite vencida). De paso se corrigio una **filtracion de 4 caracteres CJK** que venia de una ronda
+  anterior y que los barridos de esa ronda no lo pillaron (BITACORA no estaba en la lista): el
+  barrido de caracteres prohibidos da ahora cero en el archivo.
+- `CONTEXT.md`: al dia con el estado real y los bloqueos pendientes.
+- El paquete del abogado se **resincronizo** tras el cambio del cuadro canonico (adjunto 09 copiado
+  byte a byte, fila de la nota con el tamano y la huella nuevas, `SHA256SUMS.txt` regenerado desde
+  los archivos reales): **14/14 sumas coinciden**. No se corrio `armar-paquete-abogado.js`, que sigue
+  congelado en la v1.4. Se **resincronizo otra vez** cuando el 6.11 cambio de texto (el canonico
+  es copia byte a byte del adjunto 09): manifiesto regenerado desde los archivos reales y
+  **14/14 sumas coinciden**.
+- El manifiesto `legal-readiness.json` **no se toco**: `191c08b837b41069de4e2d25d7158fd90a7c3ce5f93b22696d2d7050f8a4013f`,
+  el mismo de produccion.
+
+### 7. El mapa, al cierre de esta ronda
+
+**27 bloques: 4 cerrados / 23 pendientes.** Los cuatro cerrados son el M.22 (las 39 casillas del §7
+del SECURITY.md medidas), el M.25 (`BITACORA.md` y `CONTEXT.md` al dia), el M.26 (las tres actas) y
+el M.27 (el runbook convertido en procedimiento). El M.2 **cambio de texto y de evidencia** (ya no
+falta la validacion: falta el acto) pero sigue pendiente, porque la compuerta sigue apagada.
+
+**Lo que sigue sin poder cerrarse desde el equipo** son los diez bloqueos duros, y todos los que
+dependen de un acto del owner estan con el comando literal en
+`docs/gestion-humana/firma-electronica/guion-de-cierre-2026-11-12.md`: los permisos 777, el 📦1051,
+la bandera de la compuerta, la T8, la firma del A4, la ratificacion del abogado, los alias de
+Workspace, el destino del respaldo off-site, Node 22 y el alta de la primera empresa real.
+
+### 8. Los numeros al cierre de la ronda
+
+| Que | Valor | Como se midio |
+|---|---|---|
+| Suite del `firma-service` | **2 665 tests · 2 663 pass · 0 fail · 2 skipped** | corrida final en el arbol del owner, 179 archivos de prueba, `exit 0`, 317 s |
+| Reproduccion desde clon limpio | **tres corridas, 0 fallos** | `verificacion-cierre/t1-corrida-desde-clon-limpio.md` |
+| Cuadro canonico | **76 cerrados / 20 pendientes** sobre 96 | `scripts/contar-estados-checklist.js` (idempotente) |
+| Mapa de la meta | **27 bloques: 4 cerrados / 23 pendientes** | `scripts/contar-estados-meta-apertura.js` |
+| Paquete del abogado | **14/14 sumas** | `scripts/verificar-sumas-paquete-abogado.js` |
+| `npm audit` del repo | **0 vulnerabilidades** | `npm.cmd audit --omit=dev` |
+| Manifiesto `legal-readiness.json` | **sin cambios** | `191c08b8…f8a4013f`, el mismo de produccion |
+
+**La §7 del runbook** publico 2 606 / 2 604 (una cifra vencida): quedo corregida a la vigente.
+El 6.11 del cuadro canonico queda **PARCIALMENTE**, que es lo que corresponde: la corrida
+existe y esta en verde, pero todavia no esta vinculada a un commit candidato (T3 lo tiene el
+owner).
+
+**Lo que NO se hizo en esta ronda.** No se commiteo ni se pusheo nada (falta el «dale» y el
+«pushea»). No se desplego: no hay `sudo`. No se encendio la compuerta. No se firmo nada: la T8
+y el A4 las firma el owner. No se toco el manifiesto. Y el cambio del 6.11 **no** se aplico al
+servidor: el codigo de produccion sigue siendo el de `264d08df`.
