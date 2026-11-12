@@ -45,9 +45,14 @@
 #   REMOTO=usuario@otro-servidor:/ruta/de/destino
 #   # ... o, con rclone:
 #   # METODO=rclone
-#   # REMOTO=rclone:mi-bucket/kair
+#   # REMOTO=b2-kair:kair-firma-backups
 #   RETENCION_DIAS=30
 #   EOF'
+#
+# EL FORMATO DE `REMOTO` CON RCLONE ES `<NOMBRE-DEL-REMOTO>:<RUTA>`. El nombre
+# es el del remoto en el `rclone.conf` (por ejemplo `b2-kair`), NO la palabra
+# `rclone`: si se pone `rclone:mi-bucket/kair`, rclone busca un remoto que se
+# llame "rclone", no lo encuentra y la copia falla con el codigo 1.
 #
 # METODO:
 #   rsync   -- requiere `rsync` en las dos maquinas y llave SSH sin passphrase
@@ -57,6 +62,10 @@
 #   rclone  -- requiere `rclone` con un remoto ya configurado (S3, GCS,
 #             otro S3-compatible). Para un bucket en la nube es la mejor
 #             opcion: el destino no depende de otra maquina.
+#             El hash del destino se calcula descargando el objeto y
+#             hasheandolo con SHA-256 (`rclone cat | sha256sum`). El hash
+#             nativo del remoto (MD5 en S3) NO puede coincidir con el
+#             SHA-256 local, y `rclone hash` no es un comando de rclone.
 #   ninguno -- no se copia nada (estado por defecto).
 #
 # INTERFAZ
@@ -184,7 +193,14 @@ copiar_y_verificar() {
   local hash_destino=""
   case "$METODO" in
     rclone)
-      hash_destino="$(rclone hash "$REMOTO/$nombre" 2>/dev/null | awk '{print $1}')"
+      # `rclone hash` NO sirve para comparar contra el SHA-256 local: en S3 el
+      # hash que entrega el remoto es el MD5 (ETag) y con subida por partes no
+      # hay hash, asi que jamas coincidiria con el SHA-256. Ademas `rclone hash`
+      # no es un comando de rclone (los comandos son `hashsum`, `md5sum` y
+      # `sha1sum`). Por eso el hash del destino se calcula DESCARGANDO el
+      # objeto y hasheandolo con SHA-256: la comparacion queda SHA-256 contra
+      # SHA-256, que es la garantia que este script promete.
+      hash_destino="$(rclone cat "$REMOTO/$nombre" 2>/dev/null | sha256sum | awk '{print $1}')" || hash_destino=""
       ;;
     *)
       hash_destino="$(ssh "${REMOTO%%:*}" "sha256sum '$REMOTO/${nombre##*/}'" 2>/dev/null | awk '{print $1}')"
@@ -240,7 +256,10 @@ modo_verificar() {
     hash_local="$(sha256sum "$origen" | awk '{print $1}')"
     case "$METODO" in
       rclone)
-        hash_destino="$(rclone hash "$REMOTO/$nombre" 2>/dev/null | awk '{print $1}')"
+        # Mismo criterio que en `copiar_y_verificar`: el hash del destino se
+        # calcula descargando el objeto y hasheandolo con SHA-256, porque el
+        # hash nativo del remoto (MD5 en S3) nunca coincidiria con el local.
+        hash_destino="$(rclone cat "$REMOTO/$nombre" 2>/dev/null | sha256sum | awk '{print $1}')" || hash_destino=""
         ;;
       *)
         hash_destino="$(ssh "${REMOTO%%:*}" "sha256sum '$REMOTO/${nombre##*/}'" 2>/dev/null | awk '{print $1}')"

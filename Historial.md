@@ -9145,3 +9145,155 @@ El acta con los comandos literales, la salida y el error:
 «pushea»). No se desplego: no hay `sudo`. No se encendio la compuerta. No se firmo nada: la T8
 y el A4 las firma el owner. No se toco el manifiesto. Y el cambio del 6.11 **no** se aplico al
 servidor: el codigo de produccion sigue siendo el de `264d08df`.
+
+## Decimotercera ronda — 12-nov-2026 (tarde): las siete decisiones de fondo, tomadas; y el manifiesto que se contradecía a sí mismo, corregido
+
+El owner delegó en el equipo la **toma** de las siete decisiones de fondo del mapa: «quiero que soluciones los
+7 puntos de decisiones de fondo, tomas las decisiones tu que mejor queden para cerrarlas». Delegar la
+*toma* no delega los actos: las firmas, las credenciales, la ventana y las respuestas de terceros siguen
+siendo de quien puede hacerlos. Esta ronda tomó las siete, escribió el fundamento de cada una, y dejó por
+escrito **qué es acto de terceros**.
+
+El documento es `docs/gestion-humana/firma-electronica/decisiones-de-fondo-2026-11-12.md`.
+
+### 1. Las siete decisiones, y su resultado
+
+| Bloque | Decisión | Resultado | Quién responde por lo que falta |
+|---|---|---|---|
+| M.5 | Se pide al abogado la determinación escrita de J6 y J7, con el insumo ya medido (RNBD 19,09 UVT frente al umbral de 100 000 UVT; el catálogo legado de 20 años ya retirado del código) | **PARCIALMENTE** | El abogado y el owner |
+| M.6 | La compuerta de conservación **sigue cerrada**; la tabla se entrega **ya alineada** para validar | **PARCIALMENTE** | El abogado (validar) y el owner (abrir, después) |
+| M.7 | Destino del respaldo fuera del servidor: **bucket S3-compatible de Backblaze B2** con `rclone`, retención 30 días | **PARCIALMENTE** | El owner (cuenta, bucket y activación) |
+| M.14 | La ventana de Node 22 **se mantiene y no se aplaza**, con su rollback y un verificador de solo lectura | **PARCIALMENTE** | El owner (la ventana) |
+| M.15 | La v1.1 suscrita y sin contrafirma **queda como registro histórico**: no se contrafirma retroactivamente | **CERRADO** | Nadie bloquea |
+| M.18 | **Se reemite ahora**: Anexo de Nube v1.4 y el Encargo que la remite | **PARCIALMENTE** | El abogado (redacción) y el owner (firmas) |
+| M.20 | `FIRMA_EXIGIR_MEDIO_PERSONAL_OTP` se conserva **inerte**: no es un interruptor | **CERRADO** | Nadie |
+
+**El mapa pasó de 5 cerrados / 22 pendientes a 7 cerrados / 20 pendientes.** La tabla se regeneró por
+script (`contar-estados-meta-apertura.js --escribir`) y la segunda corrida no cambió nada: el conteo sale
+de las filas, no de una cifra escrita a mano.
+
+**Por qué dos cierran y cinco no.** Un bloque cierra cuando lo que el bloque dice que falta **está hecho y
+medido**. Si lo que falta es una firma, una credencial, una ventana o la respuesta de un tercero, no está
+hecho: el bloque queda **PARCIALMENTE**, que el verificador cuenta como pendiente. Esa es la regla que
+impide el verde falso, y por eso **M.5 no cerró por haber escrito la pregunta**.
+
+### 2. El manifiesto se contradecía a sí mismo (y por eso el repositorio ya no es byte a byte igual al de producción)
+
+Al mirar el manifiesto con luz de lámpara apareció lo que ningún test veía: **el bloque y la prosa no
+contaban lo mismo**. El bloque `anexo_nube` decía `firmado: true`, `contrafirmado: true`,
+`fecha: 2026-11-12T15:38:27.990Z` y `contrafirma_fecha: 2026-11-12T16:13:54.106Z`; dos líneas más abajo, en
+la `nota`, decía **«el texto vigente todavía no está suscrito»**. Lo mismo en el Anexo de Encargo:
+`estado: firmado` con fecha del 12-nov, y la nota diciendo **«NO está suscrito»**.
+
+**Los dos actos existen en la base de producción** (suscripción id 2, `FIRMADA` y `CONTRAFIRMADA`, acta
+`050f223a3665cf7d`): lo que estaba mal era la prosa, y el manifiesto de producción la publicaba.
+
+**El defecto de fondo, en el script.** `scripts/actualizar-manifiesto-1047.js` empujaba a
+`versiones_firmadas` la firma que el propio manifiesto declaraba **sin comprobar si describía el texto
+vigente**. Efecto: la v1.3 —el texto vigente, suscrito y contrafirmado el 12-nov— quedaba registrada
+**dos veces**, una como vigente y otra **como si fuera una versión anterior ya superada**, y la entrada de
+la historia llevaba la evidencia del **primer** acto, sin la del segundo. Ahora a la historia solo pasa una
+firma que **no** describe el texto vigente, y hay **dos pruebas de regresión** que lo fijan.
+
+**Consecuencia asumida y escrita.** El manifiesto del repositorio es ahora `d9b59699…c9097b` y el de
+producción sigue siendo `191c08b8…a4013f`: difieren en **exactamente dos notas**. La invariante «el
+manifiesto del repositorio es byte a byte igual al de producción» **sigue siendo la regla, pero la restablece
+el despliegue**, que es un acto del owner. Se escribió en el expediente, en vez de esconderlo: un
+repositorio que va por delante sin decirlo es un repositorio que alguien va a «corregir» sin querer.
+
+### 3. M.7 — el destino del respaldo, y un verificador que no podía verificar
+
+**Decisión:** un **bucket S3-compatible de Backblaze B2**, alcanzado con `rclone`, con **retención de 30
+días**. Se descartó el Drive de Google porque es el **proveedor del canal de correo**: una cuenta
+comprometida se llevaría el correo y los respaldos juntos. La máquina es un portátil (sin virtualización) y
+**no hay un segundo servidor** al que copiarle; los respaldos son diminutos (683 738 B por pareja diaria) y
+van **cifrados**: el destino no ve texto claro.
+
+**Defecto real corregido:** la rama `rclone` de `deploy/backup-offsite.sh` comparaba la huella del destino
+con **`rclone hash`**, un comando **inexistente** (medido con las dos versiones reales: la de `apt` 1.60.1 y
+la 1.76.0 responden `unknown command "hash"`). Es decir, el método `rclone` **nunca podía dar una copia por
+buena**. Ahora la huella del destino se calcula **descargando el objeto y hasheándolo con SHA-256**.
+
+**Cómo se validó:** con **binarios reales de `rclone`** (1.60.1 y 1.76.0, SHA-256 verificado contra la lista
+oficial de sumas), en un sandbox de `/tmp` con un remoto local: el script original copia pero **falla** la
+verificación (salida 1); el parcheado da «OK, copiado y verificado» (salida 0), **detecta la corrupción** del
+destino («HASH DISTINTO», salida 1), **poda solo el destino** sin tocar la copia local, y no se lleva el
+archivo trampa `pre-despliegue`. Los 8 pasos de activación se probaron **literales** en el servidor.
+
+Detalle completo, con los comandos: `decision-respaldo-offsite-2026-11-12.md`.
+
+### 4. M.14 — la ventana de Node 22, con la prueba que faltaba
+
+La decisión del 11-nov (que el servidor corra **Node 22, ABI 127**) **se mantiene y no se aplaza**, pero la
+ventana tiene una **colisión real**: el cron `/etc/cron.d/kair-firma-health` **reinicia el servicio cada 5
+minutos** si `/health` no responde, y durante la ventana el servicio está reiniciándose a propósito. La
+ventana empieza desactivando ese cron y termina reactivándolo.
+
+**La prueba que faltaba se hizo, sin instalar nada.** El runtime oficial `node-v22.23.5` se descargó a
+`/tmp` y se verificó contra el `SHASUMS256.txt` de nodejs.org (`cdeb8670…40f8`); el prebuild oficial
+`better-sqlite3` 11.10.0 `node-v127-linux-x64` (`d7d9272b…8fda37`) **carga y responde `SELECT 1`** bajo
+Node 22 (SQLite 3.49.2, salida 0), mientras el **mismo** binario con el Node 20 del servidor es
+**rechazado** con `NODE_MODULE_VERSION 127 ... requires 115`. O sea: **el runtime y el módulo son el mismo
+acto**, y la ventana **no necesita compilar nada**. Al terminar, producción estaba intacta: `MainPID=281641`,
+`NRestarts=0`, `/health` en `ok`.
+
+**El rollback no depende de internet:** el `.deb` de Node 20 (`nodejs_20.20.2-1nodesource1_amd64.deb`) ya
+está en `/var/cache/apt/archives/`, y el binario nativo del ABI 115 se copia a `/tmp` antes de tocar nada.
+
+El equipo dejó `deploy/verificar-runtime-node.sh`: **de solo lectura**, sin `sudo`, que **carga el módulo y
+ejecuta un `SELECT 1` sobre una base en memoria** (no abre la base de producción) y **sale con código 1**
+ante cualquier incoherencia entre el runtime y el módulo. Ese es el código que hace fallar la ventana.
+
+Detalle con los comandos literales: `decision-ventana-node-22-2026-11-12.md`.
+
+### 5. M.18 — los candidatos de la v1.4, armados pero no firmables
+
+Un texto **suscrito no se toca**: la vía es una versión nueva. Los **candidatos** están armados
+mecánicamente, aplicando los literales ya escritos de `propuesta-v1.4-anexo-nube-2026-11-12.md` (6 anclas
+en el Nube, 5 en el Encargo), con un script que **se niega a escribir** si una ancla no casa **exactamente
+una vez** (11 de 11 bien). Quedan en `candidatos-v1.4/`, **fuera del paquete de despliegue**, marcados como
+**no publicados y no firmables**: la **redacción final es del abogado** y la **firma es del owner**.
+
+Candidato del Anexo de Nube v1.4: 85 494 B, `895d0d0b…d3fe39`. Candidato del Anexo de Encargo del
+12-nov-2026: 95 118 B, `2afb0e68…f17af1c`. Los vigentes quedan **intactos**: v1.3 `fdd10551…b585d` y
+Encargo `6308b1f7…b8948`.
+
+El costo, dicho de frente: hasta que la v1.4 esté firmada el gate **baja a 37 ítems en `ok`**, que es el
+mismo estado en que estaba la v1.3 antes del 12-nov.
+
+### 6. El pedido al abogado, en un solo escrito
+
+La nota al abogado (`paquete-abogado-2026-10-30/nota-al-abogado-2026-10-30.md`) tiene ahora una sección
+**«3.bis»** con los **cinco puntos concretos** que se le piden, cada uno con su insumo medido: la
+**ratificación de J6** (el papel de Google y el CDPA), la **determinación de J7** (la Circular 002/2025 y el
+RNBD, con los 19,09 UVT y la advertencia de que la calificación es suya), la **validación de J8** (la tabla
+de conservación, ya alineada, con la compuerta cerrada **por decisión**), la **redacción final de la v1.4**
+(con las huellas de los candidatos) y la **confirmación de la decisión sobre la v1.1**.
+
+Se corrigió, además, una afirmación de esa misma nota que ya era falsa: decía «no se publicó nada» y «no se
+firmó nada», y desde el 12-nov el Acuerdo v1.6 está publicado y los dos anexos están suscritos y
+contrafirmados.
+
+### 7. Estado al cierre de la ronda
+
+- **Mapa de la meta: 27 bloques, 7 cerrados / 20 pendientes** (tabla regenerada por script, idempotente).
+- **Cuadro canónico: 77 cerrados / 19 pendientes** de 96 (sin cambios: esta ronda no cambió requisitos).
+- **Paquete del abogado: 14 de 14 sumas** verificadas (`verificar-sumas-paquete-abogado.js`, salida 0), con
+  el adjunto 09 resincronizado byte a byte contra el canónico.
+- **Manifiesto**: el del repositorio `d9b59699…c9097b`, el de producción `191c08b8…a4013f`, con la
+  diferencia de **dos notas** declarada en el expediente.
+- **`src/services/readinessLegal.js`** decía «Acuerdo de uso v1.1» donde el vigente es la **v1.6**: corregido.
+- **Suite oficial: 2 667 tests · 2 665 pass · 0 fail · 0 cancelled · 2 skipped** (179 archivos de
+  prueba, `exit 0`, 362 s, Node 22.23.4 ABI 127). Los **+2** sobre la corrida de la manana son las
+  **dos pruebas de regresion del manifiesto**, que se agregaron con la correccion del defecto que
+  empujaba la firma del texto vigente a `versiones_firmadas`.
+- **Barrido de formato** sobre los 44 archivos de la ronda: sin BOM, sin CJK/cirílico/hangul, sin CR suelto,
+  y con el perfil de EOL de cada archivo conservado.
+
+### 8. Lo que NO se hizo en esta ronda
+
+No se commiteó ni se pusheó nada (falta el «dale» y el «pushea»). No se desplegó: no hay `sudo`. No se
+encendió ninguna compuerta. No se firmó nada: la T8, el A4 y la v1.4 los firma el owner, y la v1.4
+depende antes de la redacción del abogado. No se tocó `legal/` ni `sitio/`: los textos publicados siguen
+siendo los mismos, y los candidatos viven fuera del paquete. No se tocaron los textos ya suscritos. Y no
+se borró nada del servidor.

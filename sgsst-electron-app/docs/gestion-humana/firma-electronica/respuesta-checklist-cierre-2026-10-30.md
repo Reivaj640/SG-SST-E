@@ -1163,13 +1163,19 @@ El sistema comprueba si el medio al que sale el código pertenece a un dominio q
 pueda leer, y **rechaza la solicitud de manera incondicional**: no existe ninguna opción que
 lo desactive, y en ese caso se ofrece la firma autográfica sobre papel.
 `publicFlow.js:1161`, cubierto por `tests/d02-medio-otp.test.js`. **Lo que el abogado
-aclaró en J10 y hay que tener presente:** el interruptor
-`FIRMA_EXIGIR_MEDIO_PERSONAL_OTP` aparece **apagado** y el inventario de buzones
-corporativos se ejecutó sobre **población vacía** (0 solicitudes revisadas el 26-oct-2026),
-así que el rechazo incondicional **no está acreditado en producción**. La acreditación
-—el interruptor en su estado efectivo, al menos un caso real rechazado con su asiento
-`OTP_MEDIO_CORPORATIVO` y la reejecución del inventario con población real— es de la ronda
-de pruebas de extremo a extremo (7.11), no de este requisito.
+aclaró en J10 y hay que tener presente:** la variable `FIRMA_EXIGIR_MEDIO_PERSONAL_OTP` **no es
+un interruptor**. Desde la v1.2 del Acuerdo (27-oct-2026) **no se lee en ningún sitio del código**
+(`src/config.js:176` la conserva solo para no romper despliegues que ya la tengan definida) y su
+valor **no cambia ningún comportamiento**: el rechazo del buzón corporativo es incondicional
+(`src/services/publicFlow.js`, función `_controlarMedioCorporativo`) y cada caso rechazado queda
+como evento `OTP_MEDIO_CORPORATIVO` en `gh_firma_eventos`, que es de solo anexado.
+Lo que sí faltaba era el **caso real en producción**: el inventario de buzones corporativos se había
+ejecutado sobre **población vacía** (0 solicitudes revisadas el 26-oct-2026). Ese caso **se produjo
+el 12-nov-2026** contra el **código desplegado**, sobre una copia aislada de la base, con su asiento
+(evento id 151, `2026-11-12T18:57:58.217Z`, resultado `rechazado`) y con producción intacta
+(`verificacion-cierre/t6-caso-buzon-corporativo.md`). Lo que queda para acreditarlo **en
+producción** es que el caso ocurra en la base de producción, con una empresa real: es parte de la
+ronda de pruebas de extremo a extremo (7.11) y del M.3 del mapa de la meta.
 
 **4.8 · Se comprueba que el OTP no se puede alterar ni corregirse indebidamente — CERRADO.**
 El aviso `OTP_MEDIO_CORPORATIVO` es de solo anexado: no se corrige ni se altera; lo único
@@ -1243,10 +1249,11 @@ para que un correo de ella sea autenticable por el receptor.
     Message-ID y su `Authentication-Results`").
   - `docs/gestion-humana/firma-electronica/decision-regularizacion-correo-2026-11-09.md:31-34`
     (tabla de estado medido al 10-nov: P2, P4 y P5 cerrados con su evidencia).
-- **El manifiesto en el servidor es el mismo del repositorio.** Medición SSH del 12-nov:
+- **El manifiesto en el servidor era el mismo del repositorio; hoy el repositorio lleva una corrección
+  que el despliegue alinea.** Medición SSH del 12-nov:
   `sha256sum /opt/kair-firma/app/legal-readiness.json` =
   `191c08b837b41069de4e2d25d7158fd90a7c3ce5f93b22696d2d7050f8a4013f`, idéntico al hash local del
-  `legal-readiness.json`. En ese manifiesto, `mail_provider.cuenta` = `workspace`, `rol` =
+  `legal-readiness.json` de ese momento. **Nota de vigencia (12-nov-2026, tarde).** Esta medicion es la de ese momento y **no se reescribe**. Desde esa tarde el **repositorio** lleva el manifiesto `d9b596993cec7958cadadcd9d9ed51c33878eb03c5b0c4aa1bc642a4bfc9097b`, que difiere del de produccion en **exactamente dos campos**: las dos notas (`anexo_nube.modelo.nota` y `anexo_encargo.nota`) que en produccion dicen «NO esta suscrito» mientras el propio bloque declara `firmado: true` y `contrafirmado: true` con la fecha del 12-nov. Los dos actos **existen en la base de produccion** (suscripcion id 2, `FIRMADA` y `CONTRAFIRMADA`, acta `050f223a3665cf7d`): lo que se corrige es la prosa, no el hecho. **El despliegue es lo que alinea los dos**, y por eso el repositorio va por delante a proposito y el hash del manifiesto **no coincide** con el del servidor hasta que ese despliegue se ejecute. En ese manifiesto, `mail_provider.cuenta` = `workspace`, `rol` =
   `subencargado`, `dpa` = `true`, `aceptacion.aceptada` = `true`, `aceptacion.fecha` = `2026-11-10`
   (`legal-readiness.json:70-107`, con la evidencia de la captura en `:86-106`).
 - **El código la usa y la publica.** `src/config.js:72-80` lee `SMTP_HOST`, `SMTP_PORT` (587 por
@@ -1570,6 +1577,10 @@ corrida del arbol del owner: **el conjunto de los 2 665 nombres de prueba es ide
 omitidos son los mismos, con el mismo motivo escrito en el propio test. Y el clon quedo **byte a
 byte** igual al arbol del owner: **4 810 archivos identicos, 0 diferentes, 0 ausentes**.
 
+**Ojo con las dos cifras:** la del clon es la del commit `e4dd5f31`, **anterior** a las dos pruebas
+de regresion del manifiesto que se agregaron el 12-nov por la tarde; el arbol de hoy da
+**2 667 / 2 665 / 0 / 2**.
+
 **Un hallazgo que hay que dejar escrito.** El primer clon se hizo con la configuracion del sistema
 (`core.autocrlf = true`) y **no reproducia el arbol del owner**: materializo 2 697 de los 4 781
 archivos versionados con CRLF, cuando los blobs los tienen en LF. El repo del owner tiene
@@ -1583,13 +1594,14 @@ de `npm audit` resueltas) y los tests nuevos de esta ronda, la suite completa se
 sobre el arbol de trabajo del owner:
 
 ```
-tests 2665 | pass 2663 | fail 0 | cancelled 0 | skipped 2 | todo 0
-duration_ms 317044
+tests 2667 | pass 2665 | fail 0 | cancelled 0 | skipped 2 | todo 0
+duration_ms 362425
 ```
 
 179 archivos de prueba, `exit 0`, sin bloques `not ok`. **Esta es la cifra que publica ahora la
 seccion 7 del runbook** (`sgsst-electron-app/docs/MIGRACION-SERVIDOR-FIRMA.md`); la de 2 606 / 2 604
-que publicaba antes ya no era vigente.
+que publicaba antes ya no era vigente, y la de **2 665 / 2 663** es la de la corrida sobre el commit
+`e4dd5f31` (12-nov por la manana), que es **anterior** a las dos pruebas de regresion del manifiesto.
 
 **Evidencia.**
 `sgsst-electron-app/docs/gestion-humana/firma-electronica/verificacion-cierre/t1-corrida-desde-clon-limpio.md`
@@ -1669,7 +1681,7 @@ Medido por SSH (`sha256sum` en `/opt/kair-firma/app` frente al hash del repo en 
 | `src/server.js` | `73947e2d...ff90` | `73947e2d...ff90` | igual |
 | `src/services/readinessLegal.js` | `3f453ed2...2d9` | `3f453ed2...2d9` | igual |
 | `config/tabla-conservacion.json` | `9c81a175...a61b` | `9c81a175...a61b` | igual |
-| `legal-readiness.json` | `191c08b8...4013f` | `191c08b8...4013f` | igual |
+| `legal-readiness.json` | `d9b59699...c9097b` | `191c08b8...4013f` | **difiere en 2 notas (12-nov); el despliegue lo alinea** |
 | `scripts/fixtures/acuerdo-v1.6.txt` | `08e1eb8b...2f13e` | `08e1eb8b...2f13e` | igual |
 | `package.json` | `0a25dbe8...e424` | `ca60b002...b55ca` | **distinto** |
 
@@ -2261,7 +2273,7 @@ manda es el estado medido.
 - SSH, 12-nov: `systemctl is-active kair-firma` → `active`; `is-enabled` → `enabled`; `GET http://127.0.0.1:3001/health` → `{"status":"ok","db":"ok","smtp":"configured","uptime_seconds":14629}`.
 - SSH, 12-nov: `sha256sum` en disco → `acuerdo-v1.6.txt` `08e1eb8b...f13e`, `legal/anexo-nube-v1.3.html` `fdd10551...b585d`, `legal/anexo-encargo.html` `6308b1f7...b8948`. Coinciden con `legal-readiness.json:7`, `:145` y `:129`.
 - SSH, 12-nov: `sha256sum /opt/kair-firma/app/legal-readiness.json` → `191c08b837b41069de4e2d25d7158fd90a7c3ce5f93b22696d2d7050f8a4013f`, byte a byte igual al del repositorio (medido tambien en el PC). `sha256sum /opt/kair-firma/legal/constancia-aprobacion-acuerdo.html` → `aaf68b4e7df5e2757d5885840056218d97a0cbb1c9fa624bf7861962c8d0b413`.
-- Suite, registrada en el expediente: `sgsst-electron-app/docs/MIGRACION-SERVIDOR-FIRMA.md` §7 (12-nov: **2 665 pruebas, 2 663 verdes, 0 rojas, 2 omitidas**) y `verificacion-cierre/t1-corrida-desde-clon-limpio.md` (tres corridas desde clon limpio, 0 fallos).
+- Suite, registrada en el expediente: `sgsst-electron-app/docs/MIGRACION-SERVIDOR-FIRMA.md` §7 (12-nov por la tarde: **2 667 pruebas, 2 665 verdes, 0 rojas, 2 omitidas**; el 12-nov por la manana, sobre el commit `e4dd5f31`, 2 665 / 2 663) y `verificacion-cierre/t1-corrida-desde-clon-limpio.md` (tres corridas desde clon limpio, 0 fallos).
 
 **Que falta.** Cuatro cosas, todas con dueño, y ninguna es un problema del texto publicado. **Lo que se
 resolvio el 12-nov-2026** esta al final; lo que sigue abierto, antes:

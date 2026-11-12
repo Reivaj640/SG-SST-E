@@ -304,14 +304,35 @@ function main(args = process.argv.slice(2)) {
   // ---------------------------------------------------------------------------
   const nubePrevio = m.anexo_nube || {};
 
+  // La firma que el manifiesto declara se CONSERVA solo si describe el texto
+  // vigente. Este script no decide si una firma existe: eso lo decide el
+  // script que lee la base (`actualizar-manifiesto-anexo-nube.js`). Lo que
+  // hace este es no borrar una firma que si describe el texto que se esta
+  // publicando, para que los dos scripts se puedan correr en cualquier orden.
+  const firmaDelTextoVigente = nubePrevio.firmado === true
+    && String(nubePrevio.version || '').trim() === VERSION_NUBE
+    && String(nubePrevio.hash || '').trim().toLowerCase() === hashNube;
+
   // Las versiones suscritas que ya constan NO se borran. A eso se le suma la
-  // firma que el manifiesto declaraba, si no es la del texto vigente: cuando
+  // firma que el manifiesto declaraba, si NO es la del texto vigente: cuando
   // se publica un texto nuevo, la firma del anterior deja de describir el
   // texto vigente y pasa a la historia.
+  //
+  // DEFECTO CORREGIDO EL 12-NOV-2026: el push NO comprobaba si la firma
+  // declarada describia el texto vigente. Al correr este script sin cambiar
+  // de texto (o cuando el texto vigente ya era el que estaba firmado), la
+  // firma del texto vigente se empujaba IGUAL a `versiones_firmadas`, que es
+  // la lista de las versiones ANTERIORES. Resultado: la v1.3 (el texto
+  // vigente, suscrito y contrafirmado el 12-nov-2026) quedaba registrada dos
+  // veces, una como vigente y otra como si fuera una version anterior ya
+  // superada. Se veia en el manifiesto como una suscripcion de la v1.3 con la
+  // evidencia del PRIMER acto, sin la del segundo. El arreglo es una sola
+  // condicion: a la historia solo pasa una firma que NO describe el texto
+  // vigente.
   const firmadasPrevias = Array.isArray(nubePrevio.versiones_firmadas)
     ? nubePrevio.versiones_firmadas.slice()
     : [];
-  if (nubePrevio.firmado === true && nubePrevio.version
+  if (!firmaDelTextoVigente && nubePrevio.firmado === true && nubePrevio.version
     && !firmadasPrevias.some((x) => x && x.version === nubePrevio.version
       && String(x.hash || '').toLowerCase() === String(nubePrevio.hash || '').toLowerCase())) {
     firmadasPrevias.push({
@@ -323,15 +344,6 @@ function main(args = process.argv.slice(2)) {
     });
   }
   const firmadoPrevio = firmadasPrevias.filter((x) => x && x.version);
-
-  // La firma que el manifiesto declara se CONSERVA solo si describe el texto
-  // vigente. Este script no decide si una firma existe: eso lo decide el
-  // script que lee la base (`actualizar-manifiesto-anexo-nube.js`). Lo que
-  // hace este es no borrar una firma que si describe el texto que se esta
-  // publicando, para que los dos scripts se puedan correr en cualquier orden.
-  const firmaDelTextoVigente = nubePrevio.firmado === true
-    && String(nubePrevio.version || '').trim() === VERSION_NUBE
-    && String(nubePrevio.hash || '').trim().toLowerCase() === hashNube;
 
   m.anexo_nube = {
     firmado: firmaDelTextoVigente,
@@ -366,9 +378,10 @@ function main(args = process.argv.slice(2)) {
         + 'cerraron el 10-nov-2026, y el texto nuevo declara ese envio real con su Message-ID y su '
         + 'Authentication-Results. Siguen pendientes P3 (los alias del dominio) y P6 (revocar las app '
         + 'passwords de la cuenta anterior). La v1.2, del 9-nov-2026, nunca llego a suscribirse y queda '
-        + 'como referencia. La v1.1 (suscrita por ASEPLUS el 5-nov-2026) queda en `versiones_firmadas`: '
-        + 'el texto vigente todavia no esta suscrito y por eso el item firmado_nube del gate esta '
-        + 'pendiente. El papel del proveedor del canal de correo sigue siendo el de Subencargado, con la '
+        + 'como referencia. La v1.1 (suscrita por ASEPLUS el 5-nov-2026) queda en `versiones_firmadas`. '
+        + 'La v1.3 quedo suscrita por ASEPLUS CARIBE S.A.S. (la empresa de prueba del P8) y '
+        + 'contrafirmada por K+AIR el 12-nov-2026, con acta y huellas propias: el item firmado_nube del '
+        + 'gate se cumple con ese par de actos. El papel del proveedor del canal de correo sigue siendo el de Subencargado, con la '
         + 'formula condicional del dictamen legal del 11-nov-2026.'
         + ' ERRATA DEL 11-nov-2026, ANTES DE LA SUSCRIPCION: el parrafo 12 de la v1.3 decia '
         + '"Esta version 1.2 remite" al Anexo de Encargo, dentro de un texto que es la v1.3, y se corrigio '
@@ -397,15 +410,26 @@ function main(args = process.argv.slice(2)) {
       estado: encargoPrevio.estado,
     }].filter((x) => x && x.version);
 
+  // El estado de firma NO lo inventa este script: lo escribe el que lee la
+  // base (`actualizar-manifiesto-anexo-encargo.js`). Este solo lo CONSERVA
+  // cuando la firma es del MISMO texto vigente; si la version cambio, el
+  // estado anterior no describe este texto y se escribe no_firmado. Antes se
+  // ponia no_firmado siempre, y eso borraba del manifiesto una firma ya hecha
+  // cada vez que se regeneraba (el bloque decia "no firmado" con la nota
+  // diciendo que si lo estaba).
+  const encargoVigenteFirmado = encargoPrevio.version === VERSION_ENCARGO
+    && encargoPrevio.estado === 'firmado'
+    && Boolean(encargoPrevio.fecha)
+    && Boolean(encargoPrevio.evidencia);
+
   m.anexo_encargo = {
-    estado: 'no_firmado',
-    fecha: null,
-    evidencia: null,
-    // La FACULTAD acreditada de quien contrafirma por Gesstiar (P7). El texto
-    // vigente no esta suscrito, asi que no hay segundo acto y no hay
-    // facultad: la deja en null. El script que lee la base la escribe cuando
-    // la contrafirma exista.
-    contrafirma_facultad: null,
+    estado: encargoVigenteFirmado ? 'firmado' : 'no_firmado',
+    fecha: encargoVigenteFirmado ? encargoPrevio.fecha : null,
+    evidencia: encargoVigenteFirmado ? encargoPrevio.evidencia : null,
+    // La FACULTAD acreditada de quien contrafirma por Gesstiar (P7). Si el
+    // texto vigente esta firmado, se conserva la que dejo el script que lee la
+    // base; si no, no hay segundo acto y no hay facultad.
+    contrafirma_facultad: encargoVigenteFirmado ? (encargoPrevio.contrafirma_facultad || null) : null,
     version: VERSION_ENCARGO,
     hash: hashEncargo,
     nota: 'Texto vigente del Anexo de Encargo: la version ' + VERSION_ENCARGO + '. Corrige el parrafo '
@@ -418,12 +442,12 @@ function main(args = process.argv.slice(2)) {
       + 'telemetria, quedo respondido el 11-nov-2026 en el dictamen legal del expediente. Mantiene las '
       + 'secciones 4 y 5 (el vinculo con el proveedor de correo), la 3.4 y la 12 (devolucion, supresion '
       + 'y auditoria conforme al CDPA) y la clausula de prevalencia del instrumento bilateral mas '
-      + 'reciente, y remite ahora al Anexo de Nube v1.3. El texto vigente NO esta suscrito: la version '
-      + 'suscrita por ASEPLUS el 7-nov-2026 es la 2026-11-06, que queda en `versiones_firmadas`. Por eso '
-      + 'el item estado_encargo del gate esta pendiente y el flujo de suscripcion del servicio rechaza '
-      + 'una nueva firma por la via directa (409 SUSCRIPCION_EXISTENTE): la re-suscripcion va por el '
-      + 'canal administrativo, con su motivo. La suscripcion anterior NO se reescribe: la bitacora '
-      + 'es append-only.'
+      + 'reciente, y remite ahora al Anexo de Nube v1.3. El texto vigente quedo suscrito por ASEPLUS '
+      + 'CARIBE S.A.S. (la empresa de prueba del P8) y contrafirmado por K+AIR el 12-nov-2026, con '
+      + 'acta, huellas y facultad acreditada: el item estado_encargo del gate se cumple con ese par de '
+      + 'actos. La version que ASEPLUS suscribio el 7-nov-2026 (la 2026-11-06) queda en '
+      + '`versiones_firmadas` como instrumento anterior. La suscripcion anterior NO se reescribe: la '
+      + 'bitacora es append-only.'
       + ' ERRATA DEL 11-nov-2026, ANTES DE LA SUSCRIPCION: el menu, la seccion 1 (Partes), la seccion 5 '
       + '(Proveedores externos y subencargados) y la seccion 9 remitian al Anexo de Nube v1.2, un texto '
       + 'superado cuyo bloque de pendientes estaba desactualizado, y los cuatro puntos remiten ahora a la '

@@ -26,9 +26,9 @@ El paquete tiene **catorce (14) adjuntos**. El primero es su propia revisión; l
 | 06 | **Auditoría del Capítulo V** — los dos hallazgos T1 y T2 | `06-auditoria-capitulo-v-t1-t2.md` | `sgsst-electron-app/docs/gestion-humana/firma-electronica/auditoria-capitulo-v-acuerdo-uso-2026-10-19.md` | 16 675 | `0b407184917b4da1bcd9f07e6b94e2afd27f4d037d1a426f37476a5f4361e654` |
 | 07 | **Evaluación del canal de correo** — antecedente del 27-oct, superado | `07-evaluacion-canal-correo.md` | `sgsst-electron-app/docs/gestion-humana/firma-electronica/evaluacion-canal-correo-2026-10-27.md` | 17 165 | `9aa3cad83fe48abceb003488aa62ccbea82c43d7c299058bdc8b5a4e8153041b` |
 | 08 | **Su especificación del 30-oct-2026**, tal como se recibió | `08-especificacion-abogado-2026-10-30.md` | `sgsst-electron-app/docs/gestion-humana/firma-electronica/especificacion-abogado-2026-10-30.md` | 10 947 | `6e6d3f4a3aba229ab3b38d9e8a96f3ab6ae733b3dea518899d07fcd47ab0d47e` |
-| 09 | **Respuesta a su checklist de cierre** — los 96 requisitos con su evidencia | `09-respuesta-al-checklist-de-cierre.md` | `sgsst-electron-app/docs/gestion-humana/firma-electronica/respuesta-checklist-cierre-2026-10-30.md` | 190 029 | `52df2adf55a87d27d77841f4f50e787bb769918e0fde18d15ec989eaf16d0e14` |
-| 10 | **Informe de correcciones para revisión jurídica** — el detalle punto por punto | `10-informe-correcciones-para-asesor-juridico.md` | `sgsst-electron-app/docs/gestion-humana/firma-electronica/paquete-abogado-2026-10-30/10-informe-correcciones-para-asesor-juridico.md` | 51 406 | `3fc9a866c64a25a215aaadbad2f8c76b3f1cd2f1b4ac5945fd55b294d6d141ac` |
-| 11 | **Checklist definitivo de revisión jurídica y cierre** | `11-checklist-definitivo-revision-juridica-y-cierre.md` | `sgsst-electron-app/docs/gestion-humana/firma-electronica/paquete-abogado-2026-10-30/11-checklist-definitivo-revision-juridica-y-cierre.md` | 22 143 | `c9f1d541949794b5f1dfd0210138b431cd2af375890e64afd8861beb29bfc6ec` |
+| 09 | **Respuesta a su checklist de cierre** — los 96 requisitos con su evidencia | `09-respuesta-al-checklist-de-cierre.md` | `sgsst-electron-app/docs/gestion-humana/firma-electronica/respuesta-checklist-cierre-2026-10-30.md` | 192 150 | `19fb933540c74ef5f83a904ade2392fdf79bc15e7816daaf04b3c13b419f8aef` |
+| 10 | **Informe de correcciones para revisión jurídica** — el detalle punto por punto | `10-informe-correcciones-para-asesor-juridico.md` | `sgsst-electron-app/docs/gestion-humana/firma-electronica/paquete-abogado-2026-10-30/10-informe-correcciones-para-asesor-juridico.md` | 54 086 | `1fd392082001dee9fa2be0704aed0852aecf551714a98b8000f158e403d634f5` |
+| 11 | **Checklist definitivo de revisión jurídica y cierre** | `11-checklist-definitivo-revision-juridica-y-cierre.md` | `sgsst-electron-app/docs/gestion-humana/firma-electronica/paquete-abogado-2026-10-30/11-checklist-definitivo-revision-juridica-y-cierre.md` | 44 632 | `c3c45a46772e07568fc691dcad3561625332449a28c2fda3857e7f1be1e7f90f` |
 | 12 | **Procedimiento escrito de incidentes de datos de salud** — RNBD, 15 días hábiles | `12-procedimiento-incidentes-datos-salud.md` | `sgsst-electron-app/docs/gestion-humana/firma-electronica/procedimiento-incidentes-datos-salud-2026-10-30.md` | 29 197 | `9e5ae201cdb00944f5d902ed3c226c099559589e60f05dc7950438bfe4e8b142` |
 | 13 | **Adenda de precisión jurídica: RNBD** | `13-adenda-rnbd-2026-11-01.md` | `sgsst-electron-app/docs/gestion-humana/firma-electronica/paquete-abogado-2026-10-30/13-adenda-rnbd-2026-11-01.md` | 2 163 | `74bfcde8d56cbba00a519822ea13d018c661c4a9b0ed068d7119dc789ae08493` |
 
@@ -81,8 +81,13 @@ aprobarse contra ninguna anterior:
 
 Conviene que lo sepa antes de leer los documentos, porque los cuatro están escritos como si todo estuviera resuelto:
 
-- **No se publicó nada.** El manifiesto legal declara `acuerdo.publicado: false`.
-- **No se firmó nada.** El manifiesto declara `anexo_encargo.estado: no_firmado`, `anexo_nube.firmado: false` y `anexo_nube.hash: null`.
+- **Lo que esta nota describía como «no publicado» y «no firmado» ya no es así, y el cambio ocurrió después
+  de que usted recibiera el paquete.** El 10-nov-2026 se publicó el Acuerdo **v1.6** (`08e1eb8b…f13e`) y el
+  12-nov-2026 el Anexo de Nube **v1.3** (`fdd10551…b585d`, 85 143 B) y el Anexo de Encargo **2026-11-11**
+  (`6308b1f7…b8948`, 94 923 B) quedaron **suscritos por ASEPLUS CARIBE S.A.S. y contrafirmados por K+AIR**,
+  con sus actas y su rastro. Los dos anexos que se le enviaron en este paquete (la v1.0) son **anteriores** y
+  quedan como histórico. Los textos ya suscritos **no se tocan**: por eso lo que está en curso es una
+  **versión nueva**, que es el punto 4 de la lista de abajo.
 - **No se abrió ninguna compuerta.** Las dos que controlan el comportamiento están apagadas: la de los plazos de conservación (`aplicacion.activada: false`) y la del Anexo de Nube (`FIRMA_EXIGIR_ANEXO_NUBE`).
 - **No se hizo ninguna confirmación de cambios en el repositorio**, por instrucción del propietario. Por eso el candidato de código (su T3) todavía no puede fijarse.
 - **La v1.3 no se aprueba y no se publica.** Queda como histórico. No le pedimos aprobación sobre la huella `49eab0c5…f4de12` ni sobre ninguna huella anterior: su D3 lo exige y así se hizo.
@@ -239,6 +244,75 @@ lectura.** Lo que encontró, y que el abogado debe ver porque su checklist lo pi
 
 Lo que **no** se hizo en esa verificación: no se reinició, no se desplegó, no se migró, y el
 servidor quedó sin un solo byte modificado.
+## 3.bis Quinta vuelta (12-nov-2026): los cinco puntos concretos que se le piden ahora
+
+Los catorce adjuntos de este paquete son los del 30-oct-2026 y no se han rearmado: se rearman cuando
+usted devuelva su respuesta y el texto que de ahí salga tenga su versión y su huella. Pero **cinco cosas
+cambiaron después** y no pueden esperar a esa vuelta, porque son las que tienen plazo de terceros. Van
+primero, con el insumo ya medido para que usted no tenga que medir.
+
+**1. Ratificar J6 — el papel de Google en el canal de correo.** El dictamen del 11-nov-2026 (apartados 2.3
+y 5) ya determinó que Google es **Responsable** respecto de los datos de la cuenta del administrador y de
+la telemetría, y **Encargado por subencargado contractual** respecto de los datos del cliente que transitan
+por el correo, vinculado por el **CDPA** aceptado el 10-nov-2026. Falta **su ratificación externa**. Se le
+pide, en particular, pronunciarse sobre tres cosas: (a) si esa determinación coincide con su lectura;
+(b) que el **articulado del CDPA no está en el repositorio** —solo su SHA-256, su captura de aceptación y
+la constancia de que el administrador lo aceptó el 10-nov—, y (c) que la **`fecha_efectividad_addendum` es
+`null`**, porque no se afirma que la fecha de efectividad sea la de la aceptación.
+
+**2. Determinar J7 — la Circular Externa 002 de 2025 y el RNBD.** Los datos ya medidos: la sociedad es una
+**S.A.S.** recién creada, con **$1.000.000 COP** de activo declarado, es decir **19,09 UVT**, y el umbral de
+inscripción del artículo 2.2.2.26.1.2 del Decreto 1074 de 2015 es de **100.000 UVT** ($5.237.400.000 COP
+con la UVT 2026 de $52.374); la sociedad **no está inscrita** en el RNBD y no hay declaración de
+transferencia internacional presentada; falta el certificado de existencia y representación y los estados
+financieros. La lectura del equipo es que **con los activos declarados a la fecha no se supera el umbral**,
+pero la calificación de esa cifra como «activos totales a la fecha de corte» **es determinación suya**: el
+Anexo no cierra la obligación por aritmética. Se le pide esa determinación y, con ella, qué evidencia debe
+entregar el owner. **Un dato nuevo:** el catálogo legado de veinte (20) años desde la firma **ya está
+retirado** del código (`retencion.js:195`), de modo que la afirmación de que el catálogo vigente es ese ya
+no describe el software.
+
+**3. Validar J8 — la tabla supletoria de conservación.** La tabla está escrita, es configurable y tiene un
+plazo por categoría con su fundamento y su punto de inicio; los plazos de **diez (10)** y **cinco (5) años
+siguen sin validarse**, y la compuerta **`aplicacion.activada` es `false`**, así que no se aplican en
+producción. Se le pide validarlos o proponer otros, por categoría, con el inicio de cómputo, las
+excepciones, las solicitudes de copia, los *holds* y la supresión, y decir si la tabla puede entrar en vigor
+y bajo qué condiciones. La alineación con el §8.6 (la tabla de la Empresa tiene precedencia) ya está
+escrita. **Abrir la compuerta es un acto del owner y solo después de su validación**: por eso la compuerta
+sigue cerrada, y esa es la decisión, no una omisión.
+
+**4. Revisar y redactar la versión nueva de los dos anexos.** Los dos anexos que hoy gobiernan la relación
+—Anexo de Nube v1.3 y Anexo de Encargo 2026-11-11— están **suscritos y contrafirmados desde el
+12-nov-2026**, y sus textos **afirman que sus propios actos y el método de autenticación «están
+pendientes»**, cuando ya no era cierto. Un texto suscrito **no se toca**: la vía es una **versión nueva**,
+Anexo de Nube **v1.4** y el Anexo de Encargo del **12-nov-2026** que la remite. El equipo **armó candidatos
+mecánicos**, aplicando los literales ya escritos de la propuesta (6 anclas en el Nube, 5 en el Encargo), con
+un programa que **se niega a escribir** si una ancla no casa exactamente una vez (11 de 11 bien). Van
+**aparte** de los catorce adjuntos, marcados como **no publicados y no firmables**:
+
+| Documento | Bytes | SHA-256 |
+|---|---:|---|
+| Candidato del Anexo de Nube v1.4 | 85 494 | `895d0d0b163ae7b207a96b775727146038285b7c1e76d9f65012369959d3fe39` |
+| Candidato del Anexo de Encargo 12-nov-2026 | 95 118 | `2afb0e6877f8983604f4ac6fa9f4685ec69d5fd98f7d92e30dc26ba4f117af1c` |
+| Anexo de Nube v1.3 (vigente, **intacto**) | 85 143 | `fdd10551c2106e186d62a2b70922530ff9494a8538fc67816f6f5ad5ca2b585d` |
+| Anexo de Encargo 2026-11-11 (vigente, **intacto**) | 94 923 | `6308b1f7a51007cb1e973de0210d1e5659d3b3ceb8e3e3b7a3ee52a7275b8948` |
+
+Lo que se le pide es **la redacción final del texto**, no la revisión de un diff: los candidatos sirven para
+que usted lea un documento, no una lista de cambios. Y se le pide confirmar que **la v1.4 del Nube y el
+Encargo que la remite se suscriben juntos** y se remiten entre sí con la cláusula de prevalencia del
+instrumento bilateral más reciente.
+
+**5. Confirmar la decisión sobre la v1.1 del Anexo de Nube.** La suscripción id 1 (la **v1.1**, del
+5-nov-2026, `e9517536…`) quedó **suscrita y sin contrafirma**, y el equipo decidió que **queda como registro
+histórico**: **no se contrafirma retroactivamente**, porque contrafirmar un acto que no ocurrió sería
+fabricarlo, y porque la v1.1 no describe el texto vigente (la v1.3 es el vigente, suscrito y contrafirmado).
+La v1.1 **no se borra ni se reescribe**: sigue en el manifiesto, en `versiones_firmadas`, con su huella y su
+evidencia. Se le pide **su confirmación** de esa decisión.
+
+**Lo que NO se le pide.** No se le pide firmar el Anexo de Nube ni el de Encargo: esas suscripciones
+corresponden a las partes. No se le pide habilitar ninguna compuerta. No se le pide certificar hechos
+técnicos que no haya verificado. Y no se le pide nada fuera de los cinco puntos anteriores.
+
 ## 4. Revisión solicitada
 
 El checklist contiene catorce preguntas, J1-J14. Puede dejar recomendaciones, cambios propuestos y evidencia que convenga obtener. La firma del abogado no es requisito legal general ni compuerta técnica. Si alguna pregunta no recibe respuesta, el representante legal documentará en la sección E su decisión, fundamento, evidencia y fecha, o la dejará pendiente. El silencio no equivale a aprobación. La revisión del 30-oct-2026 se conserva íntegra como antecedente atribuido a su autor.

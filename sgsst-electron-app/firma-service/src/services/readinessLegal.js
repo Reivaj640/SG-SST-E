@@ -1271,7 +1271,7 @@ function evaluar(opciones = {}) {
   // -------------------------------------------------------------------------
   // 1. Acuerdo v1.1
   // -------------------------------------------------------------------------
-  const grupoAcuerdo = _grupo('acuerdo_v1_1', 'Acuerdo de uso v1.1', [
+  const grupoAcuerdo = _grupo('acuerdo_v1_1', 'Acuerdo de uso v1.6', [
     _item(
       'texto_v1_1',
       'Texto completo, sin placeholders ni marcas de borrador',
@@ -1585,7 +1585,7 @@ function evaluar(opciones = {}) {
     ),
     _item(
       'texto_20',
-      'Texto de la v1.1 con 20 años, hold y cinco categorías',
+      'Texto del Acuerdo v1.6 con 20 años, hold y cinco categorías',
       _estado(texto86Ok),
       {
         bloquea: GATE_AMBOS,
@@ -1594,7 +1594,7 @@ function evaluar(opciones = {}) {
           : (texto86Ok
             ? 'El texto contiene las tres cláusulas del 8.6.'
             : 'Al texto le falta alguna de las cláusulas del 8.6.'),
-        accion: 'Incluir el 8.6 completo en el texto de la v1.1.',
+        accion: 'Incluir el 8.6 completo en el texto del Acuerdo vigente (v1.6).',
         referencia: docAcuerdo.archivo,
       },
     ),

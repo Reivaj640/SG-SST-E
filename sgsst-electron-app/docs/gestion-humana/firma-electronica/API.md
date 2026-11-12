@@ -211,7 +211,7 @@ Todas las respuestas de error siguen el mismo formato JSON:
 | `ACUERDO_NOT_FOUND` | No hay versión activa del Acuerdo. |
 | `ALREADY_ACCEPTED` | El trabajador ya aceptó esta versión del Acuerdo. |
 | `AGREEMENT_VERSION_NO_LONGER_ACTIVE` | La versión del Acuerdo ligada a la solicitud ya no es la vigente. **Acción**: el firmante tiene que leer y aceptar la versión vigente (la solicitud migra sola al aceptar). `details.accion = "reaceptar_version_vigente"` |
-| `MEDIO_OTP_CORPORATIVO` | El OTP (dato de creación de la firma) iría a un buzón del dominio de la Empresa, que la Empresa puede leer. El mensaje cita el 3.7(a) y el 47.4, y ofrece la firma en papel (7.2). **Solo se activa con `FIRMA_EXIGIR_MEDIO_PERSONAL_OTP=true`**, y solo cuando exista la 9A |
+| `MEDIO_OTP_CORPORATIVO` | El OTP (dato de creación de la firma) iría a un buzón del dominio de la Empresa, que la Empresa puede leer. El mensaje cita el 3.7(a) y el 47.4, y ofrece la firma en papel (7.2). **El rechazo es INCONDICIONAL** desde la v1.2 del Acuerdo (27-oct-2026): **no hay ningún interruptor que lo desactive**, y cada caso rechazado queda como evento `OTP_MEDIO_CORPORATIVO` en `gh_firma_eventos`, que es de solo anexado |
 | `AGREEMENT_VERSION_REACCEPT_REQUIRED` | Lo mismo, detectado en la puerta del documento: sin aceptar la versión vigente no se sirve el documento (el orden (g) → (h) del 3.4). `details.accion = "reaceptar_version_vigente"` |
 | `CONSENT_NOT_FOUND` | El `consent_id` no existe. |
 | `EMPRESA_NOT_FOUND` | La empresa no existe en el directorio de empresas. |
@@ -1055,13 +1055,16 @@ POST /api/sign/{token}/medio
 El medio queda **congelado** en cuanto sale un código: después de eso, el código
 ya viajó y cambiar el destino rompería la trazabilidad del 3.4(e).
 
-**El rechazo (D2) está APAGADO** (`FIRMA_EXIGIR_MEDIO_PERSONAL_OTP`, default
-false). Se enciende cuando exista la 9A (la firma en papel): sin esa salida, exigir
-un medio personal sería una barrera de acceso al empleo (el 2.2.1.1.11).
+**El rechazo (D2) es INCONDICIONAL** (v1.2 del Acuerdo, 27-oct-2026): el OTP nunca sale a un
+buzón que la Empresa pueda leer, y la solicitud se rechaza con `400 MEDIO_OTP_CORPORATIVO`.
+**No hay ningún interruptor que lo desactive**: la variable `FIRMA_EXIGIR_MEDIO_PERSONAL_OTP`
+**no se lee en ningún sitio del código** y se conserva solo para no romper los despliegues que ya
+la tengan definida (`src/config.js:176`); su valor no cambia ningún comportamiento.
 
-Mientras está apagado, cada caso en el que el OTP cae en un buzón corporativo
-queda en el log como `WARN` con el código `OTP_MEDIO_CORPORATIVO`: de ahí sale el
-número de `scripts/inventario-buzon-corporativo.js`.
+Cada caso en el que el OTP cae en un buzón corporativo queda **asentado** como evento
+`OTP_MEDIO_CORPORATIVO` en `gh_firma_eventos`, que es de solo anexado
+(`src/services/publicFlow.js`, función `_controlarMedioCorporativo`), y además se avisa en el log
+como `WARN`. De ahí sale el número de `scripts/inventario-buzon-corporativo.js`.
 
 **Qué es un buzón corporativo**: un dominio en la lista explícita de la empresa
 (`dominios_corporativos`) o deducido de los correos que ya registró (canales de PQRS

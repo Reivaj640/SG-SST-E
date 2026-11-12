@@ -1,5 +1,15 @@
 # Plan de despliegue a producción — K+AIR Firma Electrónica (2026-10-20)
 
+> **⚠️ Nota de vigencia (12-nov-2026).** Este plan describe el despliegue del commit
+> `b5c04f93` y **no se usa para los despliegues actuales**: el procedimiento vigente es
+> `docs/MIGRACION-SERVIDOR-FIRMA.md`. Se conserva como registro de lo que se decidió el
+> 2026-10-20. **Una fila de este documento quedó desactualizada:** la de
+> `FIRMA_EXIGIR_MEDIO_PERSONAL_OTP` («No encender») describía un interruptor que **ya no
+> existe**: desde la v1.2 del Acuerdo (27-oct-2026) el rechazo del buzón corporativo es
+> **incondicional en el código** y la variable no se lee en ningún sitio. Ninguna decisión de
+> despliegue depende hoy de esa variable. Ver `API.md` (sección del medio de OTP) y la
+> determinación `determinaciones-apertura-2026-11-12.md` (bloque M.20).
+
 > **Estado: preparado, NO ejecutado.** Todo lo que sigue está verificado contra el
 > código y contra producción el 2026-10-20; los pasos que necesitan el servidor
 > quedan pendientes porque **no hay acceso SSH** (`javier@192.168.1.11` responde

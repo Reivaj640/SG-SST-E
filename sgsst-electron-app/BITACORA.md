@@ -9934,3 +9934,66 @@ Reglas:
    literales, la salida del runner y el error del `process.execPath`. Trampa nueva en el
    `PROMPT.md`: la **156**.
 
+
+## 🐗 El manifiesto que se contradecía a sí mismo y la firma que estaba en dos listas (2026-11-12, tarde)
+
+El owner delegó en el equipo las siete decisiones de fondo. Tomarlas obligó a mirar el manifiesto con
+luz de lámpara, y el manifiesto tenía un problema que no se ve en ningún test: **se contradecía a sí
+mismo**.
+
+El bloque `anexo_nube` decía, en la misma pantalla, `firmado: true`, `contrafirmado: true`,
+`fecha: 2026-11-12T15:38:27.990Z` y `contrafirma_fecha: 2026-11-12T16:13:54.106Z`… y dos líneas más
+abajo, en la prosa de la `nota`, decía **«el texto vigente todavía no está suscrito»**. Lo mismo en el
+Anexo de Encargo: `estado: firmado` con fecha del 12-nov, y la nota diciendo **«NO está suscrito»**.
+
+No era una contradicción de opinión: la **base de producción** tenía los dos actos (suscripción id 2,
+`FIRMADA` y `CONTRAFIRMADA`, acta `050f223a3665cf7d`). La contradicción estaba en el **texto del
+documento**.
+
+Reglas:
+
+1. **Un campo de estado y su prosa se actualizan en el mismo commit, o la prosa se deriva del estado.**
+   El manifiesto se escribe con dos scripts distintos —uno lee la base y escribe los hechos, otro escribe
+   la prosa— y la prosa tenía **literales fijos** que describían un estado viejo. Cuando los actos
+   ocurrieron, los hechos se movieron y la prosa no. Un documento que se contradice a sí mismo no es un
+   documento que se pueda corregir «un día»: es uno que hace dudar de los dos lados.
+2. **La lista de versiones anteriores solo recibe lo que NO es el texto vigente.** El mismo script que
+   escribe la prosa **empujaba a `versiones_firmadas` la firma que el propio manifiesto declaraba, sin
+   comprobar si describía el texto vigente**. Efecto: la v1.3 —el texto vigente, suscrito y contrafirmado
+   el 12-nov— quedaba registrada **dos veces**, una como vigente y otra **como si fuera una versión
+   anterior ya superada**, y la entrada de la historia llevaba la evidencia del **primer** acto, sin la del
+   segundo. Ahora el push exige una sola condición: a la historia solo pasa una firma que **no** describe
+   el texto vigente. Hay **dos pruebas de regresión** que lo fijan (`tests/scripts/actualizar-manifiesto-1047.test.js`).
+3. **Un control que compara contra un comando que no existe no es un control: es una hipótesis.** La
+   rama `rclone` de `deploy/backup-offsite.sh` comparaba la huella del destino con **`rclone hash`**,
+   un comando **inexistente** (medido con las dos versiones reales: la de `apt` 1.60.1 y la 1.76.0 dan
+   `unknown command "hash"`). Es decir: el método `rclone` **nunca podía dar una copia por buena**. La
+   huella del destino se calcula ahora **descargando el objeto y hasheándolo con SHA-256**, que es el
+   mismo digest con el que se firma la copia local. *Un verificador que nunca se ejecutó contra el
+   binario real no es una verificación.*
+4. **Antes de una ventana de mantenimiento hay que saber qué más le toca al servicio.** La ventana de
+   Node 22 se topó con el cron `kair-firma-health`, que **reinicia el servicio cada 5 minutos** si
+   `/health` no responde: durante la ventana el servicio está reiniciándose a propósito. La ventana
+   empieza desactivando ese cron y termina reactivándolo. *El mantenimiento no es solo el cambio: es todo
+   lo que ese cambio descoloca.*
+5. **Cuando un test que pasaba falla, primero se comprueba cómo se invoca.** Correr
+   `node --test` sin `--require ./tests/setup.js` usa la **base de desarrollo** (`data/manual-8bc/`), donde
+   las migraciones append-only **no se omiten** y el `DELETE` de limpieza aborta con
+   `SQLITE_CONSTRAINT_TRIGGER`. El error parecía un defecto del manifiesto y era **una base equivocada**.
+   El runner oficial sí lleva el `--require`.
+6. **Cuando el repositorio va por delante de producción, la diferencia se declara con su motivo y con el
+   acto que la cierra.** El manifiesto del repositorio lleva hoy `d9b59699…c9097b` y el de producción
+   `191c08b8…a4013f`: difieren en **exactamente dos notas**, las que se corrigieron. **El despliegue es lo
+   que alinea los dos**, y eso está escrito en el expediente, no escondido. *Un repositorio que va por
+   delante sin decirlo es un repositorio que alguien va a «corregir» sin querer.*
+7. **Las siete decisiones se toman con su fundamento medido, y lo que es de terceros se deja escrito como
+   de terceros.** De las siete, **dos cierran** (la v1.1 sin contrafirma queda como registro histórico —no
+   se contrafirma un acto que no ocurrió—; y la variable inerte deja de ser tratada como interruptor) y
+   **cinco quedan a medias**, porque lo que falta es una firma, una credencial o la respuesta del abogado.
+   El documento es `docs/gestion-humana/firma-electronica/decisiones-de-fondo-2026-11-12.md`; el mapa pasó
+   de **5 cerrados / 22 pendientes** a **7 cerrados / 20 pendientes**.
+8. **Un texto suscrito no se toca: se emite una versión nueva.** La v1.4 del Anexo de Nube y el Encargo
+   que la remite se **arman mecánicamente** (11 de 11 anclas casando exactamente una vez) y quedan
+   marcados como **no publicados y no firmables**: la **redacción final es del abogado** y la **firma es
+   del owner**. *Abrir a un cliente con un contrato que afirma un estado que el servicio ya superó es
+   abrir en falso.*

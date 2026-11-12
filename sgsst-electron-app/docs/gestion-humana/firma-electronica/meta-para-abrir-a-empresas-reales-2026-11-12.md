@@ -164,7 +164,7 @@ verificaciones»; `legal-readiness.json` -> `constancia.estado = "no_firmada"`;
 
 **Quién lo tiene.** El owner (representante legal de Gesstiar S.A.S.).
 
-### M.5 - La ratificacion externa del abogado: el papel de Google y la Circular 002/2025 — PENDIENTE
+### M.5 - La ratificacion externa del abogado: el papel de Google y la Circular 002/2025 — PARCIALMENTE
 
 **Origen.** J6 y J7 del informe al abogado.
 
@@ -174,15 +174,23 @@ determinaciones juridicas, no medidas de ingenieria. El propio Anexo de Nube lo 
 su contenido **debe ser revisado por un abogado** antes de considerarse contractualmente valido, y en
 particular el punto sobre la Circular Externa 002 de 2025.
 
+**Decisión tomada (12-nov-2026).** Se pide al abogado, por escrito y en un solo escrito, la determinacion
+de J6 y J7, con los datos que el equipo ya midio: el RNBD cuesta **19,09 UVT** (por debajo del umbral de
+100 000 UVT) y el catalogo legado de 20 anos ya esta **retirado** del codigo (`retencion.js:195`). La
+lectura del equipo sobre el RNBD se pide **confirmar o corregir**, no se da por buena. Detalle en
+`decisiones-de-fondo-2026-11-12.md`, bloque M.5.
+
 **Evidencia.** `10-informe-correcciones-para-asesor-juridico.md`, filas J6 y J7, ambas con
 **PENDIENTE**; `sgsst-electron-app/legal/anexo-nube-v1.3.html`, bloque «Revision profesional» (la
 redaccion que pide la revision juridica profesional).
 
-**Qué falta.** La determinacion escrita de estos dos puntos y la respuesta a la pregunta de la errata.
+**Qué falta.** La determinacion escrita del abogado sobre J6 y J7. El bloque no puede decir «cerrado»
+porque el equipo haya escrito la pregunta: el alcance de una circular y el rol contractual de un
+proveedor se determinan por quien puede emitirlos.
 
 **Quién lo tiene.** El abogado (la determinacion) y el owner (la gestion).
 
-### M.6 - La tabla supletoria de conservacion sigue sin validar, con su compuerta cerrada a proposito — PENDIENTE
+### M.6 - La tabla supletoria de conservacion sigue sin validar, con su compuerta cerrada a proposito — PARCIALMENTE
 
 **Origen.** J8 del informe al abogado; la fila 3.1 y 3.2 del cuadro canonico.
 
@@ -191,16 +199,23 @@ compuerta de conservacion esta **cerrada a proposito** y asi debe seguir hasta q
 la tabla y los plazos de 10 y 5 anos. El catalogo legado de 20 anos desde la firma no esta alineado
 con la precedencia del 8.6(a).
 
+**Decisión tomada (12-nov-2026).** La compuerta **sigue cerrada**, y esa es la decision. Al abogado se le
+entrega la tabla **ya alineada** (cinco categorias, plazos de 10 y 5 anos, y la correccion de que el
+catalogo legado de 20 anos esta retirado del codigo). Si la validacion procede, la apertura es un acto
+del owner **despues**, en el orden que el bloque ya declara: **validar, alinear, reejecutar las pruebas,
+abrir**. El paso de reejecutar las pruebas no es opcional: abrir la compuerta cambia el comportamiento del
+servicio. Detalle en `decisiones-de-fondo-2026-11-12.md`, bloque M.6.
+
 **Evidencia.** `sgsst-electron-app/firma-service/config/tabla-conservacion.json` ->
 `aplicacion.activada = false`; `10-informe-correcciones-para-asesor-juridico.md`, fila J8 (PENDIENTE:
 el catalogo legado no esta alineado y la compuerta sigue cerrada porque depende de su validacion).
 
-**Qué falta.** La validacion juridica de la tabla y de los plazos, y despues la decision de abrirla
-(su propio orden: validar, alinear, reejecutar pruebas, abrir).
+**Qué falta.** La validacion juridica de la tabla y de los plazos, y despues la decision de abrirla. Abrir
+antes aplicaria plazos que nadie ha validado.
 
 **Quién lo tiene.** El abogado (valida) y el owner (abre).
 
-### M.7 - No hay copia de los respaldos fuera del servidor, y los actos del P8 aun no estan en ninguno — PENDIENTE
+### M.7 - No hay copia de los respaldos fuera del servidor, y los actos del P8 aun no estan en ninguno — PARCIALMENTE
 
 **Origen.** El pendiente «respaldo off-site» de la cola; `7.5` del cuadro canonico.
 
@@ -211,15 +226,32 @@ era del **11-nov a las 22:00**, con sha256 `de14e3f4b3c94c32eb690ae9215c111cdc1b
 **los cuatro actos del P8 todavia no estaban en ningun respaldo** (el del 12-nov a las 22:00 ya los
 incluye).
 
+**Decisión tomada (12-nov-2026).** El destino es un **bucket S3-compatible de Backblaze B2**, alcanzado con
+`rclone`, con **retencion de 30 dias**. Se descarto el Drive de Google porque es el **proveedor del canal de
+correo**: una cuenta comprometida se llevaria el correo y los respaldos juntos. La maquina es un portatil
+(sin virtualizacion) y **no hay un segundo servidor** al que copiarle. Los respaldos son diminutos (683 738
+B por pareja diaria, 20,5 MB a 30 dias) y van **cifrados**: el destino no ve texto claro. Detalle en
+`decision-respaldo-offsite-2026-11-12.md` y en `decisiones-de-fondo-2026-11-12.md`, bloque M.7.
+
+**Defecto real corregido.** La rama `rclone` de `deploy/backup-offsite.sh` comparaba la huella del destino
+con `rclone hash`, **un comando que no existe** (medido con las dos versiones reales: la de `apt` 1.60.1 y
+la 1.76.0): el metodo `rclone` **nunca podia dar una copia por buena**. Ahora la huella del destino se
+calcula descargando el objeto y hasheandolo con SHA-256. El parche se valido con **binarios reales de
+`rclone`** en un sandbox del servidor: el script original falla la verificacion, el parcheado da «OK,
+copiado y verificado», detecta la corrupcion del destino y poda solo el destino.
+
 **Evidencia.** `ls -lt /opt/kair-firma/backups` (produccion): 22 respaldos de la base y 16 del
 storage, **todos en el mismo disco**; `tail -1 backups/backup.log`: «Backup OK:
 firma-20261111-220001.sqlite.enc (164714 B, sha256 de14e3f4b..., integrity ok, cifrado gpg)».
 
-**Qué falta.** Decidir el destino de la copia externa y dejarla corriendo y verificada. El script
-`deploy/backup-offsite.sh` quedo escrito y validado (sintaxis y selector de archivos probados en el
-servidor el 12-nov-2026); falta la configuracion del destino, que es una decision del owner.
+**Qué falta.** Que exista **una copia real verificada** en el destino: abrir la cuenta y crear el bucket con
+su llave, ejecutar la activacion con `sudo` y guardar `backup.passphrase` en otro sitio. El ensayo uso un
+remoto local y **no prueba** credenciales, permisos, region ni endpoint. Riesgo escrito: la poda del
+destino **no conoce `hold_legal`**, y las 5 firmas con deber legal se conservarian localmente pero su copia
+en el bucket se borraria a los 30 dias.
 
-**Quién lo tiene.** El owner (el destino y las credenciales); el equipo (la instalacion y la prueba).
+**Quién lo tiene.** El owner (el destino, las credenciales y la activacion); el equipo (la instalacion y la
+prueba, ya hechas).
 
 ### M.8 - El 📦1051 no esta desplegado: produccion corre las dependencias vulnerables — PENDIENTE
 
@@ -395,8 +427,9 @@ que borra en el orden correcto: lo que faltaba era que el script de produccion l
 servidor verificada byte a byte contra las capturas, las dos huellas y el A/B);
 `firma-service/scripts/probar-reversion.js` (sha256 `49b8a7a1…d9847`, 49 699 B, ASCII puro, LF, sin
 BOM); `firma-service/tests/scripts/probar-reversion.test.js` (**9/9**, unitario, sin abrir ninguna
-base); `10-informe-correcciones-para-asesor-juridico.md`, fila T7 (que **todavia dice** «PENDIENTE:
-depende del servidor» y hay que cerrarla: ver «Qué falta»);
+base); `10-informe-correcciones-para-asesor-juridico.md`, fila T7 (actualizada el 12-nov-2026 a
+**PARCIALMENTE**: reconoce el acta, el A/B y la correccion, y deja abiertos el despliegue y la
+restauracion cifrada real);
 `ls /opt/kair-firma/backups/restauracion.log` (produccion): no existe.
 
 **Qué falta.**
@@ -407,7 +440,8 @@ depende del servidor» y hay que cerrarla: ver «Qué falta»);
    contrasena, asi que la prueba de restauracion se hizo por la via de la copia limpia (`.backup` +
    `.restore`), que es la que el entorno permite. Falta la prueba del camino real, con root. El cron
    `0 4 1 * *` solo producira `restauracion.log` el 1-dic-2026.
-3. **Cerrar la fila T7** del informe al abogado: decidir si queda CERRADO o PENDIENTE.
+3. **La fila T7** del informe al abogado ya quedo actualizada a **PARCIALMENTE** (12-nov-2026): no
+   queda nada que decidir ahi; se cierra cuando se cumplan los puntos 1 y 2.
 
 **Quién lo tiene.** El owner (los puntos 1 y 2, que necesitan `sudo`) y el equipo (el punto 3).
 
@@ -453,7 +487,7 @@ donde importan. Queda tambien el **envio real contra SMTP**, que la suite no cub
 `jsonTransport`) y que habria que ejercitar antes de abrir a una empresa real.
 
 **Quién lo tiene.** El owner (el despliegue, con `sudo`: M.8). El equipo ya hizo el trabajo tecnico.
-### M.14 - Node 22 en el servidor: decidido el 11-nov-2026 y no ejecutado — PENDIENTE
+### M.14 - Node 22 en el servidor: decidido el 11-nov-2026 y no ejecutado — PARCIALMENTE
 
 **Origen.** §8.2 del runbook; la decision del owner del 11-nov-2026.
 
@@ -463,16 +497,33 @@ funciona con ese runtime. La decision del owner del 11-nov-2026 fue que el servi
 esta sano con Node 20. Es deuda de mantenimiento, con una trampa: si se sube el runtime hay que
 **recompilar** `better-sqlite3` antes de arrancar, o el proceso muere al abrir la base.
 
+**Decisión tomada (12-nov-2026).** La decision del owner se **mantiene y no se aplaza**, pero la ventana
+**no se puede abrir sin quitarle una collision**: el cron `/etc/cron.d/kair-firma-health` **reinicia el
+servicio cada 5 minutos** si `/health` no responde, y durante la ventana el servicio esta reiniciandose a
+proposito. Ese cron es la collision real, y por eso la ventana empieza desactivandolo y termina reactivandolo.
+El rollback **no depende de internet** (hay un `.deb` de Node 20 en la cache local de la maquina:
+`/var/cache/apt/archives/nodejs_20.20.2-1nodesource1_amd64.deb`) y el prebuild ABI 127 **ya esta probado en
+esta maquina**: el runtime oficial `node-v22.23.5` se verifico contra `SHASUMS256.txt` de nodejs.org
+(`cdeb8670…40f8`), y el binario `better-sqlite3` 11.10.0 `node-v127-linux-x64`
+(`d7d9272b…8fda37`) **carga y responde `SELECT 1`** bajo Node 22, mientras el Node 20 del servidor lo
+**rechaza** con `NODE_MODULE_VERSION 127 ... requires 115`: el runtime y el modulo son **el mismo acto**. El
+equipo dejo `deploy/verificar-runtime-node.sh`: es **solo lectura**, no necesita `sudo`, **carga el modulo y
+ejecuta un `SELECT 1` sobre una base en memoria** (no abre la base de produccion), comprueba `/health` con
+200 y `checks.db == "ok"`, y **sale con codigo 1** ante cualquier incoherencia entre el runtime y el modulo:
+ese es el codigo que hace fallar la ventana. Detalle con los comandos literales de la ventana y de su
+rollback en `decision-ventana-node-22-2026-11-12.md`.
+
 **Evidencia.** `node -v` en el servidor: `v20.20.2`; `systemctl show kair-firma -p ExecMainStartTimestamp`:
 arrancado el 2026-11-12 09:30:23 -05, `NRestarts = 0`; `MIGRACION-SERVIDOR-FIRMA.md` §8.2 (la tabla
-de combinaciones y el comando `npm rebuild better-sqlite3`).
+de combinaciones y el comando `npm rebuild better-sqlite3`); `crontab` del usuario `root`: `kair-firma-health`
+cada 5 minutos; `deploy/verificar-runtime-node.sh` (solo lectura, codigo 1 ante incoherencia).
 
-**Qué falta.** La ventana de mantenimiento para subir el runtime y recompilar el modulo nativo, con su
-rollback.
+**Qué falta.** La ventana de mantenimiento: desactivar el cron, subir el runtime, recompilar el modulo
+nativo, verificar con el script, y su rollback.
 
-**Quién lo tiene.** El owner (la ventana).
+**Quién lo tiene.** El owner (la ventana). El equipo ya hizo el trabajo tecnico.
 
-### M.15 - La v1.1 del Nube quedo suscrita y sin contrafirma: falta decidir que se hace con ella — PENDIENTE
+### M.15 - La v1.1 del Nube quedo suscrita y sin contrafirma: queda como registro historico — CERRADO
 
 **Origen.** La suscripcion id 1 de `gh_firma_anexo_nube_suscripciones`; la decision de juridica.
 
@@ -483,15 +534,26 @@ la version 2026-11-06 (contrafirmada el 7-nov) y la 2026-11-11 (contrafirmada el
 suscripciones viejas estan **intactas**, con su huella y su evidencia: lo que se deshizo en la fase 1
 del P8 fueron los punteros de la ficha, no los hechos.
 
+**Decisión tomada (12-nov-2026).** La v1.1 **queda como registro historico**: **no se contrafirma
+retroactivamente**. Contrafirmar un acto que **no ocurrio** seria **fabricarlo** —se pondria una fecha y
+una firma de K+AIR en un documento jamas contrafirmado, y el rastro append-only mostraria un evento sin
+contraparte en el mundo—. Y no hace falta: la v1.1 **no describe el texto vigente** (la v1.3 es el
+vigente, suscrito y contrafirmado el 12-nov), y ya esta registrada en el manifiesto, en
+`anexo_nube.versiones_firmadas`, con su huella y su evidencia: no se pierde nada y no se reescribe. La
+decision se pide **confirmada por escrito al abogado** en el mismo escrito que lleva J6, J7, J8 y la
+ratificacion de la v1.4; esa confirmacion no bloquea el cierre, porque no cambia lo que el texto dice.
+Detalle en `decisiones-de-fondo-2026-11-12.md`, bloque M.15.
+
 **Evidencia.** `gh_firma_anexo_nube_suscripciones` (produccion): id 1 con `version = 1.1`,
 `contrafirmado_at` vacio; id 2 con `version = 1.3`, `contrafirmado_at = 2026-11-12T16:13:54.106Z`,
 `contrafirma_actor = Javier Robles Fontalvo`, `contrafirma_facultad = REPRESENTANTE_LEGAL_ENCARGADO`,
-acta `050f223a3665cf7d`.
+acta `050f223a3665cf7d`. `legal-readiness.json` -> `anexo_nube.versiones_firmadas[0]`: la v1.1 con su
+evidencia del 5-nov-2026.
 
-**Qué falta.** La decision de juridica: si la v1.1 se contrafirma retroactivamente o queda como
-registro historico. No es un problema tecnico: es una decision sobre que dice el texto.
+**Qué falta.** Nada que impida el cierre: la decision esta tomada y escrita, con su fundamento. Lo que
+se pide al abogado es su confirmacion.
 
-**Quién lo tiene.** El owner con el abogado.
+**Quién lo tiene.** Nadie bloquea; la ratificacion del abogado se pide en el mismo escrito de M.5.
 
 ### M.16 - El inventario de buzones hay que repetirlo cuando haya solicitudes reales — PENDIENTE
 
@@ -577,7 +639,7 @@ ese commit y el clon quedo byte a byte igual al arbol del owner.
 
 ---
 
-### M.18 - Los dos anexos ya suscritos dicen cosas que la realidad ya desmintio: hace falta una version nueva — PENDIENTE
+### M.18 - Los dos anexos ya suscritos dicen cosas que la realidad ya desmintio: se reemite ahora — PARCIALMENTE
 
 **Origen.** El requisito 1.9 del cuadro canonico (medido en `verificacion-cierre/secciones-1-2.md`)
 y los requisitos 5.5 y 5.6 (medidos en `verificacion-cierre/secciones-3-5.md`).
@@ -597,20 +659,31 @@ no coinciden con lo que el servicio hace**:
 Un texto **suscrito no se toca**: la via no es corregirlo, es una **version nueva** (Anexo de Nube v1.4
 y el Encargo que la remite), con huella propia, firma de nuevo y manifiesto al dia.
 
+**Decisión tomada (12-nov-2026).** **Se reemite ahora**, y **no se espera al primer cliente real**: abrir
+a una empresa con un contrato que afirma un estado que el mismo servicio ya supero es **abrir en falso**.
+Los candidatos estan **armados mecanicamente** por el equipo con los literales ya escritos de
+`propuesta-v1.4-anexo-nube-2026-11-12.md` (6 anclas en el Nube, 5 en el Encargo), con un script que **se
+niega a escribir** si una ancla no casa **exactamente una vez** (11 de 11 bien). Quedan en
+`candidatos-v1.4/`, **fuera del paquete de despliegue**, marcados como **no publicados y no firmables**:
+la **redaccion final es del abogado** y la **firma es del owner**. El costo, dicho de frente: hasta que
+la v1.4 este firmada el gate **baja a 37 items en `ok`** (el mismo estado en que estaba la v1.3 antes del
+12-nov), y la compuerta `FIRMA_EXIGIR_ANEXO_NUBE` no se enciende hasta despues. Detalle en
+`decisiones-de-fondo-2026-11-12.md`, bloque M.18.
+
 **Evidencia.** `verificacion-cierre/secciones-1-2.md`, requisito 1.9 (**PARCIALMENTE**: «los dos anexos
 vigentes afirman que sus propios actos y P2 «estan pendientes»: hace falta una version nueva (un texto
 suscrito no se toca) y corregir la tabla de instrumentos»); `verificacion-cierre/secciones-3-5.md`,
 requisitos 5.5 y 5.6 (**PENDIENTE** y **PARCIALMENTE**: ambos exigen «una version nueva del Anexo de
 Nube (v1.4)»); `sgsst-electron-app/legal/anexo-nube-v1.3.html` (los §1 y §5);
-`sgsst-electron-app/legal/anexo-encargo.html` (la remision).
+`sgsst-electron-app/legal/anexo-encargo.html` (la remision); `candidatos-v1.4/` (candidato Nube v1.4:
+85 494 B, `895d0d0b...d3fe39`; candidato Encargo 12-nov: 95 118 B, `2afb0e68...f17af1c`; vigentes
+intactos: `fdd10551...b585d` y `6308b1f7...b8948`).
 
-**Qué falta.** La decision del owner de reemitir los dos anexos (v1.4 del Nube y el Encargo que la
-remite) y, con ella, la redaccion, las firmas y el manifiesto al dia. Mientras tanto,
-`tabla-instrumentos-vigentes-2026-11-09.md` sigue diciendo «NO suscrito» y contradice a la base: esa
-correccion es de un minuto y es la que mas puede confundir a un lector.
+**Qué falta.** La revision y redaccion del abogado, la suscripcion de ASEPLUS, la contrafirma de K+AIR y el
+manifiesto al dia con la huella de la v1.4.
 
-**Quién lo tiene.** El owner (la decision) con el abogado (la redaccion) y el equipo (huellas, manifiesto
-y firmas).
+**Quién lo tiene.** El abogado (la redaccion) y el owner (las firmas). El equipo (huellas, manifiesto y
+firmas) ya tiene los candidatos armados.
 
 ## 3. Riesgos y deuda
 
@@ -637,7 +710,7 @@ confirmarlo en el `.env`.
 
 **Quién lo tiene.** El owner.
 
-### M.20 - `FIRMA_EXIGIR_MEDIO_PERSONAL_OTP` es una variable muerta que parece viva — PENDIENTE
+### M.20 - `FIRMA_EXIGIR_MEDIO_PERSONAL_OTP` es una variable muerta que parece viva — CERRADO
 
 **Origen.** `src/config.js:176` y la fila J10 del informe al abogado.
 
@@ -648,14 +721,25 @@ definida, pero **su valor no cambia ningun comportamiento**. Documentos que la t
 interruptor pendiente (la fila J10 lo hacia, y ya se corrigio el 12-nov-2026) estan describiendo un
 control que no existe.
 
+**Decisión tomada (12-nov-2026).** La variable **se conserva, inerte**, con el comentario que ya dice que
+no hace nada, y **ningun documento puede tratarla como interruptor**. Lo que faltaba no era una llamada de
+codigo: era la **documentacion**, y se corrigieron los tres lugares que mentian —`API.md:214` («solo se
+activa con ...=true») y `API.md:1058-1064` («el rechazo (D2) esta APAGADO»), que ahora dicen que el
+rechazo es **incondicional** desde la v1.2, devuelve 400 `MEDIO_OTP_CORPORATIVO` y deja un evento
+append-only en `gh_firma_eventos`— y el **4.7 del cuadro canonico** («el interruptor aparece apagado»),
+que ahora dice que no es un interruptor. Se anadio ademas una **nota de vigencia** al
+`PLAN-DESPLIEGUE-PRODUCCION-2026-10-20.md`, cuya fila «No encender» describia un interruptor que nunca
+existio. Detalle en `decisiones-de-fondo-2026-11-12.md`, bloque M.20.
+
 **Evidencia.** `src/config.js:164-177` (el comentario que lo dice y la definicion);
 grep sobre `src/` del identificador `exigirMedioPersonalOtp`: la unica aparicion es la definicion;
-`src/services/publicFlow.js:1498-1557` (el rechazo incondicional).
+`src/services/publicFlow.js:1496-1557` (el rechazo incondicional); `API.md:214` y `API.md:1058-1064`
+(corregidos el 12-nov-2026); el caso real se produjo el 12-nov-2026 en una copia aislada, evento id 151.
 
-**Qué falta.** Decidir si se borra del `.env` o se deja con un comentario que diga que no hace nada.
-No es urgente: no rompe nada.
+**Qué falta.** Nada que bloquee: la decision esta tomada y escrita en el codigo y en los documentos. Que
+el `.env` de produccion la traiga o no es un detalle de configuracion, no una decision de fondo.
 
-**Quién lo tiene.** El owner.
+**Quién lo tiene.** Nadie.
 
 ### M.21 - El tunel de Cloudflare tuvo un parpadeo y nadie fue avisado — PARCIALMENTE
 
@@ -868,28 +952,7 @@ con CR CR LF y 2 325 con CRLF, sin ningun LF suelto) y `BITACORA.md` sigue en **
 
 **Qué falta.** Nada: los dos documentos dicen el estado real y los bloqueos pendientes.
 
-**Quién lo tiene.** —
-
-**Qué se verificó.** `Historial.md` y `PROMPT.md` **estan al dia** (la decima ronda documenta los
-cuatro actos del P8 y las dos compuertas). Los otros dos no:
-
-- `sgsst-electron-app/BITACORA.md:9626` — su ultima entrada es del **11-nov** («El dia que el acta
-  decia QUIEN firmo pero no CON QUE PODER»). **No hay entrada** de la publicacion de la v1.6 ni de
-  la ejecucion del P8.
-- `sgsst-electron-app/CONTEXT.md:43` y `:70` — **desactualizado**: sigue describiendo el P8 como
-  pendiente, el Anexo de Nube vigente como la **v1.2**, y «T6, T7, T8 y J1-J14» como abiertos.
-
-Un lector que entre por `CONTEXT.md` recibe una foto del 10-nov, no la de hoy.
-
-**Evidencia.** `sgsst-electron-app/BITACORA.md:9626` (ultima entrada) y el grep de `v1.6|12-nov-2026|P8`
-sobre el archivo (una sola coincidencia, de otro tema);
-`sgsst-electron-app/CONTEXT.md:43` y `:70`;
-`verificacion-cierre/seccion-8.md`, requisito 8.10 (**PARCIALMENTE**).
-
-**Qué falta.** La entrada de `BITACORA.md` con el hito de la v1.6 y del P8, y poner `CONTEXT.md` al
-dia.
-
-**Quién lo tiene.** El equipo.
+**Quién lo tiene.** -
 
 ### M.26 - Las tres actas: la comprobacion del servidor, el despliegue con commit y el cierre del checklist — CERRADO
 
@@ -897,7 +960,8 @@ dia.
 
 **Qué se verificó.** Las tres actas que el canonico pedia **no existian** al empezar esta ronda; hoy
 existen, cada una en el lugar que el propio canonico designa, y el requisito `7.13` pasa a
-**CERRADO** y el `8.10` tambien (el cuadro canonico sube de 74 a **76 cerrados / 20 pendientes**).
+**CERRADO** y el `8.10` tambien (el cuadro canonico subia de 74 a **76 cerrados / 20 pendientes** en
+ese momento; hoy son **77 cerrados / 19 pendientes**).
 
 1. **El acta de la comprobacion del servidor** (`7.13`). El canonico decia: «Es el acta del
    despliegue. El documento que la recoge es `docs/MIGRACION-SERVIDOR-FIRMA.md`, seccion 5.1». La
@@ -914,14 +978,14 @@ existen, cada una en el lugar que el propio canonico designa, y el requisito `7.
 3. **El acta de cierre del checklist de 96 requisitos** (`8.10`, y el «registro de cierre» del §5 del
    plan de cierre). `verificacion-cierre/acta-cierre-checklist-2026-11-12.md`: version, hashes,
    commit, resultados de **T1 a T9** con su evidencia, decisiones **A, B y C** con su fecha,
-   responsable, fecha, y la lista de los **20 pendientes** con su dueño.
+   responsable, fecha, y la lista de los **20 pendientes** que habia entonces (hoy son 19) con su dueño.
 
 **Evidencia.** `sgsst-electron-app/docs/MIGRACION-SERVIDOR-FIRMA.md` §5.1.4 (el resultado medido);
 `verificacion-cierre/acta-comprobacion-servidor-2026-11-12.md`;
 `verificacion-cierre/acta-despliegue-2026-11-12.md`;
 `verificacion-cierre/acta-cierre-checklist-2026-11-12.md`;
 `respuesta-checklist-cierre-2026-10-30.md` con la tabla regenerada por
-`scripts/contar-estados-checklist.js` (76 cerrados / 20 pendientes) y los 34 requisitos medidos
+`scripts/contar-estados-checklist.js` (hoy **77 cerrados / 19 pendientes**) y los 34 requisitos medidos
 aplicados por `scripts/actualizar-cuadro-canonico-2026-11-12.js` (idempotente).
 
 **Que falta.** Nada de este bloque. **Ojo con lo que el acta dice:** el registro de cierre **no es
@@ -951,6 +1015,14 @@ en el paquete de despliegue.
 resultado medido del 12-nov-2026); el manifiesto del repo y el de produccion, ambos
 `191c08b837b41069de4e2d25d7158fd90a7c3ce5f93b22696d2d7050f8a4013f`.
 
+**Nota de vigencia (12-nov-2026, tarde).** La invariante «el manifiesto del repo queda byte a byte
+igual al de produccion, porque viaja en el paquete de despliegue» **sigue siendo la regla**, pero
+**no se cumple todavia**: desde esa tarde el repositorio lleva el manifiesto
+`d9b596993cec7958cadadcd9d9ed51c33878eb03c5b0c4aa1bc642a4bfc9097b`, que difiere del de produccion en
+**exactamente dos notas** (las que en produccion dicen «NO esta suscrito» mientras el propio bloque
+declara `firmado: true` y `contrafirmado: true`). Los dos actos del 12-nov **existen en la base de
+produccion**; lo que se corrige es la prosa. **El despliegue es lo que restablece la invariante.**
+
 **Qué falta.** Nada: quedo cerrado y ejecutado.
 
 **Quién lo tiene.** —
@@ -962,11 +1034,11 @@ resultado medido del 12-nov-2026); el manifiesto del repo y el de produccion, am
 | Bloque | Cerrados | Pendientes | No aplica | Total |
 |---|---|---|---|---|
 | 1. Bloqueos duros | 0 | 10 | 0 | 10 |
-| 2. Condiciones de apertura | 1 | 7 | 0 | 8 |
-| 3. Deuda y riesgo | 4 | 5 | 0 | 9 |
-| **TOTAL** | **5** | **22** | **0** | **27** |
+| 2. Condiciones de apertura | 2 | 6 | 0 | 8 |
+| 3. Deuda y riesgo | 5 | 4 | 0 | 9 |
+| **TOTAL** | **7** | **20** | **0** | **27** |
 
-Los 22 pendientes concilian: 10 del bloque 1 + 7 del bloque 2 + 5 del bloque 3 = 22.
+Los 20 pendientes concilian: 10 del bloque 1 + 6 del bloque 2 + 4 del bloque 3 = 20.
 
 ---
 
@@ -980,10 +1052,12 @@ Esto se midio el 12-nov-2026 y **no** es un bloqueante:
 - El **Acuerdo v1.6 esta publicado**, y el Anexo de Nube v1.3 y el Anexo de Encargo 2026-11-11
   estan **suscritos y contrafirmados**, con sus actas.
 - El sitio publico sirve **exactamente** las huellas suscribidas (6 URLs comprobadas).
-- La **suite** del servicio: 2 665 tests, 2 663 pass, 0 fail, 2 skipped (corrida final del 12-nov,
-  179 archivos de prueba, `exit 0`), y **vinculada a un commit**: el 12-nov se corrio tambien desde
-  un clon limpio del commit `e4dd5f31` y dio exactamente lo mismo (mismo conjunto de 2 665 nombres
-  de prueba, clon byte a byte igual al arbol del owner).
+- La **suite** del servicio: **2 667 tests, 2 665 pass, 0 fail, 2 skipped** (corrida final del 12-nov
+  por la tarde, 179 archivos de prueba, `exit 0`), y **vinculada a un commit**: el 12-nov por la
+  manana se corrio tambien desde un clon limpio del commit `e4dd5f31` y dio el mismo resultado que
+  la corrida de esa manana (2 665 / 2 663 / 0 / 2, mismo conjunto de nombres de prueba, clon byte a
+  byte igual al arbol del owner). Los **+2** de la tarde son las dos pruebas de regresion del
+  manifiesto, posteriores a ese commit.
 - El `npm audit` del repo: **0 vulnerabilidades**. Las dos altas de M.13 se corrigieron en el repo
   (`nodemailer` 6.10.1 -> 10.5.0 y `zod` 3.25.76 -> 4.6.7); **en produccion siguen vivas** hasta
   que se despliegue el 📦1051.
@@ -991,7 +1065,8 @@ Esto se midio el 12-nov-2026 y **no** es un bloqueante:
 - Las **39 casillas del §7 del `SECURITY.md`** estan medidas una por una: **19 CERRADO, 9
   PARCIALMENTE, 11 PENDIENTE** (`verificacion-cierre/seccion-7-security.md`).
 - El **cuadro canonico** esta reconciliado con lo medido: de 62 cerrados / 34 pendientes a
-  **76 cerrados / 20 pendientes** sobre 96, con la tabla regenerada por script.
+  **77 cerrados / 19 pendientes** sobre 96, con la tabla regenerada por script (la foto anterior,
+  ya superada, era 76 / 20).
 - El **caso T6** (buzon corporativo rechazado) **se produjo** contra el codigo desplegado, con su
   asiento, sobre una copia aislada; produccion quedo intacta y demostrado.
 

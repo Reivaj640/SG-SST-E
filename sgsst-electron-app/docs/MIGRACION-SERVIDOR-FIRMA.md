@@ -814,7 +814,7 @@ servidor", que sealaba: "Es el acta del despliegue. El documento que la recoge e
 | Servicio | `active` / `enabled`, `MainPID 281641`, `NRestarts 0`, arrancado 12-nov 09:30:23 -05 |
 | Salud | `GET /health` -> `status: ok`, `db: ok`, `smtp: configured` |
 | Migraciones | **61** aplicadas, la ultima `062_encargado_poderes_append_only` |
-| Manifiesto | `191c08b837b41069de4e2d25d7158fd90a7c3ce5f93b22696d2d7050f8a4013f` — **byte a byte igual** al del repositorio |
+| Manifiesto | `191c08b837b41069de4e2d25d7158fd90a7c3ce5f93b22696d2d7050f8a4013f` — **era byte a byte igual** al del repositorio; desde el 12-nov-2026 (tarde) el repositorio lleva `d9b596993cec7958cadadcd9d9ed51c33878eb03c5b0c4aa1bc642a4bfc9097b`, que difiere en **dos notas**; **el despliegue lo alinea** |
 | Texto del Acuerdo | `app/scripts/fixtures/acuerdo-v1.6.txt` -> `08e1eb8b…f13e` (coincide con el manifiesto) |
 | Anexo de Nube v1.3 | `/opt/kair-firma/legal/anexo-nube-v1.3.html` -> `fdd10551…b585d` (coincide) |
 | Anexo de Encargo | `/opt/kair-firma/legal/anexo-encargo.html` -> `6308b1f7…b8948` (coincide) |
@@ -1111,16 +1111,20 @@ La medicion vigente es la del **2026-11-12** (corrida final sobre el arbol de tr
 ronda, ya con el arbol de dependencias nuevo y los 41 tests nuevos que trajo):
 
 ```
-tests 2665 | pass 2663 | fail 0 | skipped 2
+tests 2667 | pass 2665 | fail 0 | skipped 2
 ```
 
 Medido con **Node 22.23.4** (ABI 127) en el PC de trabajo, con `better-sqlite3` 11.10.0
 recompilado para ese ABI: 317 s. Los 2 `skipped` son los que ya estaban asi el 11-nov.
+**Actualizada el 12-nov-2026 (tarde):** la corrida dio **2 667 / 2 665 / 0 / 2** (362 s, 179
+archivos, `exit 0`). Los **+2** son las dos pruebas de regresion del manifiesto que se
+agregaron con la correccion del defecto que empujaba la firma del texto vigente a
+`versiones_firmadas` (ver §7.1).
 
 La medicion anterior (12-nov-2026, antes del cambio de dependencias) fue
 `tests 2606 | pass 2604 | fail 0 | skipped 2`, en 415 s; la de antes (11-nov-2026) fue
-`tests 2574 | pass 2572 | fail 0 | skipped 2`, en 220 s. **La diferencia son 59 pruebas nuevas**
-(2 665 - 2 606), todas en verde; el numero de la seccion 7 se queda
+`tests 2574 | pass 2572 | fail 0 | skipped 2`, en 220 s. **La diferencia son 61 pruebas nuevas**
+(2 667 - 2 606), todas en verde; el numero de la seccion 7 se queda
 atrasado si no se actualiza, y una cifra vencida leida como vigente es un verde falso.
 
 > La reproduccion desde **clon limpio** esta medida y registrada en
@@ -1128,9 +1132,11 @@ atrasado si no se actualiza, y una cifra vencida leida como vigente es un verde 
 > La corrida **sobre el estado commiteado** tambien se hizo el 12-nov-2026, con el commit
 > `e4dd5f31`: el clon sale del commit, `npm ci` desde cero y `exit 0`, con el **mismo** resultado
 > (`tests 2665 | pass 2663 | fail 0 | skipped 2`, 179 archivos de prueba, 323 s) y el **conjunto de
-> los 2 665 nombres de prueba identico** al de la corrida de arriba. El clon quedo **byte a byte**
+> los 2 665 nombres de prueba identico** al de la corrida de ese momento. El clon quedo **byte a byte**
 > igual al arbol del owner (4 810 archivos, 0 diferentes). El 6.11 del cuadro canonico quedo
-> **CERRADO** por esto.
+> **CERRADO** por esto. **Ojo con las dos cifras:** la del clon es la de `e4dd5f31`, que es
+> **anterior** a las dos pruebas de regresion del manifiesto; el arbol de hoy da **2 667 / 2 665**.
+> Compararlas como si fueran la misma corrida seria un error de lectura.
 
 > **El EOL de este archivo esta fijado por su test.** Si lo abres en un editor que normalice a
 > CRLF, el diff entero se mueve. Las ediciones se hacen a nivel de bytes.

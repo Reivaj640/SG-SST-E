@@ -131,3 +131,71 @@ test('1047 · correrlo dos veces con la aceptacion registrada deja el archivo id
   script.main(['--manifiesto', copia]);
   assert.deepEqual(fs.readFileSync(copia), primera);
 });
+
+// ===========================================================================
+// LA HISTORIA DEL ANEXO DE NUBE
+// ===========================================================================
+//
+// `versiones_firmadas` son las suscripciones ANTERIORES: las que se
+// suscribieron en su dia y ya no son el texto vigente. El texto vigente se
+// describe en el bloque principal (`firmado`, `fecha`, `version`, `hash`,
+// `evidencia`, `contrafirmado`).
+//
+// DEFECTO CORREGIDO EL 12-NOV-2026: el script empujaba a la historia la
+// firma que el manifiesto declaraba, sin comprobar si describia el texto
+// vigente. Al correrlo sin cambiar de texto, la v1.3 (suscrita y
+// contrafirmada el 12-nov-2026) quedaba registrada DOS veces: una como
+// vigente y otra como si fuera una version anterior ya superada, y la
+// entrada de la historia llevaba la evidencia del PRIMER acto, sin la del
+// segundo. Estos dos tests fijan la regla: a la historia solo pasa una firma
+// que NO describe el texto vigente.
+
+test('1047 · la firma del TEXTO VIGENTE no pasa a la historia', () => {
+  const man = leer();
+  const vigente = man.anexo_nube;
+  assert.equal(vigente.firmado, true,
+    'el manifiesto real declara firmado el texto vigente: este test lo da por cierto');
+  assert.ok(vigente.version && vigente.hash,
+    'el manifiesto real declara la version y la huella del texto vigente');
+
+  // Se simula el estado defectuoso: el texto vigente firmado, y su version
+  // ausente de la historia.
+  man.anexo_nube.versiones_firmadas = (man.anexo_nube.versiones_firmadas || [])
+    .filter((x) => !(x && x.version === vigente.version));
+  escribir(man);
+
+  script.main(['--manifiesto', copia]);
+
+  const despues = leer().anexo_nube;
+  const repetida = (despues.versiones_firmadas || []).filter((x) => x
+    && x.version === vigente.version
+    && String(x.hash || '').toLowerCase() === String(vigente.hash || '').toLowerCase());
+  assert.equal(repetida.length, 0,
+    'la firma del texto vigente quedo registrada dos veces: una como vigente y otra en la historia');
+  assert.equal(despues.firmado, true,
+    'la firma del texto vigente se perdio: el texto vigente no cambio');
+  assert.equal(despues.version, vigente.version,
+    'el texto vigente cambio de version al correr el script');
+});
+
+test('1047 · la firma de un texto ANTERIOR si pasa a la historia', () => {
+  const man = leer();
+  // Un texto que ya NO es el vigente: la v1.1, con su huella de prueba.
+  man.anexo_nube.firmado = true;
+  man.anexo_nube.version = '1.1';
+  man.anexo_nube.hash = 'e'.repeat(64);
+  man.anexo_nube.fecha = '2026-11-05T22:51:34.349Z';
+  man.anexo_nube.versiones_firmadas = [];
+  escribir(man);
+
+  script.main(['--manifiesto', copia]);
+
+  const despues = leer().anexo_nube;
+  const v11 = (despues.versiones_firmadas || []).find((x) => x && x.version === '1.1');
+  assert.ok(v11, 'la firma de un texto anterior no paso a la historia');
+  assert.equal(despues.firmado, false,
+    'una firma que no describe el texto vigente no puede quedar declarada: '
+    + 'seria un verde falso');
+  assert.equal(despues.hash, null,
+    'la huella que no describe el texto vigente no puede quedar declarada');
+});

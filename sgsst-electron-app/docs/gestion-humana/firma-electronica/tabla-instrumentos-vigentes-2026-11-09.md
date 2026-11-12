@@ -1,10 +1,11 @@
 # Tabla única de instrumentos vigentes — 9 de noviembre de 2026
 
-> **Actualizada el 11-nov-2026.** El archivo conserva el nombre del 9-nov porque así lo citan
-> otros documentos del expediente; **no se renombra**. Lo que cambia con esta actualización son
-> las versiones: el **Acuerdo v1.6**, el **Anexo de Nube v1.3** y el **Anexo de Encargo
-> 2026-11-11** son los textos vigentes (ver §4.3 y
-> `dictamen-legal-textos-2026-11-11.md`).
+> **Actualizada el 12-nov-2026.** El archivo conserva el nombre del 9-nov porque así lo citan
+> otros documentos del expediente; **no se renombra**. El 11-nov cambiaron las versiones: el
+> **Acuerdo v1.6**, el **Anexo de Nube v1.3** y el **Anexo de Encargo 2026-11-11** son los textos
+> vigentes (ver §4.3 y `dictamen-legal-textos-2026-11-11.md`). El **12-nov-2026** los dos anexos
+> vigentes quedaron **suscritos por ASEPLUS CARIBE S.A.S. y contrafirmados por K+AIR**; esta
+> actualización registra ese estado y las huellas reales de la Constancia.
 >
 > Esta es la tabla que el plan del punto 3 pide: **documento → versión → hash → fecha →
 > suscripción → evidencia**. Una sola, con las huellas calculadas sobre los bytes reales de los
@@ -25,11 +26,11 @@
 
 | Instrumento | Versión | SHA-256 | Bytes | Fecha del texto | Suscripción | Evidencia |
 |---|---|---|---|---|---|---|
-| **Anexo de Nube** (vigente) | 1.3 | `fdd10551c2106e186d62a2b70922530ff9494a8538fc67816f6f5ad5ca2b585d` | 85 143 | 11-nov-2026 | **NO suscrito** (ni suscrito ni contrafirmado) | Manifiesto `anexo_nube.modelo.version = "1.3"` y `anexo_nube.firmado = false` y `anexo_nube.contrafirmado = false`. Suspende los ítems `firmado_nube` y `contrafirma_nube` del gate. |
+| **Anexo de Nube** (vigente) | 1.3 | `fdd10551c2106e186d62a2b70922530ff9494a8538fc67816f6f5ad5ca2b585d` | 85 143 | 11-nov-2026 | **SUSCRITO Y CONTRAFIRMADO**: ASEPLUS CARIBE S.A.S. (NIT 900 829 731) lo suscribió el 2026-11-12T15:38:27.990Z y K+AIR lo contrafirmó el 2026-11-12T16:13:54.106Z | Manifiesto `anexo_nube.firmado = true`, `contrafirmado = true`, `fecha = 2026-11-12T15:38:27.990Z`, `hash = fdd10551…b585d`, `evidencia` y `contrafirma_evidencia` con el acta del segundo acto. Los ítems `firmado_nube` y `contrafirma_nube` del gate quedan `ok`. El primer acto no genera acta propia (la evidencia son las columnas y el rastro de la suscripción id 2); el segundo tiene `acta-2-contrafirma-anexo-nube.pdf` (SHA-256 `050f223a…2c74a501`). La v1.3 **no** aparece en `versiones_firmadas`: esa lista es la de las versiones **anteriores**, y la v1.3 es el texto vigente. |
 | Anexo de Nube (referencia, **nunca suscrito**) | 1.2 | `242037b3a98f2152b7c1db1f5c562fbe1f9f3e3be4422c03bfcf404e581f7245` | 84 062 | 9-nov-2026 | **Nunca fue suscrito** (queda como referencia) | No aparece en `anexo_nube.versiones_firmadas`. Su huella no se mueve: no se reescribe. Se conserva en el expediente porque el §9.4 del Acuerdo obliga a versionar con huella propia. |
 | Anexo de Nube (histórico) | 1.1 | `e95175368dcb8aed7227ab35522a55db065da0f9620b52555d16254ae4591482` | 62 198 | 5-nov-2026 | **Suscrito** por ASEPLUS CARIBE S.A.S. (NIT 900 829 731) el 2026-11-05T22:51:34.349Z, IP 181.63.26.145 | Manifiesto `anexo_nube.versiones_firmadas[0]`. Rastro: SUSCRIPCION_CREADA, ENLACE_ABIERTO, CODIGO_ENVIADO ×2, SUSCRIPCION_FIRMADA. |
 | Anexo de Nube (modelo histórico) | 1.0 | `aec7c40132979990cddbad669a8d4690d8439ddc447059d069cd8d19c83214ca` | 59 857 | 30-oct-2026 | **Nunca fue susceptible de suscripción** (su propio texto lo prohibía) | Manifiesto, bloque `anexo_nube.modelo.nota`. |
-| **Anexo de Encargo** (vigente) | 2026-11-11 | `6308b1f7a51007cb1e973de0210d1e5659d3b3ceb8e3e3b7a3ee52a7275b8948` | 94 923 | 11-nov-2026 | **NO suscrito** | Manifiesto `anexo_encargo.version = "2026-11-11"` y `anexo_encargo.estado = "no_firmado"`. Suspende el ítem `estado_encargo` del gate. |
+| **Anexo de Encargo** (vigente) | 2026-11-11 | `6308b1f7a51007cb1e973de0210d1e5659d3b3ceb8e3e3b7a3ee52a7275b8948` | 94 923 | 11-nov-2026 | **SUSCRITO Y CONTRAFIRMADO**: ASEPLUS CARIBE S.A.S. lo suscribió el 2026-11-12T15:40:06.992Z y K+AIR lo contrafirmó el 2026-11-12T16:14:31.105Z | Manifiesto `anexo_encargo.estado = "firmado"`, `fecha = 2026-11-12T16:14:31.105Z` y `contrafirma_facultad` con la representación legal acreditada. El ítem `estado_encargo` del gate queda `ok`. Actas: `acta-2-anexo-encargo.pdf` (SHA-256 `c0ca4211…6d21f6`) y `acta-2-contrafirma-anexo-encargo.pdf` (SHA-256 `5dcb2149…404b062`). |
 | Anexo de Encargo (referencia, **nunca suscrito**) | 2026-11-09 | `0cd6c05f0574bbcdbb8277306a9084784a48815edd862cd31e97eb5435c22a1e` | 93 860 | 9-nov-2026 | **Nunca fue suscrito** (queda como referencia) | No aparece en `anexo_encargo.versiones_firmadas`. Su huella no se mueve: no se reescribe. Queda en el historial de git y en el expediente, por la misma razón del §9.4 del Acuerdo. El archivo `legal/anexo-encargo.html` es hoy el de la versión 2026-11-11 |
 | Anexo de Encargo (histórico, **ejecutado**) | 2026-11-06 | `5cc7a34603ea2e300e6c82ed695454eb705363345a3165ae2e75b5733960aa72` | 87 202 | 6-nov-2026 | **Ejecutado**: suscripción de ASEPLUS el 2026-11-07T19:30:14.503Z y contrafirma de K+AIR el 2026-11-07T20:33:22.748Z | Manifiesto `anexo_encargo.versiones_firmadas[0]`. Actas: `acta-1-anexo-encargo.pdf` (SHA-256 `f4a96bee…bdf3`) y `acta-1-contrafirma-anexo-encargo.pdf` (SHA-256 `b1ec9fa2…513c`). |
 | **CDPA de Google** (instrumento del proveedor) | texto **Current** (la página **no declara fecha** ⚠️) | `0e1c729406410a15758ae1ceb6d93b6b4e200208b325abf17b09ef74f0dc69b1` | 97 831 | capturado 10-nov-2026 (`fecha_declarada_por_google: null`) | **Aceptado por la cuenta el 10-nov-2026** (P1 cerrado) | Manifiesto `subencargados.mail_provider.aceptacion`: `aceptada = true`, modo `aceptado_por_administrador`, `fecha = 2026-11-10`, `fecha_efectividad_addendum = null` (la consola no la muestra). La consola declara «Aceptado por kair@gesstiar.com el Nov 10, 2026». Captura: `scripts/fixtures/captura-consola-cdpa-i-accept-2026-11-10.png`, 96 520 bytes, SHA-256 `9d989067baf9f7908d144dcdb86c04f9b62efa6e34e4714f7dd3132e5d825560`, `verificado_localmente: true`. URL canónica: <https://admin.google.com/terms/apps/8/1/en/dpa_terms.html>. Acta: `scripts/fixtures/aceptacion-cdpa-p1-2026-11-10.json` → `node scripts/actualizar-manifiesto-aceptacion-cdpa.js --aplicar` (10-nov-2026). |
@@ -177,7 +178,7 @@ Fundamento y consecuencias: `sgsst-electron-app/docs/gestion-humana/firma-electr
 | Tests de la lectura del operador (`tests/routes/admin-empresas*.test.js`) | **45 · 45 verdes** — son tres archivos (15 + 13 + 17). El §4 decía 27 |
 | Tests de la vista del operador (`main/test-anexos-1038.js`, `main/test-anexos-1042.js`) | **27 · 27 verdes** (17 + 10) — el §4 decía 26. El +1 es el guard de UI que agregó el 📦1047 |
 | `main/test-anexos-1041.js` | 6 · 6 verdes (tercer archivo de la vista) |
-| Huellas de los textos | **Cuadran**: Anexo de Nube v1.3 `fdd10551…2b585d` (85 143 B) · v1.1 `e9517536…591482` (62 198 B) · v1.0 `aec7c401…3214ca` (59 857 B) · Encargo 2026-11-11 `6308b1f7…75b8948` (94 923 B) · Encargo 2026-11-06 `5cc7a346…60aa72` (87 202 B) · CDPA `0e1c7294…dc69b1` (97 831 B) · Acuerdo v1.6 `08e1eb8b…52f13e` (75 961 B) · Constancia `474460ca…fe6dc1` (9 709 B). Las copias de `sitio/` son byte a byte iguales |
+| Huellas de los textos | **Cuadran**: Anexo de Nube v1.3 `fdd10551…2b585d` (85 143 B) · v1.1 `e9517536…591482` (62 198 B) · v1.0 `aec7c401…3214ca` (59 857 B) · Encargo 2026-11-11 `6308b1f7…75b8948` (94 923 B) · Encargo 2026-11-06 `5cc7a346…60aa72` (87 202 B) · CDPA `0e1c7294…dc69b1` (97 831 B) · Acuerdo v1.6 `08e1eb8b…52f13e` (75 961 B) · Constancia `aaf68b4e…d0b413` (9 794 B). Las copias de `sitio/` son byte a byte iguales |
 | Manifiesto · CDPA | `aceptada = true`, modo `aceptado_por_administrador`, fecha `2026-11-10`, `fecha_efectividad_addendum = null`; captura de 96 520 B con SHA-256 `9d989067…560` (verificada en disco) |
 | Migraciones en el repo | **61 archivos `.sql`**, el último `062_encargado_poderes_append_only.sql` |
 
@@ -188,6 +189,12 @@ Fundamento y consecuencias: `sgsst-electron-app/docs/gestion-humana/firma-electr
 
 `google_dpa` sigue en `[N/A]`: no es que se cumpla, es que ya no aplica. Un ítem que ya no aplica
 no se marca "ok".
+
+> **Medición del 12-nov-2026, en el servidor (la que decide).** Los dos gates
+> (`publicacion` y `primera_firma`) dieron **`listo: true`**: 42 ítems cada uno, **40 `ok`**,
+> **0 pendientes**, **0 bloqueantes**, 1 aviso y 1 N/A. La **suite** del servicio cerró en
+> **2 667 tests** (2 665 verdes, 0 rojos, 2 omitidos; corrida del 12-nov por la tarde) y la corrida se repitió desde un clon limpio
+> del commit. Esta tabla de §4.2 se conserva como la foto del 11-nov: **no se reescribe**.
 
 ## 4.3 Lo que cambió el 11-nov-2026 (los tres textos nuevos)
 
@@ -201,8 +208,8 @@ propia huella:
 | Instrumento | Versión nueva | SHA-256 | Bytes | Fecha | Estado |
 |---|---|---|---|---|---|
 | Acuerdo de uso | **v1.6** | `08e1eb8b09449fbc57eebdda89518482b0063285d2f0f56ed335d2977532f13e` | 75 961 | 11-nov-2026 | **PUBLICADA** (`publicado: true`) el 11-nov-2026 con su autorización operativa (registro id 4); es la versión activa en la base de producción |
-| Anexo de Nube | **v1.3** | `fdd10551c2106e186d62a2b70922530ff9494a8538fc67816f6f5ad5ca2b585d` | 85 143 | 11-nov-2026 | **NO suscrito.** La v1.2 nunca lo fue: queda como referencia |
-| Anexo de Encargo | **2026-11-11** | `6308b1f7a51007cb1e973de0210d1e5659d3b3ceb8e3e3b7a3ee52a7275b8948` | 94 923 | 11-nov-2026 | **NO suscrito.** El 2026-11-09 nunca lo fue: queda como referencia |
+| Anexo de Nube | **v1.3** | `fdd10551c2106e186d62a2b70922530ff9494a8538fc67816f6f5ad5ca2b585d` | 85 143 | 11-nov-2026 | **SUSCRITO Y CONTRAFIRMADO el 12-nov-2026.** La v1.2 nunca lo fue: queda como referencia |
+| Anexo de Encargo | **2026-11-11** | `6308b1f7a51007cb1e973de0210d1e5659d3b3ceb8e3e3b7a3ee52a7275b8948` | 94 923 | 11-nov-2026 | **SUSCRITO Y CONTRAFIRMADO el 12-nov-2026.** El 2026-11-09 nunca lo fue: queda como referencia |
 
 **Lo que NO se tocó** (y por qué):
 
@@ -217,8 +224,9 @@ propia huella:
   versión 2026-11-11).
 
 **Constancia de versión y autorización** (`sgsst-electron-app/legal/constancia-aprobacion-acuerdo.html`,
-SHA-256 `474460ca7803eba3e26fdf734cd6668b95e235c43b3cbc8e47de6c7a83fe6dc1`, 9 709 B): **reemitida
-contra la v1.6 y SIN FIRMAR**.
+SHA-256 `aaf68b4e7df5e2757d5885840056218d97a0cbb1c9fa624bf7861962c8d0b413`, 9 794 B): **reemitida
+contra la v1.6, completada con los datos del registro de aprobaciones y SIN FIRMAR** (las secciones 5
+y 6 del documento siguen vacías: la autorización vive en el registro del servicio).
 
 **La decisión del 10-nov-2026** (opción A · control interno, "no hay v1.3 y la huella `242037b3…1f7245`
 no se mueve") **queda registrada** en el §3 y **fue revisada el 11-nov-2026**: el texto sí cambia,

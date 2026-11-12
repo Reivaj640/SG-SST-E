@@ -94,7 +94,7 @@ manda es el estado medido.
 - SSH, 12-nov: `systemctl is-active kair-firma` → `active`; `is-enabled` → `enabled`; `GET http://127.0.0.1:3001/health` → `{"status":"ok","db":"ok","smtp":"configured","uptime_seconds":14629}`.
 - SSH, 12-nov: `sha256sum` en disco → `acuerdo-v1.6.txt` `08e1eb8b...f13e`, `legal/anexo-nube-v1.3.html` `fdd10551...b585d`, `legal/anexo-encargo.html` `6308b1f7...b8948`. Coinciden con `legal-readiness.json:7`, `:145` y `:129`.
 - SSH, 12-nov: `sha256sum /opt/kair-firma/app/legal-readiness.json` → `191c08b837b41069de4e2d25d7158fd90a7c3ce5f93b22696d2d7050f8a4013f`, byte a byte igual al del repositorio (medido tambien en el PC). `sha256sum /opt/kair-firma/legal/constancia-aprobacion-acuerdo.html` → `aaf68b4e7df5e2757d5885840056218d97a0cbb1c9fa624bf7861962c8d0b413`.
-- Suite, registrada en el expediente: `sgsst-electron-app/docs/MIGRACION-SERVIDOR-FIRMA.md` §7 (12-nov: **2 665 pruebas, 2 663 verdes, 0 rojas, 2 omitidas**) y `verificacion-cierre/t1-corrida-desde-clon-limpio.md` (tres corridas desde clon limpio, 0 fallos).
+- Suite, registrada en el expediente: `sgsst-electron-app/docs/MIGRACION-SERVIDOR-FIRMA.md` §7 (12-nov por la tarde: **2 667 pruebas, 2 665 verdes, 0 rojas, 2 omitidas**; el 12-nov por la manana, sobre el commit `e4dd5f31`, 2 665 / 2 663) y `verificacion-cierre/t1-corrida-desde-clon-limpio.md` (tres corridas desde clon limpio, 0 fallos).
 
 **Que falta.** Cuatro cosas, todas con dueño, y ninguna es un problema del texto publicado. **Lo que se
 resolvio el 12-nov-2026** esta al final; lo que sigue abierto, antes:
@@ -255,8 +255,44 @@ vigente no promete los plazos de 10 y 5 anos, asi que el texto y el sistema no s
 **Estado de las mediciones de esta seccion.** Compuertas medidas hoy por SSH contra el codigo
 desplegado: `publicacion` y `primera_firma`, las dos en LISTO, 42 items, 40 ok, 0 pendientes, 0
 bloqueantes. Base de produccion: 61 migraciones (maximo `062`), servicio `active`, `/health` en ok,
-manifiesto `191c08b8...f8a4013f` igual al del repositorio, tres textos con huella coincidente en
+manifiesto `191c08b8...f8a4013f` —**esa es la medicion de ese momento**: desde la tarde del 12-nov el
+repositorio lleva `d9b59699...c9097b`, que difiere en **dos notas** y que **el despliegue alinea**
+(los dos actos existen en la base de produccion; lo que se corrige es la prosa)—, tres textos con huella coincidente en
 disco, cuatro aprobaciones de publicacion (una por version) y una sola Empresa.
+
+## Novedad de la tarde del 12-nov-2026: las siete decisiones de fondo
+
+El owner delego en el equipo la **toma** de las siete decisiones de fondo del mapa. El equipo las tomo,
+las escribio con su fundamento medido y dejo por escrito **que es acto de terceros y de quien**. El
+documento es `docs/gestion-humana/firma-electronica/decisiones-de-fondo-2026-11-12.md`. El mapa paso de
+**5 cerrados / 22 pendientes** a **7 cerrados / 20 pendientes**: **M.15** y **M.20** cierran; **M.5**,
+**M.6**, **M.7**, **M.14** y **M.18** quedan **PARCIALMENTE** porque lo que falta es una firma, una
+credencial o la respuesta de un tercero.
+
+Lo que **cambio en el codigo, en el manifiesto y en los documentos**:
+
+- **El manifiesto del repositorio lleva ahora la verdad y el de produccion todavia no.** Se corrigieron
+  **exactamente dos notas** (`anexo_nube.modelo.nota` y `anexo_encargo.nota`), que en produccion dicen
+  «NO esta suscrito» mientras el propio bloque declara `firmado: true` y `contrafirmado: true` con la
+  fecha del 12-nov. Los dos actos **existen en la base de produccion** (suscripcion id 2, `FIRMADA` y
+  `CONTRAFIRMADA`, acta `050f223a3665cf7d`): lo que se corrigio fue la prosa. El repositorio queda
+  `d9b59699...c9097b` y el despliegue lo alinea.
+- **Defecto real corregido en `scripts/actualizar-manifiesto-1047.js`:** empujaba a `versiones_firmadas`
+  la firma declarada **sin comprobar si describia el texto vigente**, de modo que la v1.3 (el texto
+  vigente, suscrito y contrafirmado) quedaba registrada **dos veces**: una como vigente y otra como si
+  fuera una version anterior. Ahora solo pasa a la historia una firma que **no** describe el texto vigente,
+  y hay **dos pruebas de regresion** que lo fijan.
+- **`src/services/readinessLegal.js`** decia «Acuerdo de uso v1.1» donde el Acuerdo vigente es la **v1.6**.
+- **El destino del respaldo fuera del servidor quedo decidido** (bucket S3-compatible de Backblaze B2 con
+  `rclone`, retencion de 30 dias) y se corrigio un defecto que hacia inutil el metodo: la rama `rclone`
+  comparaba con `rclone hash`, **un comando que no existe** (medido con las dos versiones reales).
+- **La ventana de Node 22 quedo escrita con su rollback** y con un verificador de solo lectura
+  (`deploy/verificar-runtime-node.sh`) que sale con codigo 1 ante cualquier incoherencia entre el runtime
+  y el modulo nativo.
+- **Los candidatos de la v1.4 estan armados** (Nube v1.4 y el Encargo que la remite), con 11 de 11 anclas
+  casando exactamente una vez, marcados como **no publicados y no firmables**.
+- **La variable `FIRMA_EXIGIR_MEDIO_PERSONAL_OTP` quedo declarada inerte** y tres documentos que la
+  trataban como interruptor se corrigieron (`API.md` dos veces y el 4.7 del cuadro canonico).
 
 **Pendiente de limpieza, sin efecto sobre el servicio.** Por la politica de borrado de esta sesion no
 se pudieron eliminar los archivos temporales de la medicion: en el servidor quedan

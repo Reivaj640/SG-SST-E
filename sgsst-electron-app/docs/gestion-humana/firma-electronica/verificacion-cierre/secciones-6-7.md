@@ -64,6 +64,10 @@ corrida del arbol del owner: **el conjunto de los 2 665 nombres de prueba es ide
 omitidos son los mismos, con el mismo motivo escrito en el propio test. Y el clon quedo **byte a
 byte** igual al arbol del owner: **4 810 archivos identicos, 0 diferentes, 0 ausentes**.
 
+**Ojo con las dos cifras:** la del clon es la del commit `e4dd5f31`, **anterior** a las dos pruebas
+de regresion del manifiesto que se agregaron el 12-nov por la tarde; el arbol de hoy da
+**2 667 / 2 665 / 0 / 2**.
+
 **Un hallazgo que hay que dejar escrito.** El primer clon se hizo con la configuracion del sistema
 (`core.autocrlf = true`) y **no reproducia el arbol del owner**: materializo 2 697 de los 4 781
 archivos versionados con CRLF, cuando los blobs los tienen en LF. El repo del owner tiene
@@ -77,8 +81,8 @@ de `npm audit` resueltas) y los tests nuevos de esta ronda, la suite completa se
 sobre el arbol de trabajo del owner:
 
 ```
-tests 2665 | pass 2663 | fail 0 | cancelled 0 | skipped 2 | todo 0
-duration_ms 317044
+tests 2667 | pass 2665 | fail 0 | cancelled 0 | skipped 2 | todo 0
+duration_ms 362425
 ```
 
 179 archivos de prueba, `exit 0`, sin bloques `not ok`. **Esta es la cifra que publica ahora la
@@ -123,7 +127,7 @@ Medido por SSH (`sha256sum` en `/opt/kair-firma/app` frente al hash del repo en 
 | `src/server.js` | `73947e2d...ff90` | `73947e2d...ff90` | igual |
 | `src/services/readinessLegal.js` | `3f453ed2...2d9` | `3f453ed2...2d9` | igual |
 | `config/tabla-conservacion.json` | `9c81a175...a61b` | `9c81a175...a61b` | igual |
-| `legal-readiness.json` | `191c08b8...4013f` | `191c08b8...4013f` | igual |
+| `legal-readiness.json` | `191c08b8...4013f` | `d9b59699...c9097b` | **difiere en 2 notas (12-nov, tarde); el despliegue lo alinea** |
 | `scripts/fixtures/acuerdo-v1.6.txt` | `08e1eb8b...2f13e` | `08e1eb8b...2f13e` | igual |
 | `package.json` | `0a25dbe8...e424` | `ca60b002...b55ca` | **distinto** |
 
@@ -457,7 +461,7 @@ migraciones"), y por eso la comprobacion tiene que ser por disco.
 `proxy-addr 2.0.7`, `qs 6.15.3`).
 El manifiesto de produccion si esta verificado byte a byte: `sha256sum
 /opt/kair-firma/app/legal-readiness.json` = `191c08b837b41069de4e2d25d7158fd90a7c3ce5f93b22696d2d7050f8a4013f`,
-que es el hash canonico del repo.
+que es el hash canonico del repo. **Nota de vigencia (12-nov-2026, tarde).** Esta medicion es la de ese momento y **no se reescribe**. Desde esa tarde el **repositorio** lleva el manifiesto `d9b596993cec7958cadadcd9d9ed51c33878eb03c5b0c4aa1bc642a4bfc9097b`, que difiere del de produccion en **exactamente dos campos**: las dos notas (`anexo_nube.modelo.nota` y `anexo_encargo.nota`) que en produccion dicen «NO esta suscrito» mientras el propio bloque declara `firmado: true` y `contrafirmado: true` con la fecha del 12-nov. Los dos actos **existen en la base de produccion** (suscripcion id 2, `FIRMADA` y `CONTRAFIRMADA`, acta `050f223a3665cf7d`): lo que se corrige es la prosa, no el hecho. **El despliegue es lo que alinea los dos**, y por eso el repositorio va por delante a proposito y el hash del manifiesto **no coincide** con el del servidor hasta que ese despliegue se ejecute.
 
 **Que falta.** La mitad de migraciones esta resuelta. La de version queda a medias: (a) **no hay
 sello de version en el servidor** (ni git, ni build, ni version leida del manifiesto), asi que
@@ -548,7 +552,7 @@ para la validacion de la compuerta de conservacion (J8) y la ratificacion extern
 
 | ID | Requisito | Estado | Que falta, en una linea |
 |---|---|---|---|
-| 6.11 | Ejecutar la bateria completa de pruebas del servicio | **CERRADO** | Nada: la suite esta vinculada al commit `e4dd5f31` y se reprodujo desde un clon limpio de ese commit (2 665 / 2 663 / 0 / 2, exit 0, conjunto de nombres de prueba identico y clon byte a byte igual al arbol del owner). |
+| 6.11 | Ejecutar la bateria completa de pruebas del servicio | **CERRADO** | Nada: la suite esta vinculada al commit `e4dd5f31` y se reprodujo desde un clon limpio de ese commit (2 665 / 2 663 / 0 / 2, exit 0, conjunto de nombres de prueba identico y clon byte a byte igual al arbol del owner). La corrida del 12-nov por la tarde da **2 667 / 2 665 / 0 / 2**: los +2 son las pruebas de regresion del manifiesto, posteriores a ese commit. |
 | 7.1 | Confirmar la version exacta del codigo que se va a desplegar | **PARCIALMENTE** | El arbol desplegado se puede identificar por hash, pero es mixto (codigo de la punta, dependencias previas al 1051) y no hay commit candidato fijado para el proximo despliegue. |
 | 7.3 | Ejecutar las migraciones de base de datos necesarias | **CERRADO** | Nada: 61 de 61 aplicadas, 1:1 con el repo, incluidas la 060, la 061 y la 062. |
 | 7.4 | Comprobar que las migraciones se aplicaron correctamente | **CERRADO** | Nada: tablas, 15 columnas de contrafirma, 36 disparadores append-only, `integrity_check` ok y rutas 401 y no 404. |
