@@ -1178,6 +1178,88 @@ El detalle completo (mediciones, release oficial verificado, comando exacto) est
 > **El npm audit y el cierre A/B/C del `SECURITY.md` siguen aplazados** (decision del 2026-10-25).
 > Lo que cambio el 11-nov es **el runtime**, no el resto de la deuda.
 
+### 8.3. P8: los cuatro actos, paso a paso (la referencia que faltaba)
+
+P8 son **cuatro actos** sobre los textos **vigentes**: suscribir y contrafirmar el Anexo de Nube
+v1.3 (`fdd10551...2b585d`) y el Anexo de Encargo 2026-11-11 (`6308b1f7...75b8948`). ASEPLUS
+CARIBE S.A.S. (`900829731`) es la empresa de prueba del proceso.
+
+**Lo que NO es un acto de K+AIR:** la suscripcion de cada instrumento la hace la **Empresa**, desde
+el enlace de un solo uso, con el codigo que sale a su buzon. K+AIR abre la suscripcion, verifica
+documentalmente a quien firmo y contrafirma. Por eso el runbook tiene dos fases y la primera se
+detiene a la espera de una persona.
+
+#### Las cuatro rutas del canal administrativo (el orden importa)
+
+Las dos de cada instrumento se desarman **fase 2 primero, fase 1 despues**. Deshacer la fase 1 con
+la fase 2 puesta no alcanza: el 409 `SUSCRIPCION_EXISTENTE` mira los dos campos.
+
+| Orden | Ruta | Que deshace |
+|---|---|---|
+| 1 | `POST /internal/admin/empresas/:id_empresa/anexo-nube-ejecutado/quitar` | Nube fase 2: `anexo_nube_ejecutado_at` (la contrafirma) |
+| 2 | `POST /internal/admin/empresas/:id_empresa/anexo-nube-suscrito/quitar` | Nube fase 1: `anexo_nube_firmado_at`, `_version`, `_hash`, `_evidencia` |
+| 3 | `POST /internal/admin/empresas/:id_empresa/anexo-firmado/quitar` | Encargo fase 2: `anexo_encargo_firmado_at` |
+| 4 | `POST /internal/admin/empresas/:id_empresa/anexo-suscrito/quitar` | Encargo fase 1: `anexo_encargo_suscrito_at`, `_version`, `_hash`, `_evidencia` |
+
+Las cuatro exigen `X-Admin-Motivo` (y `X-Admin-Actor`), **no tocan ninguna fila** de las tablas de
+suscripciones — la suscripcion anterior queda `FIRMADA`/`CONTRAFIRMADA`, con su huella, su evidencia
+y su acta — y dejan el valor anterior en el rastro append-only. Lo que se deshace es el puntero de
+la ficha, no el hecho.
+
+> **La premarca NO es el camino.** `POST .../anexo-nube-firmado` registra en la ficha la version y la
+> huella del texto vigente **antes** de que la Empresa suscriba: eso es un registro falso y un
+> conteo falso en el gate. Se usa solo cuando la Empresa **ya** suscrito fuera del sistema.
+
+#### Fase 1: preparar (la ejecuta el owner, en el servidor)
+
+```bash
+sudo bash /tmp/kair-p8/p8-aseplus.sh fase1
+```
+
+El script: comprueba que el servicio esta vivo, **muestra la linea de errata** y **no sigue hasta que
+el owner confirme que la envio por correo** (al abrir la suscripcion sale sola la invitacion, y la
+errata tiene que estar en la cabeza de la contraparte antes de pedirle la firma), deshace las cuatro
+fases, abre las dos suscripciones y imprime los dos enlaces.
+
+> **La linea de errata va antes.** Es la condicion que puso el dictamen del 11-nov-2026 para la
+> errata en sitio (opcion A): la contraparte tiene que saber que el texto que va a firmar es el texto
+> corregido (art. 3 de la Ley 527 de 1999, buena fe; art. 7 literal a, aprobacion inequivoca del
+> contenido). El texto literal esta en
+> [`docs/gestion-humana/firma-electronica/contrafirma-anexo-nube-v1-2.md`](gestion-humana/firma-electronica/contrafirma-anexo-nube-v1-2.md) §3.5.
+
+#### Fase 2: los pasos de la Empresa y las contrafirmas
+
+El owner abre los dos enlaces en el navegador (el codigo del Nube sale a `jrf2011@live.com`; el del
+Encargo, al segundo canal, `reivaj640@gmail.com`), pide el codigo, lo escribe y acepta. En el del
+Encargo tiene que aceptar tambien el tratamiento de datos y revisar los cinco datos del parrafo 11.
+
+Despues:
+
+```bash
+sudo bash /tmp/kair-p8/p8-aseplus.sh fase2
+```
+
+El script verifica que las dos suscripciones **estan FIRMADA** y que son del texto vigente (por
+huella, no por fecha), registra la verificacion documental de la representante legal (el
+`verificar-representante`; el tipo es `RUT`, porque el certificado de camara no se reviso), pide los
+**dos codigos de contrafirma** (salen al buzon de proteccion de datos de K+AIR, `privacidad.kair@gmail.com`,
+que es fijo en la configuracion: un canal elegido por quien pide el acto no probaria nada),
+contraforma los dos instrumentos, **regenera los dos manifiestos** y mide la compuerta.
+
+#### Lo que hay que mirar al terminar
+
+| Que | Donde |
+|---|---|
+| Los tres items del gate | `firmado_nube`, `contrafirma_nube` y `estado_encargo` pasan a `ok` |
+| La ficha de ASEPLUS | `anexo_nube_firmado_at`, `anexo_nube_ejecutado_at`, `anexo_encargo_suscrito_at` y `anexo_encargo_firmado_at` con fecha del dia |
+| Las suscripciones | las dos nuevas `FIRMADA` y `CONTRAFIRMADA`; las dos viejas (v1.1 y 2026-11-06) **intactas** |
+| El manifiesto | `--check` en 0 en los dos scripts (comparan **estado**, no bytes) |
+| La habilitacion | `GET /internal/empresa/anexos` responde `habilitacion.ok = true` sin pendientes |
+
+**Lo que NO debe pasar:** que la suscripcion nueva se escriba sobre la vieja, que un manifiesto
+declare «firmado» sin que exista la suscripcion del texto vigente, o que la compuerta se cierre con
+una fecha de suscripcion que nadie merece.
+
 ---
 
 ## 9. Guia anterior (Oracle + Caddy + sslip.io)

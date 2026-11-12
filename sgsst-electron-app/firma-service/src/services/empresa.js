@@ -1174,6 +1174,178 @@ function desmarcarAnexoSuscrito(id_empresa, ctx = {}) {
 }
 
 /**
+ * Quita el registro de la SUSCRIPCIÓN (fase 1) del Anexo de Nube.
+ *
+ * POR QUÉ ESTA RUTA EXISTE
+ * ------------------------
+ * El Anexo de Nube también se versiona: cuando el texto vigente cambia, la
+ * Empresa tiene que suscribir DE NUEVO, porque la suscripción anterior
+ * describe un texto que ya no rige. `services/anexoNube.js` lo dice con todas
+ * las letras: si la ficha tiene `anexo_nube_firmado_at` y su huella es
+ * DISTINTA de la del texto que la Empresa está suscribiendo, la suscripción
+ * pública se rechaza con 409 SUSCRIPCION_EXISTENTE y avisa de que "la
+ * corrección se registra por el canal administrativo, con su motivo".
+ *
+ * Ese canal administrativo NO existía por HTTP para el Anexo de Nube (para el
+ * Anexo de Encargo sí existe: `anexo-suscrito/quitar`, del 11-nov-2026). El
+ * resultado era un callejón: una Empresa suscrita no podía volver a suscribir
+ * el texto vigente, y la única salida era la PREMARCA (`anexo-nube-firmado`),
+ * que escribe una fecha de suscripción ANTES de que la suscripción exista: un
+ * registro falso en la ficha y un conteo falso en el gate.
+ *
+ * LO QUE HACE
+ * ------------
+ * Pone en NULL los cuatro campos de la fase 1 en la ficha de la Empresa
+ * (`anexo_nube_firmado_at`, `_version`, `_hash` y `_evidencia`), con el valor
+ * anterior en el historial append-only, el actor y el motivo.
+ *
+ * LO QUE NO HACE
+ * ---------------
+ * - No toca `anexo_nube_ejecutado_at`: esa es la fecha del SEGUNDO acto (la
+ *   contrafirma de K+AIR). Si hay que quitarla, es otra ruta y otro motivo:
+ *   `POST .../anexo-nube-ejecutado/quitar`.
+ * - No toca NINGUNA fila de `gh_firma_anexo_nube_suscripciones`: la
+ *   suscripción anterior queda FIRMADA, con su huella y su evidencia. Lo que
+ *   se deshace es el puntero de la ficha, no el hecho.
+ * - No borra nada del historial: el rastro es append-only.
+ *
+ * @param {string} id_empresa
+ * @param {object} [ctx] - { actor, motivo, ip, user_agent }; el motivo es obligatorio.
+ * @returns {object}
+ */
+function desmarcarAnexoNubeSuscrito(id_empresa, ctx = {}) {
+  const actual = getById(id_empresa);
+  if (!actual) {
+    throw new AppError(404, 'EMPRESA_NOT_FOUND', `No existe la empresa ${id_empresa}`);
+  }
+  if (!actual.anexo_nube_firmado_at) {
+    throw new AppError(409, 'ANEXO_NO_REGISTRADO',
+      `La empresa ${id_empresa} no tiene una suscripcion de Anexo de Nube registrada`);
+  }
+  const motivo = typeof ctx.motivo === 'string' ? ctx.motivo.trim() : '';
+  if (!motivo) {
+    throw new AppError(400, 'MOTIVO_REQUERIDO',
+      'para quitar la suscripcion del Anexo de Nube hay que declarar el motivo '
+      + 'en X-Admin-Motivo');
+  }
+
+  const anterior = {
+    anexo_nube_firmado_at: actual.anexo_nube_firmado_at,
+    anexo_nube_version: actual.anexo_nube_version,
+    anexo_nube_hash: actual.anexo_nube_hash,
+    anexo_nube_evidencia: actual.anexo_nube_evidencia,
+  };
+  const tx = db.transaction(() => {
+    db.prepare(`
+      UPDATE gh_firma_empresas
+      SET anexo_nube_firmado_at = NULL, anexo_nube_version = NULL,
+          anexo_nube_hash = NULL, anexo_nube_evidencia = NULL,
+          updated_at = datetime('now')
+      WHERE id_empresa = ?
+    `).run(id_empresa);
+    for (const campo of Object.keys(anterior)) {
+      auditoriaService.registrarCampo({
+        id_empresa,
+        campo,
+        valor_anterior: anterior[campo],
+        valor_nuevo: null,
+        actor: ctx.actor || null,
+        ip: ctx.ip || null,
+        user_agent: ctx.user_agent || null,
+        motivo,
+      });
+    }
+  });
+  tx();
+
+  logger.warn('Suscripcion del Anexo de Nube desmarcada', {
+    id_empresa, fecha_anterior: anterior.anexo_nube_firmado_at, motivo,
+  });
+  return getById(id_empresa);
+}
+
+/**
+ * Quita la fecha de EJECUCIÓN (fase 2) del Anexo de Nube.
+ *
+ * POR QUÉ ESTA RUTA EXISTE
+ * ------------------------
+ * El Anexo de Nube es bilateral: lo suscribe la Empresa (fase 1,
+ * `anexo_nube_firmado_at`) y lo contrafirma K+AIR (fase 2,
+ * `anexo_nube_ejecutado_at`). Cuando el texto vigente cambia, hay que
+ * deshacer LAS DOS: si queda la fecha de ejecución, el operador sigue viendo
+ * "ejecutado" en el listado de Empresas (`tiene_anexo_nube_ejecutado`) un
+ * instrumento que ya no existe, porque esa fecha NO se valida contra el texto
+ * vigente.
+ *
+ * Es el equivalente del `anexo-firmado/quitar` del Anexo de Encargo, y por el
+ * mismo motivo: un registro que solo se puede poner deja al sistema sin forma
+ * de corregir una marca equivocada.
+ *
+ * LO QUE NO HACE
+ * ---------------
+ * - No toca la fase 1: es otra ruta y otro motivo
+ *   (`POST .../anexo-nube-suscrito/quitar`).
+ * - No toca NINGUNA fila de `gh_firma_anexo_nube_suscripciones`: la
+ *   contrafirma anterior queda CONTRAFIRMADA, con su acta y su evidencia.
+ *
+ * @param {string} id_empresa
+ * @param {object} [ctx] - { actor, motivo, ip, user_agent }; el motivo es obligatorio.
+ * @returns {object}
+ */
+function desmarcarAnexoNubeEjecutado(id_empresa, ctx = {}) {
+  const actual = getById(id_empresa);
+  if (!actual) {
+    throw new AppError(404, 'EMPRESA_NOT_FOUND', `No existe la empresa ${id_empresa}`);
+  }
+  // La columna llega con la migración 060. Si no está aplicada, no hay fase 2
+  // que quitar: se dice, en vez de dejar que reviente un UPDATE.
+  const tieneColumna = db.prepare('PRAGMA table_info(gh_firma_empresas)').all()
+    .some((c) => c.name === 'anexo_nube_ejecutado_at');
+  if (!tieneColumna) {
+    throw new AppError(409, 'ANEXO_NO_REGISTRADO',
+      'esta base no tiene la fase 2 del Anexo de Nube (la migración 060 no esta aplicada)');
+  }
+  const fila = db.prepare(
+    'SELECT anexo_nube_ejecutado_at FROM gh_firma_empresas WHERE id_empresa = ?',
+  ).get(id_empresa);
+  const anterior = fila ? fila.anexo_nube_ejecutado_at || null : null;
+  if (!anterior) {
+    throw new AppError(409, 'ANEXO_NO_REGISTRADO',
+      `La empresa ${id_empresa} no tiene una fecha de ejecucion del Anexo de Nube registrada`);
+  }
+  const motivo = typeof ctx.motivo === 'string' ? ctx.motivo.trim() : '';
+  if (!motivo) {
+    throw new AppError(400, 'MOTIVO_REQUERIDO',
+      'para quitar la ejecucion del Anexo de Nube hay que declarar el motivo '
+      + 'en X-Admin-Motivo');
+  }
+
+  const tx = db.transaction(() => {
+    db.prepare(`
+      UPDATE gh_firma_empresas
+      SET anexo_nube_ejecutado_at = NULL, updated_at = datetime('now')
+      WHERE id_empresa = ?
+    `).run(id_empresa);
+    auditoriaService.registrarCampo({
+      id_empresa,
+      campo: 'anexo_nube_ejecutado_at',
+      valor_anterior: anterior,
+      valor_nuevo: null,
+      actor: ctx.actor || null,
+      ip: ctx.ip || null,
+      user_agent: ctx.user_agent || null,
+      motivo,
+    });
+  });
+  tx();
+
+  logger.warn('Ejecucion del Anexo de Nube desmarcada', {
+    id_empresa, fecha_anterior: anterior, motivo,
+  });
+  return getById(id_empresa);
+}
+
+/**
  * Da de baja (soft) o reactiva una empresa.
  *
  * La baja y la reactivacion quedan RASTREADAS (migraciones 037 y 038): una
@@ -1813,6 +1985,8 @@ module.exports = {
   fechaEjecucionAnexoNube,
   desmarcarAnexoFirmado,
   desmarcarAnexoSuscrito,
+  desmarcarAnexoNubeSuscrito,
+  desmarcarAnexoNubeEjecutado,
   setActivo,
   verificarHabilitacionFirma,
   assertHabilitadaParaFirma,

@@ -160,6 +160,37 @@
 >
 > **La cola, en orden.** (1) **P8 real con ASEPLUS**: la línea de errata la envía el owner (está en `contrafirma-anexo-nube-v1-2.md` §3.5), y después los cuatro actos en producción, en el orden del §3.6 de ese documento. (2) **Desplegar en producción el arreglo del gate y los dos scripts del manifiesto**: sin eso, el `--check` del servidor puede volver a contradecir al de la copia, y el mensaje de `empresas_nube` seguirá señalando a la empresa equivocada en la ventana entre la suscripción y la contrafirma. (3) Cerrar o dejar viva la instancia de prueba (`sudo systemctl stop kair-firma-prueba`). (4) El **commit 📦1048** (56 archivos), esperando el «dale». (5) El **push** a `origin/Dev` y a `gh-pages` (P9), esperando el «pushea». (6) Lo heredado: P11 (las 5 app passwords), P3 (los alias de Workspace), la ratificación externa del abogado (J6/J8/J9 y la pregunta de la errata), Node 22 en el servidor (recompilar `better-sqlite3` para el ABI 127), el respaldo off-site, `npm audit`, T6/T7/T8.
 
+> **Actualización 2026-11-12 (octava ronda) — EL COMPONENTE QUE FALTABA: el Anexo de Nube tampoco se podía volver a suscribir. Sus dos rutas existen hoy, y P8 queda con el runbook listo**
+>
+> **Lo que se cerró de la ronda anterior, medido por SSH.** El owner corrió `sudo bash /tmp/kair-gate/instalar-gate.sh`: los cuatro archivos llegaron con su SHA-256 correcto (`readinessLegal.js`, los dos scripts del manifiesto y el NUEVO `scripts/lib/manifiesto.js`), quedaron respaldados en `/opt/kair-firma/backup-gate-20261112-084035`, pasaron `node --check`, y el servicio reinició **`active`** con **`NRestarts=0`** y la salud pública `ok` (uptime 4 s). **El manifiesto NO se tocó**: sigue en `cad606a9d3a9ac5196685e0ec0b1baef7e3bc5a6e917d622bde651c935df0d3a`, byte a byte igual. La instancia de prueba quedó **parada** (`sudo systemctl stop kair-firma-prueba`).
+>
+> **P9 cerrado: el sitio público publica los tres textos nuevos.** `gh-pages` se regeneró desde `sitio/` (5 archivos, +2 922/−88) y se verificó por HTTP: `https://kair.fyi/` responde **200**; `anexo-nube-v1.3.html` → `fdd10551…` (85 143 B); `anexo-nube-v1.1.html` → `e9517536…` (62 198 B); `anexo-encargo.html` → `6308b1f7…` (94 923 B); `anexo-encargo-2026-11-06.html` → `5cc7a346…` (87 202 B); `constancia-aprobacion-acuerdo.html` → `aaf68b4e…` (9 794 B). El `CNAME` (`kair.fyi`) se conservó: existe solo en `gh-pages`, no en `sitio/`.
+>
+> **El commit y los push.** 📦1048 (`443e0890`): 56 archivos, 8 434 inserciones y 395 eliminaciones — `fix(firma-electronica): la re-suscripcion del Anexo de Encargo y el gate que senala a la empresa equivocada`. Push a `origin/Dev` (`089ff912..443e0890`) y a `gh-pages` (`a0396654..f99a686f`).
+>
+> **El hallazgo de esta ronda: el Anexo de Nube tenía EXACTAMENTE el mismo hueco, y nadie lo había visto.** El Anexo de Nube también se versiona: cuando el texto vigente cambia, la Empresa tiene que suscribir de nuevo, y `services/anexoNube.js:596` rechaza la suscripción pública con **409 `SUSCRIPCION_EXISTENTE`** mientras la ficha tenga `anexo_nube_firmado_at` con una huella distinta de la del texto que se está suscribiendo. Pero **no existía ninguna ruta HTTP que deshaciera esa fase**: el servicio tenía la pieza del Encargo (`desmarcarAnexoSuscrito`), no la del Nube. Las tres salidas que había eran malas:
+>
+> 1. **La premarca** (`POST .../anexo-nube-firmado`) escribe en la ficha la versión y la huella del texto vigente **antes** de que la Empresa suscriba: un registro falso en la ficha de la Empresa y un conteo falso en el gate (`empresas_nube` contaría a una empresa «suscrita al texto vigente» que no lo suscribió). Es lo que el §3.6 de `contrafirma-anexo-nube-v1-2.md` llamaba «la vía del Anexo de Nube», y no era una vía: era un atajo con una fecha adelantada.
+> 2. **Tocar la base a mano**: sin rastro, y el repo no lo permite.
+> 3. **No re-suscripción**: el Anexo de Nube v1.3 se quedaba sin suscribir y P8 no cerraba.
+>
+> Y un segundo hueco, del mismo tipo: **`anexo_nube_ejecutado_at` (la contrafirma de K+AIR) no se validaba contra el texto vigente**, y **no tenía ruta de baja**. Sin ella, el operador seguía viendo «ejecutado» en el listado de Empresas (`tiene_anexo_nube_ejecutado`) un instrumento que ya no existía. El Anexo de Encargo no tenía ese problema porque su fase 2 sí tiene `anexo-firmado/quitar`.
+>
+> **Las dos rutas nuevas.** `POST /internal/admin/empresas/:id_empresa/anexo-nube-suscrito/quitar` (fase 1: `anexo_nube_firmado_at`, `_version`, `_hash` y `_evidencia` en NULL) y `POST /internal/admin/empresas/:id_empresa/anexo-nube-ejecutado/quitar` (fase 2: `anexo_nube_ejecutado_at` en NULL). Mismo patrón que el Encargo: `adminApiAuth`, **`X-Admin-Motivo` obligatorio**, actor opcional, el valor anterior en el historial **append-only** con el actor y el motivo, **ninguna fila de `gh_firma_anexo_nube_suscripciones` tocada** (la suscripción anterior queda `FIRMADA`, con su huella y su evidencia) y **cada ruta toca solo su fase**. Los errores: `404 EMPRESA_NOT_FOUND`, `409 ANEXO_NO_REGISTRADO`, `400 MOTIVO_REQUERIDO`; sin llave, `401`. En `empresa.js`: `desmarcarAnexoNubeSuscrito()` y `desmarcarAnexoNubeEjecutado()`.
+>
+> **Las pruebas, y la prueba de fuego.** `tests/anexo-nube-resuscripcion.test.js` (archivo nuevo, **13 casos**): 401 sin llave (las dos rutas); 400 `MOTIVO_REQUERIDO` (las dos); 409 `ANEXO_NO_REGISTRADO` (las dos); los cuatro campos de la fase 1 en NULL **sin tocar** la fecha de ejecución; la fecha de ejecución en NULL **sin tocar** la suscripción; el rastro append-only de cada una, con actor y motivo; el **409 `SUSCRIPCION_EXISTENTE`** en la vía pública con una suscripción anterior de otro texto; **la suscripción del texto vigente después del desmarque** (mismo enlace y mismo código); y que **la suscripción anterior NO se reescribe** (su fila queda `FIRMADA`, con su huella). **11 de los 13 fallan con el código viejo**: se revirtieron los dos archivos fuente y se comprobó, una por una (las dos que pasan en ambos casos son las que describen el estado *anterior*, que tiene que ser cierto antes y después).
+>
+> **Lo que NO se hizo, y es lo importante:** no se firmó nada en producción, no se tocó la base, no se tocó el manifiesto, no se tocó ninguno de los dos instrumentos ya suscritos, y `FIRMA_EXIGIR_ANEXO_NUBE` sigue **apagada**. Lo único que se escribió en la ficha de ASEPLUS, en toda esta ronda, fue **nada**.
+>
+> **P8, con el runbook escrito y medido.** El estado real de producción, medido por SSH con un script de solo lectura (`/tmp/kair-gate/medir-produccion.js`, con variables de entorno de mentira: los secretos reales nunca se leen ni se escriben): la compuerta `primera_firma` da **`listo: false`**, con 36 ítems `ok`, **3 pendientes** (`firmado_nube`, `contrafirma_nube`, `estado_encargo`), 2 avisos y 1 `no_aplica` — **nada más bloquea**. La ficha de ASEPLUS (`900829731`): `anexo_nube_firmado_at` = 2026-11-05 / v1.1 / `e9517536…`; `anexo_nube_ejecutado_at` = NULL; `anexo_encargo_suscrito_at` = 2026-11-07 / 2026-11-06 / `5cc7a346…`; `anexo_encargo_firmado_at` = 2026-11-07T20:33:22.748Z. Las dos suscripciones: solo la id 1 de cada instrumento, `FIRMADA`. Y un dato que había que medir antes de escribir una sola línea: **los dos buzones de los códigos son del owner** — el de la suscripción del Nube (`jrf2011@live.com`) y el segundo canal del Encargo (`reivaj640@gmail.com`, el buzón del operador) —, el de las contrafirmas es el fijo de configuración `privacidad.kair@gmail.com`.
+>
+> **El runbook del P8 quedó escrito y probado en seco** (§8.3 de `MIGRACION-SERVIDOR-FIRMA.md`, que antes no existía aunque se lo citaba): `sudo bash /tmp/kair-p8/p8-aseplus.sh fase1` (muestra la línea de errata y **no sigue hasta que el owner confirme que la envió por correo**; después deshace las cuatro fases en el orden fase 2 → fase 1 de cada instrumento, y abre las dos suscripciones) y `sudo bash /tmp/kair-p8/p8-aseplus.sh fase2` (verifica que las dos suscripciones estén `FIRMADA` **y sean del texto vigente por huella**, registra la verificación documental de la representante legal contra el RUT, pide los dos códigos de contrafirma, contrafirma los dos, regenera los dos manifiestos con su `--check` y mide la compuerta). Se probó en seco con `estado` y con `fase1` abortando antes del correo: **no se tocó nada**.
+>
+> **Lo que le toca al owner, y en este orden:** (1) **instalar las dos rutas en producción** — `sudo bash /tmp/kair-p8/instalar-rutas-nube.sh` (verifica los dos SHA-256, respalda, instala, reinicia, comprueba que el manifiesto no cambió y que las dos rutas responden 401 sin llave frente al 404 de una ruta inexistente); (2) **mandar la línea de errata a ASEPLUS por correo, antes de la fase 1** (el texto literal está en `contrafirma-anexo-nube-v1-2.md` §3.5 y en `/tmp/kair-p8/p8-errata.txt`): es la condición que puso el dictamen del 11-nov para la errata en sitio, y el texto que va a firmar es el corregido; (3) **correr la fase 1**; (4) **abrir los dos enlaces en el navegador**, pedir los dos códigos y aceptar (el del Nube llega a `jrf2011@live.com`, el del Encargo al segundo canal); (5) **correr la fase 2** y teclear los dos códigos de contrafirma. El **commit** de esta ronda (servicio, router, pruebas y documentos) espera el «dale».
+>
+> **La cola, en orden.** (1) **P8 real con ASEPLUS**: los cuatro actos, con el runbook de arriba. (2) El **commit 📦1049** de esta ronda, esperando el «dale», y su push, esperando el «pushea». (3) Lo heredado: P3 (los alias de Workspace), Node 22 en el servidor (recompilar `better-sqlite3` para el ABI 127), el respaldo off-site, `npm audit`, T6/T7/T8, y la ratificación externa del abogado (J6/J8/J9 y la pregunta de la errata).
+
+
 
 > **Actualización 2026-11-10 (cierre de jornada) — P7 CERRADO: la contrafirma del Anexo de Nube sigue DENTRO del servicio, y la condición del abogado sobre la FACULTAD de quien contrafirma por Gesstiar quedó implementada, verificada y DECIDIDA.**
 >
@@ -8487,3 +8518,59 @@ la fila J12 del checklist del abogado (con el hallazgo de la capacidad prometida
 
 **Commits** — **ninguno**. El paquete sigue sin commitear, esperando el «dale» del owner; y el push a
 `origin/Dev` y a `gh-pages` (P9), esperando el «pushea».
+
+
+## 2026-11-12 (octava ronda) · 📦1049 · El Anexo de Nube tampoco se podía volver a suscribir: sus dos rutas
+
+**Qué se hizo** — pieza → qué:
+
+| Pieza | Qué hace |
+|---|---|
+| `src/services/empresa.js` | `desmarcarAnexoNubeSuscrito()` y `desmarcarAnexoNubeEjecutado()`: las dos piezas que faltaban del Nube, con motivo obligatorio, valor anterior en el rastro append-only, y sin tocar ninguna fila de suscripciones |
+| `src/routes/admin-empresas.js` | Las dos rutas HTTP: `POST .../anexo-nube-suscrito/quitar` (fase 1) y `POST .../anexo-nube-ejecutado/quitar` (fase 2) |
+| `tests/anexo-nube-resuscripcion.test.js` | 13 casos (archivo nuevo). **11 fallan con el código viejo**, verificado revirtiendo los dos archivos fuente |
+| `API.md` §6.13.2 | «Los nueve endpoints» → **«Los once endpoints»**: las dos filas, el apartado de las dos rutas y sus errores |
+| `contrafirma-anexo-nube-v1-2.md` §3.6 | La «vía del Anexo de Nube» (que era la premarca) se corrige: ahora hay dos rutas, con su qué-quita y qué-no-toca |
+| `MIGRACION-SERVIDOR-FIRMA.md` §8.3 | **El runbook del P8**, que el documento citaba y no existía: las cuatro rutas del canal administrativo y su orden, las dos fases del script, y la tabla de qué mirar al terminar |
+| `tabla-instrumentos-vigentes-2026-11-09.md` | La fila de P8, con el hueco del Nube y su cierre |
+| `11-checklist-definitivo-revision-juridica-y-cierre.md` | La fila J12, con el hallazgo del Anexo de Nube |
+
+**El hallazgo** — el Anexo de Nube se versiona como el de Encargo: cuando el texto vigente cambia, la
+Empresa tiene que suscribir de nuevo, y `services/anexoNube.js:596` rechaza la suscripción pública
+con **409 `SUSCRIPCION_EXISTENTE`** mientras la ficha tenga `anexo_nube_firmado_at` con otra huella.
+**No había ninguna ruta HTTP que deshaciera esa fase.** La única salida era la **premarca**
+(`anexo-nube-firmado`), que escribe en la ficha la versión y la huella del texto vigente **antes** de
+que la Empresa suscriba: un registro falso en la ficha y un conteo falso en el gate. Y el segundo
+hueco, del mismo tipo: `anexo_nube_ejecutado_at` —la contrafirma de K+AIR— **no se validaba contra el
+texto vigente** y no tenía ruta de baja, así que el operador seguía viendo «ejecutado» un
+instrumento que ya no existía. La documentación incluso llamaba «la vía del Anexo de Nube» a la
+premarca: era la misma trampa 149 de la ronda anterior, en el otro instrumento.
+
+**Lo que NO se hizo** — no se firmó nada en producción; no se tocó la base, el manifiesto, la ficha
+de ASEPLUS ni los dos instrumentos ya suscritos; `FIRMA_EXIGIR_ANEXO_NUBE` sigue apagada; no se
+commitió ni se pusheó nada.
+
+**Medido** — suite del firma-service **2 606 tests · 2 604 pass · 0 fail · 2 skipped** (antes 2 593 ·
+2 591 · 0 · 2: **+13**). Barrido de secretos y de caracteres no latinos: limpio. EOL y BOM: correctos
+(el `Historial.md` conserva su perfil mixto; este bloque se empalmó a nivel de bytes). La compuerta
+`primera_firma` de producción, medida por SSH con un script de solo lectura: `listo: false`, 36 ítems
+`ok`, **3 pendientes** (`firmado_nube`, `contrafirma_nube`, `estado_encargo`), 2 avisos, 1 `no_aplica`
+— **nada más bloquea**.
+
+**Lo que se subió al servidor** — `/tmp/kair-p8/`: `instalar-rutas-nube.sh` (verifica los dos
+SHA-256, respalda, instala, reinicia, comprueba que el manifiesto no cambió y que las dos rutas
+responden 401 sin llave frente al 404 de una ruta inexistente), `p8-aseplus.sh` (el runbook, en dos
+fases), `p8-json.js`, `p8-errata.txt` (la línea de errata) y los dos archivos de código. Todo
+verificado por hash y con `bash -n`. El script se probó en seco con `estado` y con `fase1` abortando
+antes del correo: **no se tocó nada**.
+
+**Decisiones del owner** — (1) **ASEPLUS es una empresa de prueba**, antes de que esto salga a
+producción: eso baja el riesgo del P8, pero **no cambia el camino**, porque el hueco del Nube se
+repetiría en cada empresa real que tuviera que re-suscribir cuando el texto cambie, y por eso se
+cerró con código y no con un rodeo; (2) el **gate de producción** (`FIRMA_EXIGIR_ANEXO_NUBE`) sigue
+apagado: P8 es un ensayo, no la apertura.
+
+**Cola** — (1) **P8 real con ASEPLUS**: los cuatro actos, con el runbook de arriba; (2) el commit
+📦1049, esperando el «dale», y su push, esperando el «pushea»; (3) lo heredado: P3 (los alias de
+Workspace), Node 22 en el servidor, el respaldo off-site, `npm audit`, T6/T7/T8 y la ratificación
+externa del abogado (J6/J8/J9 y la pregunta de la errata).

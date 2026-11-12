@@ -1887,7 +1887,7 @@ la firma.
 **Tipo:** entero positivo, máximo 36500 (100 años). `null` o ausente = sin
 plazo declarado.
 
-### 6.13.2 Los nueve endpoints
+### 6.13.2 Los once endpoints
 
 | Método | Ruta | Qué hace |
 |---|---|---|
@@ -1899,6 +1899,8 @@ plazo declarado.
 | `POST` | `/internal/admin/empresas/:id_empresa/anexo-firmado` | Registra la fecha de firma del Anexo de Encargo (art. 25 Decreto 1377/2013). Endpoint aparte: ese dato sustenta el cumplimiento legal y no debe cambiar en una actualización de rutina. |
 | `POST` | `/internal/admin/empresas/:id_empresa/anexo-firmado/quitar` | **Quita** la fecha del Anexo de Encargo. Es la salida auditada para una marca equivocada: exige `X-Admin-Motivo`, escribe el valor anterior y `null` en el historial append-only y deja un WARN en el log. Después de quitarla, D-03 vuelve a bloquear la Empresa hasta que se registre una fecha respaldada por el PDF. |
 | `POST` | `/internal/admin/empresas/:id_empresa/anexo-suscrito/quitar` | **Quita** el registro de la SUSCRIPCIÓN del Anexo de Encargo (el PRIMER acto). Es la vía administrativa de la re-suscripción: cuando el texto vigente cambia, la suscripción pública se rechaza con `409 SUSCRIPCION_EXISTENTE` y esta ruta es la que deja re-suscribirse a la Empresa. Exige `X-Admin-Motivo` y **no toca** ninguna fila de suscripción ni la fecha de firma. |
+| `POST` | `/internal/admin/empresas/:id_empresa/anexo-nube-suscrito/quitar` | **Quita** el registro de la SUSCRIPCIÓN del Anexo de Nube (su PRIMER acto). Es la vía administrativa de la re-suscripción del Anexo de Nube, que también se versiona: la suscripción pública se rechaza con `409 SUSCRIPCION_EXISTENTE` mientras la ficha tenga el Anexo de otro texto. Exige `X-Admin-Motivo` y **no toca** ninguna fila de suscripción ni la fecha de ejecución. |
+| `POST` | `/internal/admin/empresas/:id_empresa/anexo-nube-ejecutado/quitar` | **Quita** la fecha de EJECUCIÓN del Anexo de Nube (su SEGUNDO acto, la contrafirma de K+AIR). Esa fecha no se valida contra el texto vigente, así que sin esta ruta el operador seguiría viendo «ejecutado» un instrumento que ya no existe. Exige `X-Admin-Motivo` y **no toca** la suscripción ni ninguna fila de la tabla de suscripciones. |
 | `POST` | `/internal/admin/empresas/:id_empresa/estado` | Alta/baja lógica. Una empresa inactiva no muestra bloque en la mini-app, pero sus firmas históricas se conservan intactas. |
 
 **Body de `POST` / `PUT`** (los campos de identificación):
@@ -2029,6 +2031,41 @@ la fecha del segundo acto.
 | La empresa no existe | `404` | `EMPRESA_NOT_FOUND` |
 | Se intenta quitar sin `X-Admin-Motivo` | `400` | `MOTIVO_REQUERIDO` |
 | La empresa no tiene suscripción registrada | `409` | `ANEXO_NO_REGISTRADO` |
+
+**Quitar la suscripción del Anexo de Nube (`POST .../anexo-nube-suscrito/quitar`)**.
+No recibe body. Exige `X-Admin-Motivo` y devuelve la empresa con
+`anexo_nube_firmado_at`, `anexo_nube_version`, `anexo_nube_hash` y
+`anexo_nube_evidencia` en `null`. Los cuatro cambios quedan en el historial con el
+valor anterior, `null` como valor nuevo, el actor y el motivo.
+
+**Quitar la ejecución del Anexo de Nube (`POST .../anexo-nube-ejecutado/quitar`)**.
+No recibe body. Exige `X-Admin-Motivo` y borra `anexo_nube_ejecutado_at`, la
+fecha del SEGUNDO acto (la contrafirma de K+AIR). El cambio queda en el
+historial.
+
+Las dos son la **vía administrativa de la re-suscripción del Anexo de Nube**, que
+también se versiona: cuando el texto vigente cambia, la Empresa tiene que
+suscribir de nuevo, y la suscripción pública se rechaza con
+`409 SUSCRIPCION_EXISTENTE` mientras la ficha tenga el Anexo de otro texto. Sin
+ellas, la única salida era la premarca (`anexo-nube-firmado`), que escribe una
+fecha de suscripción **antes** de que la suscripción exista: un registro falso
+en la ficha y un conteo falso en el gate.
+
+**Lo que NO hacen:** no tocan ninguna fila de `gh_firma_anexo_nube_suscripciones`
+— la suscripción anterior queda `FIRMADA` o `CONTRAFIRMADA`, con su evidencia y
+su acta. Lo que se deshace es el puntero de la ficha, no el hecho. Y cada una
+toca solo su fase: `anexo-nube-suscrito/quitar` no toca la fecha de ejecución, y
+`anexo-nube-ejecutado/quitar` no toca la suscripción.
+
+El **orden** importa: primero la fase 2 (`anexo-nube-ejecutado/quitar`), después
+la fase 1 (`anexo-nube-suscrito/quitar`) y solo entonces la suscripción pública
+nueva. Es el mismo orden del Anexo de Encargo.
+
+| Situación | HTTP | Código |
+|---|---|---|
+| La empresa no existe | `404` | `EMPRESA_NOT_FOUND` |
+| Se intenta quitar sin `X-Admin-Motivo` | `400` | `MOTIVO_REQUERIDO` |
+| La empresa no tiene esa fase registrada | `409` | `ANEXO_NO_REGISTRADO` |
 
 ### 6.13.3 El hold legal de conservación
 

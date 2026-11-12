@@ -234,16 +234,38 @@ ficha, no el hecho.
 no tiene una suscripción registrada) y `400 MOTIVO_REQUERIDO` (sin `X-Admin-Motivo` la ruta no
 quita nada). Sin llave, `401`.
 
-**La vía del Anexo de Nube es otra y no usa esta ruta.** El Nube se desbloquea con la **premarca**
-(`POST .../anexo-nube-firmado`, que registra en la ficha la versión y la huella del texto vigente
-antes de que la Empresa suscriba) y después con una suscripción pública nueva. La premarca no toca
-la suscripción anterior, que queda en la historia como texto ya suscrito.
+**El Anexo de Nube tenía el mismo callejón, y también sus dos rutas.** El Nube también se versiona:
+cuando el texto vigente cambia, la Empresa tiene que suscribir de nuevo, y la suscripción pública se
+rechaza con `409 SUSCRIPCION_EXISTENTE` mientras la ficha tenga el Anexo de otro texto. La única salida
+era la **premarca** (`POST .../anexo-nube-firmado`), que registra en la ficha la versión y la huella
+del texto vigente **antes** de que la Empresa suscriba: un registro falso en la ficha y un conteo
+falso en el gate.
+
+El **12-nov-2026** se cerraron las dos rutas que faltaban, con el mismo patrón del Anexo de Encargo:
+
+| Ruta | Qué quita | Qué NO toca |
+|---|---|---|
+| `POST .../anexo-nube-suscrito/quitar` | La **fase 1**: `anexo_nube_firmado_at`, `anexo_nube_version`, `anexo_nube_hash` y `anexo_nube_evidencia` | La fecha de ejecución, ni ninguna fila de `gh_firma_anexo_nube_suscripciones` |
+| `POST .../anexo-nube-ejecutado/quitar` | La **fase 2**: `anexo_nube_ejecutado_at`, la fecha de la contrafirma | La suscripción, ni ninguna fila de `gh_firma_anexo_nube_suscripciones` |
+
+La segunda hacía falta por una razón propia: **esa fecha no se validaba contra el texto vigente**, así
+que sin ruta de baja el operador seguía viendo «ejecutado» en el listado de Empresas un instrumento
+que ya no existía. El orden es el mismo que en el Encargo: primero la fase 2, después la fase 1, y
+solo entonces la suscripción pública nueva.
+
+En las dos, `X-Admin-Motivo` es obligatorio, el valor anterior queda en el rastro append-only con el
+actor y el motivo, y la suscripción anterior queda `FIRMADA` o `CONTRAFIRMADA`, con su huella, su
+evidencia y su acta: lo que se deshace es el puntero de la ficha, no el hecho. Sus errores:
+`404 EMPRESA_NOT_FOUND`, `409 ANEXO_NO_REGISTRADO` y `400 MOTIVO_REQUERIDO`; sin llave, `401`. Las
+pruebas están en `tests/anexo-nube-resuscripcion.test.js` (13 casos) y el detalle de la API, con sus
+errores, en `API.md` §6.13.2 («Los once endpoints»).
 
 **Verificado.** La ruta se desplegó el 11-nov-2026 y se comprobó por SSH: hash en disco
 `ae0fff23…7aa2f0` (el del repo), servicio `active` con `NRestarts=0`, salud `ok`, y la ruta
 respondiendo **401** sin llave mientras una ruta inexistente responde **404** (o sea: existe). Las
 pruebas están en `tests/anexo-encargo-resuscripcion.test.js` (8 casos) y el detalle de la API, con
-sus errores, en `API.md` §6.13.2 («Los nueve endpoints»).
+sus errores, en `API.md` §6.13.2 («Los once endpoints»; la del Anexo de Encargo no cambió, la tabla
+creció con las dos del Nube).
 
 **No tiene canal IPC**: como la contrafirma del Anexo de Nube, se ejecuta por HTTP contra el
 servicio. La app de escritorio **muestra** el estado; no ejecuta el acto.

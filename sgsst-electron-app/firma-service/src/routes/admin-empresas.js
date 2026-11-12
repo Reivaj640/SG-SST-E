@@ -23,6 +23,8 @@
  *   POST   /internal/admin/empresas/:id/anexo-firmado
  *   POST   /internal/admin/empresas/:id/anexo-firmado/quitar
  *   POST   /internal/admin/empresas/:id/anexo-suscrito/quitar
+ *   POST   /internal/admin/empresas/:id/anexo-nube-suscrito/quitar
+ *   POST   /internal/admin/empresas/:id/anexo-nube-ejecutado/quitar
  *   POST   /internal/admin/empresas/:id/anexo-nube/suscripcion
  *   POST   /internal/admin/empresas/:id/anexo-nube/suscripcion/:id_suscripcion/anular
  *   POST   /internal/admin/empresas/:id/anexo-nube/contrafirmar/codigo
@@ -852,6 +854,92 @@ router.post('/empresas/:id_empresa/anexo-suscrito/quitar', adminApiAuth(), (req,
   try {
     const id = _parseId(req);
     const empresa = empresaService.desmarcarAnexoSuscrito(id, _contextoAuditoria(req));
+    res.json(empresa);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ============================================================================
+// POST /internal/admin/empresas/:id_empresa/anexo-nube-suscrito/quitar
+// Quita el registro de la SUSCRIPCIÓN (fase 1) del Anexo de Nube.
+//
+// POR QUÉ ESTA RUTA EXISTE
+// ------------------------
+// El Anexo de Nube se versiona: cuando el texto vigente cambia, la Empresa
+// tiene que SUSCRIBIR DE NUEVO, porque la suscripción anterior describe un
+// texto que ya no rige. `services/anexoNube.js` lo dice con todas las letras:
+// si la ficha tiene `anexo_nube_firmado_at` y su huella es DISTINTA de la del
+// texto que se está suscribiendo, la suscripción pública se rechaza con 409
+// SUSCRIPCION_EXISTENTE y avisa de que "la corrección se registra por el
+// canal administrativo, con su motivo".
+//
+// Ese canal administrativo NO existía por HTTP para el Anexo de Nube (para el
+// Anexo de Encargo sí: `anexo-suscrito/quitar`). El resultado era un callejón:
+// una Empresa suscrita no podía volver a suscribir el texto vigente, y la
+// única salida era la premarca (`anexo-nube-firmado`), que escribe una fecha
+// de suscripción ANTES de que la suscripción exista — un registro falso en la
+// ficha y un conteo falso en el gate.
+//
+// LO QUE HACE
+// ------------
+// Pone en NULL los cuatro campos de la fase 1 en la ficha de la Empresa
+// (`anexo_nube_firmado_at`, `_version`, `_hash` y `_evidencia`), con el valor
+// anterior en el historial append-only, el actor y el motivo.
+//
+// LO QUE NO HACE
+// ---------------
+// - No toca `anexo_nube_ejecutado_at`: esa es la fecha del SEGUNDO acto (la
+//   contrafirma de K+AIR). Si hay que quitarla, es otra ruta y otro motivo:
+//   `POST .../anexo-nube-ejecutado/quitar`.
+// - No toca NINGUNA fila de `gh_firma_anexo_nube_suscripciones`: la
+//   suscripción anterior queda FIRMADA, con su evidencia y su huella. Lo que
+//   se deshace es el puntero de la ficha, no el hecho.
+// - No borra nada del historial: el rastro es append-only.
+//
+// EL MOTIVO ES OBLIGATORIO
+// ------------------------
+// Es un acto que deshace un registro jurídico de la ficha: sin motivo, el
+// rastro registra que alguien borró una suscripción y no por qué.
+// ============================================================================
+router.post('/empresas/:id_empresa/anexo-nube-suscrito/quitar', adminApiAuth(), (req, res, next) => {
+  try {
+    const id = _parseId(req);
+    const empresa = empresaService.desmarcarAnexoNubeSuscrito(id, _contextoAuditoria(req));
+    res.json(empresa);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ============================================================================
+// POST /internal/admin/empresas/:id_empresa/anexo-nube-ejecutado/quitar
+// Quita la fecha de EJECUCIÓN (fase 2) del Anexo de Nube.
+//
+// POR QUÉ ESTA RUTA EXISTE
+// ------------------------
+// El Anexo de Nube es BILATERAL: lo suscribe la Empresa (fase 1,
+// `anexo_nube_firmado_at`) y lo contrafirma K+AIR (fase 2,
+// `anexo_nube_ejecutado_at`). Cuando el texto vigente cambia hay que deshacer
+// LAS DOS: si queda la fecha de ejecución, el operador sigue viendo
+// "ejecutado" en el listado de Empresas un instrumento que ya no existe,
+// porque esa fecha NO se valida contra el texto vigente.
+//
+// Es el equivalente del `anexo-firmado/quitar` del Anexo de Encargo, y por el
+// mismo motivo: un registro que solo se puede poner deja al sistema sin forma
+// de corregir una marca equivocada.
+//
+// LO QUE NO HACE
+// ---------------
+// - No toca la fase 1: es otra ruta y otro motivo
+//   (`POST .../anexo-nube-suscrito/quitar`).
+// - No toca NINGUNA fila de `gh_firma_anexo_nube_suscripciones`: la
+//   contrafirma anterior queda CONTRAFIRMADA, con su acta y su evidencia.
+// ============================================================================
+router.post('/empresas/:id_empresa/anexo-nube-ejecutado/quitar', adminApiAuth(), (req, res, next) => {
+  try {
+    const id = _parseId(req);
+    const empresa = empresaService.desmarcarAnexoNubeEjecutado(id, _contextoAuditoria(req));
     res.json(empresa);
   } catch (err) {
     next(err);
