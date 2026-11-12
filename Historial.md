@@ -9105,9 +9105,41 @@ Workspace, el destino del respaldo off-site, Node 22 y el alta de la primera emp
 | Manifiesto `legal-readiness.json` | **sin cambios** | `191c08b8…f8a4013f`, el mismo de produccion |
 
 **La §7 del runbook** publico 2 606 / 2 604 (una cifra vencida): quedo corregida a la vigente.
-El 6.11 del cuadro canonico queda **PARCIALMENTE**, que es lo que corresponde: la corrida
-existe y esta en verde, pero todavia no esta vinculada a un commit candidato (T3 lo tiene el
-owner).
+El 6.11 del cuadro canonico quedo **PARCIALMENTE**, que es lo que correspondia en ese
+momento: la corrida existia y estaba en verde, pero todavia no estaba vinculada a un commit
+candidato (T3 lo tiene el owner).
+
+### 9. La corrida sobre el commit: el 6.11 y el M.17, CERRADOS
+
+Con el «dale» del owner, la ronda se commiteo (`e4dd5f31`) y se pudo correr la suite **desde un
+clon limpio de ese commit**, que era la unica cosa que faltaba.
+
+```
+tests 2665 | pass 2663 | fail 0 | cancelled 0 | skipped 2 | todo 0
+duration_ms 323480
+```
+
+179 archivos de prueba, `exit 0`, `not ok` 0. El clon se hizo con
+`git -c core.autocrlf=false clone --no-hardlinks`, su `git status --porcelain` salio **vacio**, no
+tiene `.env`, y `npm ci` dio `added 139 packages` con **0 vulnerabilidades**. Comparada contra la
+corrida del arbol del owner: **el conjunto de los 2 665 nombres de prueba es identico** y los dos
+omitidos son los mismos. Y el clon quedo **byte a byte** igual al arbol del owner: **4 810
+archivos identicos, 0 diferentes, 0 ausentes**.
+
+**El 6.11 del cuadro canonico y el M.17 del mapa pasaron a CERRADO**, y con eso el cuadro canonico
+subio a **77 cerrados / 19 pendientes** y el mapa a **27 bloques: 5 cerrados / 22 pendientes**.
+La tabla de los dos se regenero por script y es idempotente.
+
+**El error que casi lo hace pasar por rojo, y la trampa que produjo.** La primera corrida del clon
+**aborto en 0 s** con `[TEST SAFETY] No se pudieron aplicar las migraciones en la BD de tests`: el
+runner oficial lanza la suite con `process.execPath`, que es **el Node con el que arranco el
+script**, no el que esta primero en el `PATH`. El `npm ci` si habia corrido con el Node 22 (npm
+si resuelve el node por el `PATH`), asi que la instalacion y la corrida usaron runtimes
+distintos: el `better-sqlite3` quedo para el ABI 127 y la suite corria con el ABI 147. La trampa
+quedo escrita en el `PROMPT.md` (la 156).
+
+El acta con los comandos literales, la salida y el error:
+`verificacion-cierre/t1-corrida-desde-clon-limpio.md` §10.
 
 **Lo que NO se hizo en esta ronda.** No se commiteo ni se pusheo nada (falta el «dale» y el
 «pushea»). No se desplego: no hay `sudo`. No se encendio la compuerta. No se firmo nada: la T8

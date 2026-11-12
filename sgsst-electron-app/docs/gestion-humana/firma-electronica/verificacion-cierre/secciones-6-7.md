@@ -28,12 +28,11 @@ verificacion de K+AIR.**
 
 ## 6. Correspondencia y pruebas
 
-### 6.11 - Ejecutar la bateria completa de pruebas del servicio - PARCIALMENTE
+### 6.11 - Ejecutar la bateria completa de pruebas del servicio - CERRADO
 
 **Que se verifico.** El texto canonico del requisito y su estado, y las tres fuentes que reportan
-la ultima corrida de la suite: el runbook de despliegue (cifra del 11-nov), el `Historial.md` de
-la ronda del 12-nov (cifra con el arbol de dependencias nuevo) y el informe del abogado, donde T1
-sigue marcado como pendiente de T3.
+la ultima corrida de la suite: el runbook de despliegue, el `Historial.md` de la ronda del 12-nov
+y el informe al abogado, donde T1 sigue marcado como pendiente de T3.
 
 **Lo que se resolvio el 12-nov-2026 (T1).** La bateria se ejecuto **completa, tres veces, desde un
 clon limpio del repositorio** (`verificacion-cierre/t1-corrida-desde-clon-limpio.md`):
@@ -48,8 +47,22 @@ Las tres corrieron en un clon con `npm ci` desde cero (Node 22, ABI 127) y **sin
 conjuntos de nombres de prueba coinciden **exactamente** con las corridas del arbol del owner
 (comparacion cerrada en los dos casos: 14:34 y 15:02). `npm ci` en el clon: `added 139 packages`,
 exit 0, **0 vulnerabilidades**; los devDependencies no se perdieron y `better-sqlite3` carga bajo
-Node 22. El clon final quedó **byte a byte idéntico** al arbol del owner (4 780 de 4 780 archivos
-versionados) y con el mismo `git status --porcelain`.
+Node 22.
+
+**La corrida sobre el commit, que es la que faltaba (16:04 a 16:11).** Con la ronda ya commiteada
+(`e4dd5f31`), el clon sale del commit: no hay nada que trasladar a mano.
+
+```
+tests 2665 | pass 2663 | fail 0 | cancelled 0 | skipped 2 | todo 0
+duration_ms 323480
+```
+
+179 archivos de prueba, `exit 0`, sin bloques `not ok`. El clon se hizo con
+`git -c core.autocrlf=false clone --no-hardlinks`, su `git status --porcelain` salio **vacio**, no
+tiene `.env`, y `npm ci` dio `added 139 packages` con **0 vulnerabilidades**. Comparada contra la
+corrida del arbol del owner: **el conjunto de los 2 665 nombres de prueba es identico** y los dos
+omitidos son los mismos, con el mismo motivo escrito en el propio test. Y el clon quedo **byte a
+byte** igual al arbol del owner: **4 810 archivos identicos, 0 diferentes, 0 ausentes**.
 
 **Un hallazgo que hay que dejar escrito.** El primer clon se hizo con la configuracion del sistema
 (`core.autocrlf = true`) y **no reproducia el arbol del owner**: materializo 2 697 de los 4 781
@@ -74,22 +87,19 @@ que publicaba antes ya no era vigente.
 
 **Evidencia.**
 `sgsst-electron-app/docs/gestion-humana/firma-electronica/verificacion-cierre/t1-corrida-desde-clon-limpio.md`
-(el acta, con la salida literal de cada corrida);
-`sgsst-electron-app/docs/gestion-humana/firma-electronica/paquete-abogado-2026-10-30/10-informe-correcciones-para-asesor-juridico.md:132`
-- T3 ("fijar el candidato de codigo") sigue **PENDIENTE: lo tiene el owner**.
+(el acta, con la salida literal de cada corrida y la de la corrida sobre el commit);
+`sgsst-electron-app/docs/MIGRACION-SERVIDOR-FIRMA.md` §7 (la cifra vigente);
 `sgsst-electron-app/docs/MIGRACION-SERVIDOR-FIRMA.md:1232` - "[ ] Correr los tests en el
 servidor. La suite completa nunca se ha corrido ahi". Medido por SSH hoy: `/opt/kair-firma/app/tests`
 **no existe** en el servidor.
 
-**Que falta.** Una sola cosa, y **no es correr mas pruebas**: **vincular la corrida a un commit
-candidato**, que sigue sin existir porque T3 (y el commit) lo tiene el owner. Las otras dos que
-faltaban ya estan: la reproduccion desde un clon limpio (hecha, tres veces, 0 fallos) y la seccion 7
-del runbook (actualizada con la cifra vigente, 2 665 / 2 663 / 0 / 2). Queda una salvedad
-declarada: la corrida se hizo sobre `HEAD` **mas** el trabajo sin commitear de la ronda, que hubo
-que trasladar a mano al clon; la corrida sobre el estado commiteado es la que falta, y es la que
-dara el vinculo.
+**Que falta.** **Nada del lado de este requisito.** La corrida esta vinculada a un commit
+(`e4dd5f31`), se reprodujo desde un clon limpio de ese commit, y la seccion 7 del runbook publica
+la cifra vigente. Lo que **no** queda es otra cosa, y no es de este requisito: la suite **no se ha
+corrido en el servidor** (`/opt/kair-firma/app/tests` no existe ahi), porque el servidor no tiene
+los tests y desplegarlos es un acto del owner.
 
-**Quien lo tiene.** Owner (fijar T3 y autorizar el commit) y equipo (reejecutar sobre el commit).
+**Quien lo tiene.** — (cerrado por el equipo, con la corrida sobre el commit `e4dd5f31`).
 
 ---
 
@@ -538,7 +548,7 @@ para la validacion de la compuerta de conservacion (J8) y la ratificacion extern
 
 | ID | Requisito | Estado | Que falta, en una linea |
 |---|---|---|---|
-| 6.11 | Ejecutar la bateria completa de pruebas del servicio | **PARCIALMENTE** | La suite corrio y se reprodujo desde clon limpio (tres corridas, 0 fallos; corrida final 2 665 / 2 663 / 0 / 2), pero la corrida no esta vinculada a un commit candidato: T3 lo tiene el owner. |
+| 6.11 | Ejecutar la bateria completa de pruebas del servicio | **CERRADO** | Nada: la suite esta vinculada al commit `e4dd5f31` y se reprodujo desde un clon limpio de ese commit (2 665 / 2 663 / 0 / 2, exit 0, conjunto de nombres de prueba identico y clon byte a byte igual al arbol del owner). |
 | 7.1 | Confirmar la version exacta del codigo que se va a desplegar | **PARCIALMENTE** | El arbol desplegado se puede identificar por hash, pero es mixto (codigo de la punta, dependencias previas al 1051) y no hay commit candidato fijado para el proximo despliegue. |
 | 7.3 | Ejecutar las migraciones de base de datos necesarias | **CERRADO** | Nada: 61 de 61 aplicadas, 1:1 con el repo, incluidas la 060, la 061 y la 062. |
 | 7.4 | Comprobar que las migraciones se aplicaron correctamente | **CERRADO** | Nada: tablas, 15 columnas de contrafirma, 36 disparadores append-only, `integrity_check` ok y rutas 401 y no 404. |
@@ -552,7 +562,11 @@ para la validacion de la compuerta de conservacion (J8) y la ratificacion extern
 | 7.13 | Registrar el resultado de la comprobacion del servidor | **CERRADO** | Nada: el resultado quedo como acta en `MIGRACION-SERVIDOR-FIRMA.md` §5.1.4, con las actas `acta-comprobacion-servidor-2026-11-12.md` y `acta-despliegue-2026-11-12.md`. |
 | 7.15 | Autorizar expresamente la activacion del flujo | **PENDIENTE** | No existe el acto expreso del owner que autorice abrir el flujo a empresas reales (T8); lo que hay es la autorizacion de publicar el Acuerdo v1.6 y los actos del P8 sobre la empresa de prueba. |
 
-**Conteo de esta seccion: 5 CERRADO · 3 PARCIALMENTE · 5 PENDIENTE.**
+**Conteo de esta seccion: 6 CERRADO · 2 PARCIALMENTE · 5 PENDIENTE.**
+
+> El 6.11 paso de PARCIALMENTE a **CERRADO** cuando la ronda se commiteo (`e4dd5f31`) y se pudo
+> correr la suite **desde un clon limpio de ese commit**. Antes era el unico requisito de esta
+> seccion que faltaba por el vinculo al commit.
 
 ---
 

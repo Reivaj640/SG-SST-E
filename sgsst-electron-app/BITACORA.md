@@ -9891,3 +9891,46 @@ Reglas:
    (**76 cerrados / 20 pendientes / 0 no aplica, 96 en total**). Suite completa del firma-service:
    **2 665 tests · 2 663 pass · 0 fail · 2 skipped** (Node 22.23.4, ABI 127, 317 s).
 
+## 🐗 El día que el clon limpio daba verde y la suite ni siquiera arrancó (2026-11-12)
+
+La ronda se commiteó (`e4dd5f31`) y el T1 —que llevaba dos rondas en PARCIALMENTE porque no había
+commit— se podía cerrar de verdad: el clon sale del commit, `npm ci` y la suite, sin trasladar nada
+a mano.
+
+La primera corrida **abortó en 0 s**:
+
+```
+Error: [TEST SAFETY] No se pudieron aplicar las migraciones en la BD de tests.
+  Error: The module '...better_sqlite3.node' was compiled against a different Node.js version using
+  NODE_MODULE_VERSION 127. This version of Node.js requires NODE_MODULE_VERSION 147.
+```
+
+El mensaje habla de **datos** y de la base de tests. Y el guardia de `tests/setup.js:130` existe
+justamente para que un problema de runtime **no se confunda** con uno de datos: el propio guardia
+lanza el mensaje. Debajo estaba el ABI.
+
+La causa: el runner oficial lanza la suite con `spawnSync(process.execPath, ...)`, y
+`process.execPath` es **el Node con el que arrancó el proceso**, no el que está primero en el
+`PATH`. El script se arrancó con el `node` del sistema (v26, ABI 147) aunque su `PATH` tuviera el
+Node 22 primero — y `npm ci` **sí** corrió con el Node 22, porque npm sí resuelve el node por el
+`PATH`. Instalación y ejecución, **dos runtimes distintos**, en la misma corrida.
+
+Reglas:
+
+1. **`npm` sigue el `PATH`; `process.execPath` no.** En una corrida con dos runtimes posibles, un
+   `npm ci` en verde **no dice nada** del runtime con el que va a correr la suite.
+2. **Un runner se invoca con la ruta absoluta del binario que se quiere usar.** Poner el Node 22
+   primero en el `PATH` **dentro** del script no cambia el intérprete con el que ese script
+   arrancó.
+3. **«[TEST SAFETY] No se pudieron aplicar las migraciones» es un síntoma de runtime, no de
+   datos.** Hay que leer el error hasta el final antes de culpar a la base.
+4. **El vínculo al commit se cierra corriendo, no declarando.** El 6.11 del cuadro canónico y el
+   M.17 del mapa decían exactamente lo mismo: «falta la corrida sobre el estado commiteado». Con
+   el commit (`e4dd5f31`), el clon sale del commit y la corrida da **2 665 / 2 663 / 0 / 2**, exit
+   0, con el **conjunto de los 2 665 nombres de prueba idéntico** al de la corrida del árbol del
+   owner, y el clon **byte a byte** igual (4 810 archivos, 0 diferentes). Los dos quedaron
+   **CERRADO**, y el cuadro canónico subió a **77 cerrados / 19 pendientes**.
+5. **Pruebas:** el acta `verificacion-cierre/t1-corrida-desde-clon-limpio.md` §10, con los comandos
+   literales, la salida del runner y el error del `process.execPath`. Trampa nueva en el
+   `PROMPT.md`: la **156**.
+

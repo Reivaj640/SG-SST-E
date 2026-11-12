@@ -9,10 +9,11 @@ owner con sus dependencias ya instaladas y su `.env` local.
 **Fecha.** 12-nov-2026, de 14:41 a 15:18 (hora de Colombia).
 **Donde.** Windows, PowerShell 5.1. El clon queda en `%TEMP%\kair-t1\clone`
 (`C:\Users\Usuario\AppData\Local\Temp\kair-t1\clone`) y **no** se borro.
-**Estado.** **T1 cerrado como metodo.** La corrida desde el clon limpio
-reproduce exactamente el resultado del arbol del owner, dos veces, con el
-conjunto de nombres de prueba identico. Queda pendiente una re-corrida sobre
-el estado **commiteado** (ver seccion 8).
+**Estado.** **T1 cerrado.** La corrida desde el clon limpio reproduce
+exactamente el resultado del arbol del owner, con el conjunto de nombres de
+prueba identico. Y el 12-nov-2026, con la ronda ya commiteada (`e4dd5f31`),
+se hizo la **corrida sobre el commit**: el clon sale del commit, no hay nada
+que trasladar a mano y el resultado es el mismo (ver seccion 10).
 
 > Nota de codificacion: este archivo es ASCII puro, sin tildes, con LF y sin
 > BOM, por la regla del repo. Por eso el camino del repo aparece como
@@ -341,7 +342,7 @@ linea de comandos, o forzar el checkout con `git checkout-index -a -f`.
 
 ## 8. Que queda pendiente y quien lo tiene
 
-### 8.1 Re-corrir T1 sobre el estado commiteado - el equipo, al commitear
+### 8.1 Re-corrir T1 sobre el estado commiteado - HECHO el 12-nov-2026 (seccion 10)
 
 La corrida desde el clon limpio se hizo sobre `HEAD` **mas** el trabajo
 sin commitear de la ronda, que hubo que trasladar a mano (parche + copia de
@@ -352,6 +353,11 @@ es el entregable de punta a punta.
 Cuando la ronda se commitee, T1 se cierra de verdad: el clon sale del commit,
 `npm ci` y la suite, y no hay nada que trasladar a mano. El metodo ya esta
 probado y medido; lo que falta es la corrida.
+
+> **Resuelto.** La ronda se commiteo el 12-nov-2026 (`e4dd5f31`) y la corrida
+> sobre el commit se hizo ese mismo dia: ver la seccion 10. El clon sale del
+> commit, el `npm ci` y la suite dan el mismo resultado, y el clon queda
+> **byte a byte** igual al arbol del owner.
 
 ### 8.2 El arbol del owner se movio durante la sesion - el equipo
 
@@ -402,3 +408,97 @@ siguen) siguen abiertos y **no** los toco esta sesion.
 | TAP de la corrida C | `%TEMP%\kair-p8\suite-worker-t1-c.txt` |
 | TAP de la corrida del owner (14:34) | `%TEMP%\kair-p8\suite-17.txt` |
 | TAP de la corrida del owner (15:02) | `%TEMP%\kair-p8\suite-worker-audit.txt` |
+| Clon del commit `e4dd5f31` | `%TEMP%\kair-p8\clon-1053` |
+| TAP de la corrida sobre el commit | `%TEMP%\kair-p8\suite-clon-1053.txt` |
+| Log de la corrida sobre el commit | `%TEMP%\kair-p8\clon-1053.log` |
+
+---
+
+## 10. La corrida sobre el commit (12-nov-2026, 16:04 a 16:11)
+
+Con la ronda commiteada (`e4dd5f31`), T1 se cierra de verdad: **el clon sale
+del commit** y no hay nada que trasladar a mano.
+
+### 10.1 Los comandos, literales y en orden
+
+```powershell
+# 1) CLON LIMPIO DEL COMMIT (sin parche y sin copia de no versionados)
+git -c core.autocrlf=false clone --no-hardlinks --branch Dev $repo $dest
+git -C $dest rev-parse --short HEAD      # e4dd5f31
+git -C $dest status --porcelain           # (vacio)
+
+# 2) INSTALAR DESDE CERO (dentro del clon, con node 22)
+Set-Location "$dest\sgsst-electron-app\firma-service"
+npm.cmd ci
+
+# 3) CORRER LA SUITE (con el node 22 por RUTA ABSOLUTA)
+& "$node22dir\node.exe" "$env:TEMP\kair-p8\runner-suite.js" `
+     "$env:TEMP\kair-p8\suite-clon-1053.txt" "$dest\sgsst-electron-app\firma-service"
+```
+
+### 10.2 Lo que se midio
+
+| Dato | Valor |
+|---|---|
+| HEAD del clon | `e4dd5f31` (el commit de la ronda) |
+| `git status --porcelain` del clon | (vacio) |
+| `.env` en el clon | no |
+| `npm ci` | exit 0, `added 139 packages`, `found 0 vulnerabilities` |
+| Node de la suite | `v22.23.4` |
+| Archivos de prueba | 179 |
+| Resultado | `tests 2665 / pass 2663 / fail 0 / cancelled 0 / skipped 2 / todo 0` |
+| Bloques `not ok` | 0 |
+| Duracion | 323 480 ms (326 s) |
+
+### 10.3 Las dos corridas son la MISMA prueba
+
+Comparada la corrida del clon contra la corrida del arbol del owner (mismo
+runner, mismo Node 22):
+
+```
+arbol del owner : {"tests":2665,"pass":2663,"fail":0,"cancelled":0,"skipped":2,"todo":0}
+clon del commit : {"tests":2665,"pass":2663,"fail":0,"cancelled":0,"skipped":2,"todo":0}
+nombres de prueba: owner 2665 | clon 2665
+conjunto de nombres IDENTICO: true
+skips: owner 2 | clon 2 | IDENTICOS: true
+bloques not ok en el clon: 0
+```
+
+Los dos omitidos son los mismos dos de siempre, con el motivo escrito en el
+propio test (seccion 4.1).
+
+### 10.4 El clon es el mismo arbol, byte a byte
+
+```
+archivos versionados: 4811
+identicos byte a byte: 4810
+diferentes: 0
+ausentes en el clon: 0
+```
+
+El que no se cuenta es un submodulo. Esta es la comprobacion de la trampa 155:
+un clon hecho con la configuracion del Git del sistema **no** seria el mismo
+arbol, aunque la suite diera verde igual.
+
+### 10.5 El error que se cometio al correrla, y la trampa que produjo
+
+La primera corrida del clon **aborto en 0 s** con un error que parece de
+datos:
+
+```
+Error: [TEST SAFETY] No se pudieron aplicar las migraciones en la BD de tests.
+  Error: The module '...\node_modules\better-sqlite3\build\Release\better_sqlite3.node'
+  was compiled against a different Node.js version using NODE_MODULE_VERSION 127.
+  This version of Node.js requires NODE_MODULE_VERSION 147.
+```
+
+La causa no era el clon ni el commit. El runner oficial lanza la suite con
+`process.execPath`, y `process.execPath` es **el Node con el que se lanzo el
+script**, no el Node que esta primero en el `PATH`. El script se lanzo con el
+`node` del sistema (v26, ABI 147) aunque su `PATH` tuviera el Node 22 primero.
+`npm ci` si corrio con el Node 22 (npm si resuelve el node por el `PATH`), y
+por eso el `better-sqlite3` quedo compilado para el ABI 127: **la instalacion
+y la corrida usaron runtimes distintos**.
+
+El arreglo: lanzar el runner con la **ruta absoluta** del binario de Node 22.
+La trampa quedo escrita en el `PROMPT.md` (la 156).

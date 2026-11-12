@@ -513,7 +513,7 @@ porque el caso real en produccion todavia no ha ocurrido.
 
 **Quién lo tiene.** El equipo.
 
-### M.17 - La corrida desde un clon limpio se hizo tres veces y coincide exacta con el arbol del owner; falta la corrida sobre el commit — PARCIALMENTE
+### M.17 - La corrida desde un clon limpio del commit da el mismo resultado que la del arbol del owner — CERRADO
 
 **Origen.** T1 del cuadro canonico; el requisito `8.5` del cuadro canonico.
 
@@ -543,19 +543,37 @@ archivos versionados con CRLF, cuando los blobs los tienen en LF. El repo del ow
 `core.autocrlf = false` en su `.git/config` local, que pisa al del sistema, y `git reset --hard`
 **no** reescribe los archivos que el indice ya da por buenos. Sin esa opcion, un clon "limpio" en
 esta maquina no es el arbol del owner, y cualquier prueba que mire bytes (EOL, huellas) puede dar
-un resultado distinto. La trampa quedo escrita en `PROMPT.md` y en el acta.
+un resultado distinto. La trampa quedo escrita en `PROMPT.md` (la 155) y en el acta.
+
+**La corrida que faltaba: la del commit (16:04 a 16:11).** La ronda se commiteo (`e4dd5f31`) y el
+clon salio **del commit**, sin parche y sin copia de no versionados:
+
+```
+tests 2665 | pass 2663 | fail 0 | cancelled 0 | skipped 2 | todo 0
+duration_ms 323480
+```
+
+179 archivos de prueba, `exit 0`, `not ok` 0. El clon: `git status --porcelain` **vacio**, sin
+`.env`, `npm ci` con `added 139 packages` y **0 vulnerabilidades**. Comparada contra la corrida
+del arbol del owner, el conjunto de los **2 665 nombres de prueba es identico** y los dos omitidos
+son los mismos. Y el clon quedo **byte a byte** igual al arbol del owner: **4 810 archivos
+identicos, 0 diferentes, 0 ausentes**.
+
+**El error que casi lo hace pasar por rojo.** La primera corrida del clon **aborto en 0 s** con
+`[TEST SAFETY] No se pudieron aplicar las migraciones en la BD de tests`: el runner oficial lanza
+la suite con `process.execPath`, que es **el Node con el que se lanzo el script**, no el que esta
+primero en el `PATH`. El `npm ci` si habia corrido con el Node 22, asi que la instalacion y la
+corrida usaron runtimes distintos. La trampa quedo escrita en `PROMPT.md` (la 156).
 
 **Evidencia.** `verificacion-cierre/t1-corrida-desde-clon-limpio.md` (el acta, con la salida literal
-de cada corrida y la comparacion de nombres); `10-informe-correcciones-para-asesor-juridico.md`, fila
+de cada corrida, la del commit y el error del `process.execPath`); `10-informe-correcciones-para-asesor-juridico.md`, fila
 T1; `plan-cierre-abogado-2026-10-31.txt:91`; `verificacion-cierre/seccion-8.md`, requisito 8.5.
 
-**Qué falta.** **Una sola cosa, y no es correr mas pruebas:** la corrida **sobre el estado
-commiteado**. La de hoy se hizo sobre `HEAD` **mas** el trabajo sin commitear de la ronda, que hubo
-que trasladar a mano al clon; sin commit no hay un commit candidato al que vincular la corrida (T3).
-Cuando haya commit, el clon sale del commit y no hay nada que trasladar: es una corrida mas.
+**Qué falta.** **Nada.** La corrida esta vinculada a un commit, se reprodujo desde un clon limpio de
+ese commit y el clon quedo byte a byte igual al arbol del owner.
 
-**Quién lo tiene.** El equipo, en el momento en que haya commit. El owner es quien lo habilita
-(es el «dale» del que habla `PROMPT.md` §5.1).
+**Quién lo tiene.** — (cerrado por el equipo el 12-nov-2026, con la corrida sobre el commit
+`e4dd5f31`).
 
 ---
 
@@ -944,11 +962,11 @@ resultado medido del 12-nov-2026); el manifiesto del repo y el de produccion, am
 | Bloque | Cerrados | Pendientes | No aplica | Total |
 |---|---|---|---|---|
 | 1. Bloqueos duros | 0 | 10 | 0 | 10 |
-| 2. Condiciones de apertura | 0 | 8 | 0 | 8 |
+| 2. Condiciones de apertura | 1 | 7 | 0 | 8 |
 | 3. Deuda y riesgo | 4 | 5 | 0 | 9 |
-| **TOTAL** | **4** | **23** | **0** | **27** |
+| **TOTAL** | **5** | **22** | **0** | **27** |
 
-Los 23 pendientes concilian: 10 del bloque 1 + 8 del bloque 2 + 5 del bloque 3 = 23.
+Los 22 pendientes concilian: 10 del bloque 1 + 7 del bloque 2 + 5 del bloque 3 = 22.
 
 ---
 
@@ -963,7 +981,9 @@ Esto se midio el 12-nov-2026 y **no** es un bloqueante:
   estan **suscritos y contrafirmados**, con sus actas.
 - El sitio publico sirve **exactamente** las huellas suscribidas (6 URLs comprobadas).
 - La **suite** del servicio: 2 665 tests, 2 663 pass, 0 fail, 2 skipped (corrida final del 12-nov,
-  179 archivos de prueba, `exit 0`).
+  179 archivos de prueba, `exit 0`), y **vinculada a un commit**: el 12-nov se corrio tambien desde
+  un clon limpio del commit `e4dd5f31` y dio exactamente lo mismo (mismo conjunto de 2 665 nombres
+  de prueba, clon byte a byte igual al arbol del owner).
 - El `npm audit` del repo: **0 vulnerabilidades**. Las dos altas de M.13 se corrigieron en el repo
   (`nodemailer` 6.10.1 -> 10.5.0 y `zod` 3.25.76 -> 4.6.7); **en produccion siguen vivas** hasta
   que se despliegue el 📦1051.

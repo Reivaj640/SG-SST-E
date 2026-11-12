@@ -1124,9 +1124,13 @@ La medicion anterior (12-nov-2026, antes del cambio de dependencias) fue
 atrasado si no se actualiza, y una cifra vencida leida como vigente es un verde falso.
 
 > La reproduccion desde **clon limpio** esta medida y registrada en
-> `docs/gestion-humana/firma-electronica/verificacion-cierre/t1-corrida-desde-clon-limpio.md`
-> (tres corridas, 0 fallos). La corrida sobre el estado **commiteado** sigue pendiente: la tiene el
-> owner, porque exige el commit candidato (T3).
+> `docs/gestion-humana/firma-electronica/verificacion-cierre/t1-corrida-desde-clon-limpio.md`.
+> La corrida **sobre el estado commiteado** tambien se hizo el 12-nov-2026, con el commit
+> `e4dd5f31`: el clon sale del commit, `npm ci` desde cero y `exit 0`, con el **mismo** resultado
+> (`tests 2665 | pass 2663 | fail 0 | skipped 2`, 179 archivos de prueba, 323 s) y el **conjunto de
+> los 2 665 nombres de prueba identico** al de la corrida de arriba. El clon quedo **byte a byte**
+> igual al arbol del owner (4 810 archivos, 0 diferentes). El 6.11 del cuadro canonico quedo
+> **CERRADO** por esto.
 
 > **El EOL de este archivo esta fijado por su test.** Si lo abres en un editor que normalice a
 > CRLF, el diff entero se mueve. Las ediciones se hacen a nivel de bytes.

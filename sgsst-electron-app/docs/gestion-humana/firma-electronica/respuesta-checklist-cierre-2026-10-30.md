@@ -58,13 +58,13 @@ quince correcciones», más abajo.
 | 3. Conservación y supresión | 11 | 2 | 0 | 13 |
 | 4. Seguridad del flujo | 14 | 0 | 0 | 14 |
 | 5. Correo electrónico | 9 | 2 | 0 | 11 |
-| 6. Correspondencia y pruebas | 11 | 1 | 0 | 12 |
+| 6. Correspondencia y pruebas | 12 | 0 | 0 | 12 |
 | 7. Producción y despliegue | 8 | 7 | 0 | 15 |
 | 8. Constancia y cierre | 7 | 3 | 0 | 10 |
-| **TOTAL** | **76** | **20** | **0** | **96** |
+| **TOTAL** | **77** | **19** | **0** | **96** |
 
-Los 20 pendientes concilian: 2 de la sección 1 + 3 de la sección 2 + 2 de la sección 3 +
-2 de la sección 5 + 1 de la sección 6 + 7 de la sección 7 + 3 de la sección 8 = 20.
+Los 19 pendientes concilian: 2 de la sección 1 + 3 de la sección 2 + 2 de la sección 3 +
+2 de la sección 5 + 7 de la sección 7 + 3 de la sección 8 = 19.
 
 La sección 3 incluye la reverificación del cómputo SG-SST; la sección 7 debe identificar un
 commit exacto antes de desplegar.
@@ -297,7 +297,7 @@ historial de git, y las correcciones de cada ronda estan al principio del docume
 | **F-13** | 5.1 Se identifica la cuenta remitente real: estado **PENDIENTE** -> **CERRADO**, con la medicion del 12-nov-2026 | Este cuadro, 5.1 (evidencia en `verificacion-cierre/secciones-3-5.md`) |
 | **F-14** | 5.5 Se acredita la activación de MFA: estado **PENDIENTE** -> **PENDIENTE**, con la medicion del 12-nov-2026 | Este cuadro, 5.5 (evidencia en `verificacion-cierre/secciones-3-5.md`) |
 | **F-15** | 5.6 Se acredita el uso de contraseña de aplicación, sin incorporarla a los documentos ni al repositorio: estado **PENDIENTE** -> **PARCIALMENTE**, con la medicion del 12-nov-2026 | Este cuadro, 5.6 (evidencia en `verificacion-cierre/secciones-3-5.md`) |
-| **F-16** | 6.11 Ejecutar la bateria completa de pruebas del servicio: estado **PARCIALMENTE** -> **PARCIALMENTE**, con la medicion del 12-nov-2026 | Este cuadro, 6.11 (evidencia en `verificacion-cierre/secciones-6-7.md`) |
+| **F-16** | 6.11 Ejecutar la bateria completa de pruebas del servicio: estado **PARCIALMENTE** -> **CERRADO**, con la medicion del 12-nov-2026 | Este cuadro, 6.11 (evidencia en `verificacion-cierre/secciones-6-7.md`) |
 | **F-17** | 7.1 Confirmar la version exacta del codigo que se va a desplegar: estado **PENDIENTE** -> **PARCIALMENTE**, con la medicion del 12-nov-2026 | Este cuadro, 7.1 (evidencia en `verificacion-cierre/secciones-6-7.md`) |
 | **F-18** | 7.3 Ejecutar las migraciones de base de datos necesarias: estado **PENDIENTE** -> **CERRADO**, con la medicion del 12-nov-2026 | Este cuadro, 7.3 (evidencia en `verificacion-cierre/secciones-6-7.md`) |
 | **F-19** | 7.4 Comprobar que las migraciones se aplicaron correctamente: estado **PENDIENTE** -> **CERRADO**, con la medicion del 12-nov-2026 | Este cuadro, 7.4 (evidencia en `verificacion-cierre/secciones-6-7.md`) |
@@ -1530,14 +1530,15 @@ CERRADO.**
 Las rutas `tests/…` citadas en la tabla existen. La batería de 6.11 se ejecutó el 3-nov-2026 en
 el árbol de trabajo local; su reproducción desde clon limpio, asociada al commit T3, sigue pendiente.
 
-**6.11 · Ejecutar la bateria completa de pruebas del servicio — PARCIALMENTE.**
+**6.11 · Ejecutar la bateria completa de pruebas del servicio — CERRADO.**
 
 **Medicion del 12-nov-2026** (informe `verificacion-cierre/secciones-6-7.md`). Se contrasta el requisito contra el codigo y contra el servidor; lo que sigue es la medicion y su evidencia.
 
+*Cambio de estado: en la ronda del 30-oct-2026 figuraba como PARCIALMENTE.*
+
 **Que se verifico.** El texto canonico del requisito y su estado, y las tres fuentes que reportan
-la ultima corrida de la suite: el runbook de despliegue (cifra del 11-nov), el `Historial.md` de
-la ronda del 12-nov (cifra con el arbol de dependencias nuevo) y el informe del abogado, donde T1
-sigue marcado como pendiente de T3.
+la ultima corrida de la suite: el runbook de despliegue, el `Historial.md` de la ronda del 12-nov
+y el informe al abogado, donde T1 sigue marcado como pendiente de T3.
 
 **Lo que se resolvio el 12-nov-2026 (T1).** La bateria se ejecuto **completa, tres veces, desde un
 clon limpio del repositorio** (`verificacion-cierre/t1-corrida-desde-clon-limpio.md`):
@@ -1552,8 +1553,22 @@ Las tres corrieron en un clon con `npm ci` desde cero (Node 22, ABI 127) y **sin
 conjuntos de nombres de prueba coinciden **exactamente** con las corridas del arbol del owner
 (comparacion cerrada en los dos casos: 14:34 y 15:02). `npm ci` en el clon: `added 139 packages`,
 exit 0, **0 vulnerabilidades**; los devDependencies no se perdieron y `better-sqlite3` carga bajo
-Node 22. El clon final quedó **byte a byte idéntico** al arbol del owner (4 780 de 4 780 archivos
-versionados) y con el mismo `git status --porcelain`.
+Node 22.
+
+**La corrida sobre el commit, que es la que faltaba (16:04 a 16:11).** Con la ronda ya commiteada
+(`e4dd5f31`), el clon sale del commit: no hay nada que trasladar a mano.
+
+```
+tests 2665 | pass 2663 | fail 0 | cancelled 0 | skipped 2 | todo 0
+duration_ms 323480
+```
+
+179 archivos de prueba, `exit 0`, sin bloques `not ok`. El clon se hizo con
+`git -c core.autocrlf=false clone --no-hardlinks`, su `git status --porcelain` salio **vacio**, no
+tiene `.env`, y `npm ci` dio `added 139 packages` con **0 vulnerabilidades**. Comparada contra la
+corrida del arbol del owner: **el conjunto de los 2 665 nombres de prueba es identico** y los dos
+omitidos son los mismos, con el mismo motivo escrito en el propio test. Y el clon quedo **byte a
+byte** igual al arbol del owner: **4 810 archivos identicos, 0 diferentes, 0 ausentes**.
 
 **Un hallazgo que hay que dejar escrito.** El primer clon se hizo con la configuracion del sistema
 (`core.autocrlf = true`) y **no reproducia el arbol del owner**: materializo 2 697 de los 4 781
@@ -1578,22 +1593,19 @@ que publicaba antes ya no era vigente.
 
 **Evidencia.**
 `sgsst-electron-app/docs/gestion-humana/firma-electronica/verificacion-cierre/t1-corrida-desde-clon-limpio.md`
-(el acta, con la salida literal de cada corrida);
-`sgsst-electron-app/docs/gestion-humana/firma-electronica/paquete-abogado-2026-10-30/10-informe-correcciones-para-asesor-juridico.md:132`
-- T3 ("fijar el candidato de codigo") sigue **PENDIENTE: lo tiene el owner**.
+(el acta, con la salida literal de cada corrida y la de la corrida sobre el commit);
+`sgsst-electron-app/docs/MIGRACION-SERVIDOR-FIRMA.md` §7 (la cifra vigente);
 `sgsst-electron-app/docs/MIGRACION-SERVIDOR-FIRMA.md:1232` - "[ ] Correr los tests en el
 servidor. La suite completa nunca se ha corrido ahi". Medido por SSH hoy: `/opt/kair-firma/app/tests`
 **no existe** en el servidor.
 
-**Que falta.** Una sola cosa, y **no es correr mas pruebas**: **vincular la corrida a un commit
-candidato**, que sigue sin existir porque T3 (y el commit) lo tiene el owner. Las otras dos que
-faltaban ya estan: la reproduccion desde un clon limpio (hecha, tres veces, 0 fallos) y la seccion 7
-del runbook (actualizada con la cifra vigente, 2 665 / 2 663 / 0 / 2). Queda una salvedad
-declarada: la corrida se hizo sobre `HEAD` **mas** el trabajo sin commitear de la ronda, que hubo
-que trasladar a mano al clon; la corrida sobre el estado commiteado es la que falta, y es la que
-dara el vinculo.
+**Que falta.** **Nada del lado de este requisito.** La corrida esta vinculada a un commit
+(`e4dd5f31`), se reprodujo desde un clon limpio de ese commit, y la seccion 7 del runbook publica
+la cifra vigente. Lo que **no** queda es otra cosa, y no es de este requisito: la suite **no se ha
+corrido en el servidor** (`/opt/kair-firma/app/tests` no existe ahi), porque el servidor no tiene
+los tests y desplegarlos es un acto del owner.
 
-**Quien lo tiene.** Owner (fijar T3 y autorizar el commit) y equipo (reejecutar sobre el commit).
+**Quien lo tiene.** — (cerrado por el equipo, con la corrida sobre el commit `e4dd5f31`).
 
 **6.12 · Documentar los errores preexistentes, pruebas omitidas y resultados nuevos —
 CERRADO.**
