@@ -8682,3 +8682,113 @@ externa del abogado (J6/J8/J9 y la pregunta de la errata).
 > abogado, si la v1.1 del Nube (suscrita, sin contrafirma) se contrafirma retroactiva o queda como
 > registro histórico.
 
+---
+
+## Decima ronda — 12-nov-2026 (noche): la pregunta «¿esta lista para produccion?» contestada con MEDIDAS, y el `npm audit` cerrado en la parte que no rompe nada.
+
+> **La pregunta y el metodo.** El owner pregunto si el servicio de firma esta listo para produccion. La
+> respuesta no se dio de memoria: se midio. Se evaluaron **los dos gates** contra el codigo desplegado
+> (no una copia), se reviso **como esta expuesto el servicio**, se conto **que empresas hay**, se
+> verifico **que dice el sitio publico**, y se corrio **`npm audit`** sobre las dependencias reales.
+
+> **Los dos gates pasan, sin un solo bloqueante.** `publicacion` y `primera_firma`, evaluados en el
+> servidor con `readinessLegal.evaluar({ gate })`: 42 items cada uno, **40 `ok`**, 0 pendientes,
+> **0 bloqueantes**, 1 `aviso` (`empresas_nube`) y 1 `no_aplica` (`google_dpa`, sustituido por Google
+> Workspace con CDPA). El verificador de cierre del P8 sigue cerrando con «P8 CERRADO». La salud del
+> servicio es `ok` (db ok, smtp configured), `NRestarts=0`, y el monitor de salud cada 5 minutos
+> reporta local y publico en verde (hubo un unico parpadeo del tunel a las 12:50 que se recupero solo).
+
+> **Como esta expuesto: solo por el tunel, y el puerto nunca se abrio.** El servicio escucha
+> **unicamente en `127.0.0.1:3001`**. La unica entrada es **Cloudflare Tunnel**
+> (`/etc/cloudflared/config.yml`: `firma.kair.fyi -> http://127.0.0.1:3001`); en la VM no hay nginx,
+> Caddy ni nada escuchando en 80/443. `TRUST_PROXY` esta documentado como `loopback`
+> (`deploy/README-DESPLIEGUE.md:45`) y el codigo **nunca** usa `'true'`: `app.set('trust proxy',
+> config.trustProxy)` (`src/server.js:67`), con default `'loopback'` (`src/config.js:58`) y un test
+> que lo fija. El valor real vive en el `.env`, que es `600 root`: **no se pudo leer desde la cuenta
+> de servicio** y queda como comprobacion del owner.
+
+> **La respuesta honesta a la pregunta.** El servicio **esta listo para operar**: los dos gates en
+> verde, sin bloqueantes, sano, monitoreado, con los dos instrumentos suscritos y contrafirmados y el
+> sitio sirviendo **exactamente** las huellas suscribidas (6 URLs comprobadas: la v1.3 con
+> `fdd10551…2b585d`, el Encargo 2026-11-11 con `6308b1f7…75b8948`, la v1.1 y el Encargo del 6-nov
+> intactos). **Lo que no esta hecho es abrirlo a una empresa real**: en la base de produccion hay
+> **UNA sola empresa, ASEPLUS CARIBE S.A.S., que es la de prueba**. El alta, la suscripcion de los
+> anexos y la primera solicitud de firma de un cliente real: ese camino nadie lo ha recorrido.
+
+> **Los dos interruptores, medidos (no de memoria).** `FIRMA_EXIGIR_MEDIO_PERSONAL_OTP` **ya no cambia
+> ningun comportamiento**: se define en `src/config.js:176` y **no se lee en ningun otro sitio** (grep
+> sobre `src/`), porque desde la v1.2 del Acuerdo (27-oct-2026) el rechazo del buzon corporativo es
+> **incondicional en el codigo** (`_controlarMedioCorporativo`, `src/services/publicFlow.js`) y cada
+> caso rechazado deja el evento `OTP_MEDIO_CORPORATIVO` en el rastro append-only.
+> `FIRMA_EXIGIR_ANEXO_NUBE` **si** gobierna comportamiento, y `src/config.js:198-201` exige un orden
+> escrito antes de encenderla: **validar, alinear, reejecutar pruebas y solo entonces abrir**. Dato
+> util: hoy la poblacion es de una sola empresa y **ya tiene** el Anexo de Nube v1.3 suscrito **y
+> ejecutado** (contrafirmado el 12-nov a las 16:13:54.106Z), asi que encenderla **no bloquearia hoy**;
+> a partir del primer cliente real si, y eso es exactamente el control que el abogado pidio (C-1).
+
+> **El caso real todavia no ha ocurrido.** El manifiesto declara `d02.inventario_buzones = 0` con la
+> evidencia del 26-oct-2026 («0 solicitudes revisadas… hay que repetirlo cuando haya solicitudes
+> reales»). Medido el 12-nov sobre la base de produccion: **0 eventos `OTP_MEDIO_CORPORATIVO`** (5
+> solicitudes creadas, 2 firmadas, 1 en papel, 1 cancelada). El camino del codigo esta probado por la
+> suite, pero **el caso real rechazado, con su asiento, no ha ocurrido**: eso es T6, y sigue abierto.
+
+> **`npm audit`: se cerraron la critica y la moderada, sin romper nada.** El audit decia **6
+> vulnerabilidades (1 critica, 4 altas, 1 moderada)**. La critica era `proxy-addr` (2.0.7, IP spoofing
+> por subred IPv4-mapped IPv6) y la moderada `qs`. Se aplico el `npm audit fix` **sin `--force`**, o
+> sea **solo lo que no rompe version mayor**: `proxy-addr` a **2.0.8**, `qs` a **6.16.2** (con
+> `express` de 4.22.2 a **4.22.3**, un parche dentro del rango `^4.21.0` que ya declaraba el
+> proyecto), `body-parser` a 1.20.9 y `multer` a 2.5.0. **Quedan 2 altas** que **exigen salto de
+> version mayor** y por eso NO se tocaron: `nodemailer` (6.10.1 → 10.5.0) y `zod` (3.25.76 → 4.6.7),
+> los dos con cambios de API que hay que revisar en el codigo. El piso de `express` quedo en
+> `^4.22.3` para que una instalacion nueva no vuelva a traer la version vulnerable.
+
+> **La trampa que casi hace ruido.** `npm audit fix --omit=dev` **poda los devDependencies**: dejo el
+> arbol sin `supertest` y **133 archivos de prueba fellaron con «Cannot find module 'supertest'»** (no
+> era un fallo del codigo, era el arbol incompleto). Se restauro con un `npm install` completo, y el
+> `package-lock.json` **nunca habia perdido** la declaracion de `supertest`: lo que faltaba era el
+> arbol. El `MIGRACION-SERVIDOR-FIRMA.md` §6 ya avisaba del `--include=dev` por otra via; la trampa es
+> la inversa: **`--omit=dev` borra**, no deja de instalar.
+
+> **Medido** — suite del firma-service con el arbol completo y las versiones nuevas: **2 606 tests ·
+> 2 604 pass · 0 fail · 2 skipped**, los mismos numeros que antes del cambio de dependencias. La
+> comprobacion del ABI: `better-sqlite3` 11.10.0 carga bajo Node 22.23.4 con **ABI 127**, en el mismo
+> Node que compila el arbol de pruebas (el Node del sistema es v26 y **no** sirve: produce falsos
+> rojos). EOL y BOM: correctos. Barrido de secretos: limpio.
+
+> **Documentos corregidos.** Dos filas describian un estado que ya no existe y se habian dejado como
+> estaban, con lo cual un lector iba a pensar que el Acuerdo y los anexos **debian** seguir sin
+> firmar: **T9** (la condicion de «no abrir todavia») y **J10** (que daba por hecho un interruptor
+> apagado que ya no hace nada). Las dos se reescribieron con el estado medido. El **manifiesto NO se
+> toco**: es la copia del estado real, viaja en el paquete de despliegue y tiene que seguir siendo
+> **byte a byte igual** al de produccion (`191c08b8…f8a4013f`).
+
+> **Un manifiesto de integridad que nadie volvera a verificar hasta que se rompe.** El
+> paquete del abogado lleva su `SHA256SUMS.txt`, y al verificarlo aparecio **una suma
+> desactualizada que no era de esta ronda**: la del `11-checklist-definitivo-...` venia del
+> 📦1050 (la fila J12 se edito y el manifiesto de sumas **no se regenero**). El fallo era invisible
+> porque nadie vuelve a correr esa comprobacion: el archivo de la ronda anterior seguia
+> cuadrando con lo que se habia enviado al abogado, y el repo ya no cuadraba. Se regeneraron las
+> 14 sumas **desde los archivos reales**, en el mismo formato y orden que escribe
+> `scripts/armar-paquete-abogado.js` (que ademas copia y borra adjuntos, y por eso **no se
+> ejecuto**: regenerar el manifiesto a mano no toca el contenido de los adjuntos). Las 14
+> coinciden ahora. **El mismo fallo habria pasado con el informe de esta ronda**: por eso el
+> `SHA256SUMS.txt` va en el commit, no se queda para despues.
+
+> **Commits de la sesion.** `91214c55` (📦1050, el cierre del P8: manifiesto sincronizado y
+> documentos) y `dfc403b0` (📦1051, el cierre del `npm audit` en la parte que no rompe nada).
+> **Ninguno ha salido del PC**: falta el «pushea».
+
+> **Cola** — (1) el **push** de los dos commits, esperando el «pushea»; (2) **desplegar** el 📦1051 en
+> el servidor (el bump de dependencias **viaja en el paquete de despliegue**, asi que sin desplegar la
+> produccion sigue con las versiones viejas); (3) **T6** (el caso real rechazado con su asiento),
+> **T7** (reversion probada con acta) y **T8** (la decision operativa del representante legal); (4) la
+> **ratificacion externa del abogado**: J6 (papel de Google), J7 (Circular 002/2025 y RNBD) y J8 (la
+> tabla de conservacion, cuya compuerta sigue cerrada a proposito); (5) **P3** (los alias de
+> Workspace, que el manifiesto ya declara como excepcion documentada en los canales de derechos, PQRS
+> e incidentes); (6) el **respaldo off-site**: hoy los respaldos son diarios a las 22:00, cifrados con
+> GPG, pero **en el mismo disco** — y los **cuatro actos del P8 todavia no estan en ningun
+> respaldo** (el ultimo es del 11-nov a las 22:00; el de hoy a las 22:00 los incluye); (7) **Node 22
+> en el servidor** (hoy corre Node 20 y funciona; recompilar `better-sqlite3` es lo que falla si se
+> sube el runtime); (8) las **2 altas** que quedan de `npm audit` (`nodemailer` y `zod`), que exigen
+> revisar codigo, no un parche; (9) decidir, con el abogado, si la **v1.1 del Nube** (suscrita, sin
+> contrafirma) se contrafirma retroactiva o queda como registro historico.

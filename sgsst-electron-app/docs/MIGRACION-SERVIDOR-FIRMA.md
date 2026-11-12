@@ -339,6 +339,27 @@ sudo systemctl show -p MainPID -p ActiveEnterTimestamp kair-firma
 curl -sS https://firma.kair.fyi/health
 ```
 
+> **Si el despliegue cambia `package.json` o `package-lock.json`, hay que INSTALAR
+> (el 📦1051).** El tar de despliegue lleva `src`, `web`, `scripts`, `config`,
+> `package.json`, `package-lock.json` y `legal-readiness.json` — **no lleva `node_modules`** — y los
+> pasos de arriba **no instalan nada**: el servidor sigue con el `node_modules` que hay. Un cambio
+> de dependencias **no se aplica por sí solo**. El 12-nov-2026 el 📦1051 subió `express` de 4.22.2
+> a **4.22.3** (para cerrar la vulnerabilidad moderada de `qs`) y `proxy-addr` a **2.0.8** (la
+> crítica): sin instalar, el servidor **seguiría corriendo las versiones vulnerables con el código
+> nuevo**, y el `npm audit` del servidor no lo delata.
+>
+> ```bash
+> # Con el servicio PARADO (el paso 1), antes del paso 4 (las migraciones):
+> cd /opt/kair-firma/app
+> sudo -u kairfirma npm ci --omit=dev        # el lock manda; no tocar el arbol a mano
+> sudo -u kairfirma npm ls express proxy-addr qs
+> ```
+>
+> `npm ci` **borra** `node_modules` y lo reconstruye desde el lock: hace falta red en el servidor.
+> Con Node 20 (ABI 115) el `better-sqlite3` 11.10.0 baja su prebuild y no hay que compilar; si el
+> runtime fuera Node 22 (ABI 127), habría que `npm rebuild better-sqlite3` (ver §8.2). Ojo con
+> `--omit=dev`: **borra** los devDependencies, que el §6 necesita para correr la batería.
+
 El paso 4 esta aparte a proposito. `src/server.js` llama a `migrate()` al arrancar:
 si una migracion falla, el proceso sale con codigo 1 y el servicio **no vuelve**
 (el systemd lo reintenta en bucle). Corriendolas a mano con el servicio parado, el
@@ -1145,6 +1166,22 @@ retomarlo estan en
 Estado al 2026-10-25: **Node 20.20.2** (EOL 2026-04-30), `npm audit --omit=dev` con **7
 vulnerabilidades** (1 critica, 4 altas, 2 moderadas) y el **§7 del SECURITY.md con 0/39
 casillas**. No se presenta como resuelto.
+
+**Actualizado el 12-nov-2026.** El `npm audit fix` **sí se aplicó**, pero **no el completo**: se
+aplicó solo la parte **sin ruptura de versión mayor**. `proxy-addr` (la **crítica**, IP spoofing por
+subred IPv4-mapped IPv6) pasó de 2.0.7 a **2.0.8**; `qs` (moderada) a **6.16.2**, con `express`
+subido de 4.22.2 a **4.22.3** (un parche dentro del rango `^4.21.0` que ya declaraba el
+proyecto); y de paso `body-parser` a 1.20.9 y `multer` a 2.5.0. Quedan **2 altas** que **exigen
+salto de versión mayor** y por eso NO se tocaron: `nodemailer` (6.10.1 → 10.5.0) y `zod`
+(3.25.76 → 4.6.7), los dos con cambios de API que hay que revisar en el código, no un parche.
+El piso de `express` quedó en `^4.22.3` para que una instalación nueva no vuelva a traer la
+versión vulnerable.
+
+> **Trampa del `npm audit fix` (12-nov-2026).** `npm audit fix --omit=dev` **poda los
+> devDependencies**: dejó el árbol sin `supertest` y 133 archivos de prueba fallaron con «Cannot
+> find module 'supertest'». El `package-lock.json` no había perdido la declaración: lo que
+> faltaba era el árbol. Se restauró con un `npm install` completo. El §6 avisa del
+> `--include=dev` por otra vía; esta es la inversa: **`--omit=dev` borra**, no deja de instalar.
 
 ### 8.2. Node 22: la decision del 11-nov-2026 (ya no es "sugerencia")
 
