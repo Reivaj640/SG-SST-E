@@ -33,6 +33,8 @@
 >
 > **Medido.** Suite completa **2 693 / 2 691 / 0 / 2** (180 archivos, `exit 0`, 318 s, corrida en solitario). Test del script del conteo **15/15**. Mapa **31 bloques · 31 cerrados · 0 pendientes**, **24 solicitudes (23 `EMITIDA`, 1 `CERRADA`)**. Paquete al abogado: **14 de 14** sumas coinciden (solo cambió el adjunto 09, que es copia byte a byte del canónico). Barrido de los archivos de la ronda: **0 problemas**. Verificación de cierre: **sin inconsistencias**.
 >
+> **El commit.** Esta ronda queda en el **📦1061** (`138a2b50`, 20 archivos, +943 / −78): los mismos 20 archivos llevan lo de la ronda 20 y lo de esta. **Sin push**: `origin/Dev` sigue en `d8e59dcc` hasta que el owner diga «pushea».
+>
 > **La cola del owner no cambia.** Enviar las **5** solicitudes al abogado (S-01 a S-04 y S-23; las cuatro primeras vencen el **2026-11-20** y la S-23 el **2026-11-27**), **firmar el procedimiento** (S-24) y ejecutar las 17 de ejecución.
 > **Actualización 2026-11-13 (tarde, cuarta parte) — LAS CINCO DECISIONES DEL PROCEDIMIENTO DEL CANAL YA ESTÁN ESCRITAS (S-22 CERRADA), Y EL PEDIDO QUE FALTA —QUE EL ABOGADO VALIDE EL PROCEDIMIENTO— QUEDÓ REGISTRADO COMO S-23.**
 >

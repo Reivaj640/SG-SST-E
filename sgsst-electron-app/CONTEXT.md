@@ -29,6 +29,8 @@
 >
 > **Medido al cierre de esta parte.** Test del script del conteo **15/15** (las dos nuevas: la S-24 y la línea viva), mapa **31 · 31 cerrados · 0 pendientes**, **24 solicitudes: 23 `EMITIDA` y 1 `CERRADA`**, suite **2 693 / 2 691 / 0 / 2** (180 archivos de prueba, `exit 0`, 318 s).
 >
+> **El commit.** `138a2b50` (📦1061, 20 archivos, +943 / −78). **Sin push**: `origin/Dev` sigue en `d8e59dcc` hasta que el owner diga «pushea».
+>
 > **Lo que sigue abierto.** La **validación del abogado** sobre el procedimiento (S-23, vence 2026-11-27), la **firma del owner** sobre el procedimiento (S-24, vence 2026-11-20), la respuesta a **S-01 a S-04** (vence 2026-11-20) y la **primera operación real** del canal con una empresa real.
 > **🆕 13-nov-2026 (tarde, segunda parte) — LA REVISIÓN DE LA ASESORÍA YA ESTÁ APLICADA: la cita del Decreto 1377 se corrigió en la fuente, S-01 y S-04 llevan las dos preguntas al abogado, y el escrito enviable ya no manda huellas viejas. Las cuatro solicitudes siguen EMITIDA y 0 respondidas: una revisión no es la respuesta.**
 >
