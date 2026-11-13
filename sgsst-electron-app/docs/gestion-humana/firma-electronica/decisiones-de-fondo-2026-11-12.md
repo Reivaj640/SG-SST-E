@@ -41,11 +41,12 @@ decir «cerrado» porque el equipo haya escrito la pregunta.
 pedido está emitido y medido** —con su destinatario, su fecha y su verificación—, y los actos de un tercero
 (firma, credencial, ventana, respuesta) **no** cierran un bloque: se siguen en
 `tabla-de-solicitudes-2026-11-13.md`, con su estado y su fecha. Con la regla nueva el mapa quedó en **31
-cerrados / 0 pendientes**, con **24 solicitudes: 18 `EMITIDA`, 1 `RESPONDIDA` y 5 `CERRADA`** (la S-02,
+cerrados / 0 pendientes**, con **25 solicitudes: 19 `EMITIDA`, 0 `RESPONDIDA` y 6 `CERRADA`** (la S-02,
 respondida el 13-nov-2026 por el abogado matriculado con un escrito **no formal** —sin nombre, sin fecha
-de suscripcion y sin huella—, que por eso **no cierra** la fila; la S-22, respondida por el
-owner el 13-nov-2026 y aplicada al procedimiento del canal de `fecha_terminacion`; y S-01, S-03, S-04 y
-S-23, cerradas por resolucion ese mismo dia: «resuelto por decision del owner, sin ratificacion externa»),
+de suscripcion y sin huella— y **cerrada por resolucion** ese mismo dia, al declarar el owner que esa
+validacion **no es requisito**; la S-22, respondida por el
+owner el 13-nov-2026 y aplicada al procedimiento del canal de `fecha_terminacion`; y S-01, S-02, S-03,
+S-04 y S-23, cerradas por resolucion ese mismo dia: «resuelto por decision del owner, sin ratificacion externa»),
 y **sin afirmar que el
 servicio
 pueda abrirse a empresas reales**. La regla de arriba es la que rigió el 12-nov-2026.
@@ -77,20 +78,29 @@ pregunta «que dice la Circular 002 de 2025» no tiene una respuesta que el equi
 `paquete-abogado-2026-10-30/nota-al-abogado-2026-10-30.md`, con J6, J7 y J8 actualizados al estado real
 medido hoy.
 
-### M.6 - La tabla supletoria de conservacion sigue sin validar, con su compuerta cerrada a proposito
+### M.6 - La tabla supletoria de conservacion esta PREPARADA, con su compuerta cerrada a proposito; la validacion escrita de un tercero ya no es requisito (13-nov-2026)
 
 **Decision.** La compuerta de conservacion **sigue cerrada**, y esa es la decision. `aplicacion.activada`
-sigue en `false` y `validado_por` en `null`; abrirla antes de la validacion juridica aplicaria plazos que
-nadie ha(validado.
+sigue en `false` y `activado_at` en `null`; abrirla antes de tiempo aplicaria plazos que nadie ha
+aprobado.
 
 Al abogado se le entrega la tabla **ya alineada**: ocho categorias, plazos de 10 y 5 anos, y la correccion
-de que el catalogo legado de 20 anos esta retirado del codigo. La apertura, si procede, es un acto del owner
-**despues** de la validacion, en el orden que el propio bloque declara: **validar, alinear, reejecutar las
-pruebas, abrir**. El paso de «reejecutar las pruebas» no es opcional: abrir la compuerta cambia el
-comportamiento del servicio y las pruebas que la cubren tienen que volver a correr en verde.
+de que el catalogo legado de 20 anos esta retirado del codigo. El orden que el propio bloque declara es
+**validar, alinear, reejecutar las pruebas, abrir**. El paso de «reejecutar las pruebas» no es opcional:
+abrir la compuerta cambia el comportamiento del servicio y las pruebas que la cubren tienen que volver a
+correr en verde.
 
-**Lo que queda como acto de terceros.** La validacion juridica de la tabla y de los plazos, y despues la
-decision de abrir.
+**Lo que cambio el 13-nov-2026 (decision del owner).** El paso de **validar** dejo de ser requisito: la
+validacion escrita de un tercero **no es requisito** para abrir la compuerta. La abre un acto expreso y
+**fechado** del owner (`aplicacion.activada` en `true` **mas** `aplicado_at` con fecha), que es la **S-25**.
+La compuerta **sigue cerrada** y la tabla **sigue sin fecha de apertura**. El Acuerdo vigente (la v1.6,
+publicada y activa desde el 11-nov-2026) **si describe esta tabla** en su numeral 8.6(a), y lo que exige de
+ella —fundamento y punto de inicio en cada regla, publicacion en el Anexo de Encargo, y que un cambio no
+altere los plazos ya calculados— **esta cumplido** en las ocho categorias.
+
+**Lo que queda como acto.** Solo la apertura, con la suite reejecutada antes. La ratificacion externa de
+L1, L2, L4, L5 y de las condiciones C1 a C4 sigue pendiente en el mundo (M.5, M.18, M.28/M.7), pero **no es
+requisito** para abrir la compuerta.
 
 ### M.7 - No hay copia de los respaldos fuera del servidor, y los actos del P8 aun no estan en ninguno
 

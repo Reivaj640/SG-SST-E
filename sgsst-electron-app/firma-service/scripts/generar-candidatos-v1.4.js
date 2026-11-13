@@ -17,6 +17,11 @@
  *   `pedido-6-backblaze-v1-4-2026-11-12.md` (L4 y L5). El texto no se
  *   transcribe: se aplica tal cual esta escrito en la determinacion.
  *
+ *   FASE 3 - la REGLA DE LA COMPUERTA de la tabla supletoria, que cambio por
+ *   decision del owner el 13-nov-2026: la validacion escrita de un tercero
+ *   deja de ser requisito para abrir la compuerta. Son tres anclas literales
+ *   en el Anexo de Encargo (que es donde esta la tabla del seccion 8).
+ *
  * QUE NO HACE (y por que importa)
  * --------------------------------
  * - No modifica `legal/anexo-nube-v1.3.html` ni `legal/anexo-encargo.html`: son
@@ -188,6 +193,67 @@ const ENCARGO = [
 ];
 
 // ---------------------------------------------------------------------------
+// FASE 3: LA REGLA DE LA COMPUERTA DE LA TABLA SUPLETORIA (13-nov-2026)
+// ---------------------------------------------------------------------------
+//
+// QUE ES
+// ------
+// El owner decidio el 13-nov-2026 que la validacion escrita de un tercero NO
+// es requisito para abrir la compuerta de la tabla supletoria: la compuerta la
+// abre K+AIR, con un acto expreso y FECHADO.
+//
+// El texto firmado del Anexo de Encargo (el del 11-jun-2026, que NO se toca)
+// dice lo contrario en dos frases de su seccion 8: que la tabla "existe una
+// vez validada y activada" y que "los plazos que esta tabla declara como
+// supletorios estan sujetos a la validacion juridica pendiente". Ese texto ya
+// no describe la regla vigente, y el v1.4 es un texto NUEVO: un texto
+// suscrito no se corrige, se sustituye.
+//
+// QUE HACE ESTA FASE
+// ------------------
+// Corrige esas dos frases EN EL CANDIDATO, por ancla literal, con el mismo
+// guard que las demas fases: cada ancla tiene que casar EXACTAMENTE una vez o
+// no se escribe nada.
+//
+// LO QUE NO HACE
+// --------------
+// - No toca `legal/anexo-encargo.html`: el texto firmado se queda como esta.
+// - No toca el Anexo de Nube: la compuerta de la tabla se describe en el
+//   Anexo de Encargo, que es donde esta la tabla del seccion 8.
+// - No enciende la compuerta: la tabla sigue con `activada` en false.
+//
+const ENCARGO_COMPUERTA = [
+  {
+    id: 'COMPUERTA-1',
+    donde: 'Seccion 8, el parrafo que presenta la tabla supletoria',
+    antes:
+      'es el plazo por defecto y, una vez validada y activada, <strong>siempre',
+    despues:
+      'es el plazo por defecto y, una vez activada por K+AIR con la fecha de su acto, <strong>siempre',
+  },
+  {
+    id: 'COMPUERTA-2',
+    donde: 'Seccion 8, el parrafo de fuente y precedencia de la tabla',
+    antes:
+      'que, una vez validada y activada, siempre existe:',
+    despues:
+      'que, una vez activada por K+AIR con la fecha de su acto, siempre existe:',
+  },
+  {
+    id: 'COMPUERTA-3',
+    donde: 'Seccion 8, la frase de los plazos supletorios',
+    antes:
+      'Los plazos que esta tabla declara como supletorios est&aacute;n sujetos a la '
+      + 'validaci&oacute;n jur&iacute;dica pendiente. ',
+    despues:
+      'Los plazos que esta tabla declara como supletorios no est&aacute;n sujetos a la '
+      + 'validaci&oacute;n de un tercero: la apertura de la tabla es un acto expreso y '
+      + 'fechado de K+AIR, y el numeral 8.6(a) del Acuerdo exige que cada regla tenga '
+      + 'fundamento y punto de inicio, que esta tabla declara en sus ocho categor&iacute;as. ',
+  },
+];
+
+// ---------------------------------------------------------------------------
 // EL MOTOR
 // ---------------------------------------------------------------------------
 
@@ -260,7 +326,20 @@ function correr(escribir) {
     return 1;
   }
   const textoNubeFinal = d.nube.texto;
-  const textoEncargoFinal = d.encargo.texto;
+  let textoEncargoFinal = d.encargo.texto;
+
+  // FASE 3: la regla de la compuerta de la tabla supletoria (decision del
+  // owner del 13-nov-2026). Va DESPUES de las determinaciones porque no es una
+  // determinacion juridica: es un cambio de regla de K+AIR, y asi queda dicho.
+  const rc = aplicar(textoEncargoFinal, ENCARGO_COMPUERTA);
+  console.log('Regla de la compuerta (13-nov-2026): ' + ENCARGO_COMPUERTA.length + ' reemplazos.');
+  if (rc.problemas.length) {
+    console.error('\nERROR: una ancla de la regla de la compuerta no se pudo aplicar:');
+    rc.problemas.forEach((p) => console.error('  ' + p));
+    console.error('NO SE ESCRIBE NADA.');
+    return 1;
+  }
+  textoEncargoFinal = rc.texto;
 
   // El texto vigente no se toca: se comprueba antes de escribir nada.
   const bufNube = fs.readFileSync(origenNube);
@@ -299,7 +378,7 @@ function correr(escribir) {
   return 0;
 }
 
-module.exports = { correr: correr, NUBE: NUBE, ENCARGO: ENCARGO };
+module.exports = { correr: correr, NUBE: NUBE, ENCARGO: ENCARGO, ENCARGO_COMPUERTA: ENCARGO_COMPUERTA };
 
 if (require.main === module) {
   const args = process.argv.slice(2);

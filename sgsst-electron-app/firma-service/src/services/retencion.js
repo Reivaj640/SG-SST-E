@@ -469,7 +469,7 @@ const ORDEN_BUSQUEDA = Object.freeze([
  *   - una Empresa que NO declara plazo NO recibe el plazo legado de veinte
  *     (20) años desde la firma: ese catálogo se retiró. Lo que recibe es un
  *     HOLD (`tabla_supletoria_pendiente_validacion`), sin fecha de supresión
- *     calculada, hasta que la tabla esté validada y la compuerta se abra;
+ *     calculada, hasta que la tabla se activate;
  *   - las excepciones legales siguen aplicando: el piso del SG-SST y el hold
  *     del contrato sin término. No dependen de la tabla: son deberes.
  *
@@ -482,11 +482,29 @@ const ORDEN_BUSQUEDA = Object.freeze([
  * "la fecha de la firma NO sustituye la fecha de cese; el registro queda
  * pendiente y sin fecha de supresión calculada".
  *
- * La razón es jurídica: los plazos de diez (10) y cinco (5) años de esta tabla
- * todavía no los validó el abogado, y el Acuerdo que los describe (la v1.4)
- * no está aprobado. Aplicarlos sin la validación sería aplicar un plazo que el
- * Acuerdo vigente no dice. Abrir la compuerta es un acto expreso del owner,
- * con la validación escrita del abogado: no lo hace el código ni una
+ * EL PASO (iv) CAMBIÓ (13-nov-2026): el owner decidió que la validación
+ * escrita de un abogado NO es requisito para abrir la compuerta. La compuerta
+ * la abre el owner, con su fecha. Los otros tres pasos (retirar el catálogo
+ * legado, alinear la precedencia del 8.6(a) y reejecutar las pruebas) siguen
+ * cumplidos y medidos.
+ *
+ * LO QUE DICE EL ACUERDO VIGENTE (13-nov-2026)
+ * ---------------------------------------------
+ * El Acuerdo que describe este mecanismo NO es la v1.4: es la v1.6, publicada
+ * y activa desde el 11-nov-2026. Su numeral 8.6(a) dice que la tabla supletoria
+ * la administra K+AIR, que es configurable, que cada regla ha de tener
+ * fundamento y punto de inicio, que se publica en el Anexo de Encargo y que un
+ * cambio en ella no altera los plazos ya calculados. Este archivo cumple los
+ * cuatro: las ocho categorías declaran su fundamento y su punto de inicio, y la
+ * tabla se publica en el Anexo de Encargo. El numeral NO exige una validación
+ * escrita de un tercero, y la compuerta tampoco.
+ *
+ * LO QUE LA ABRE
+ * --------------
+ * `activada: true` Y `activado_at` con fecha. El `activado_at` es el rastro
+ * auditable del acto del owner: sin fecha, `activada` sería un interruptor sin
+ * cuándo, que es el defecto que motivó el cambio del 12-nov-2026. Abrir la
+ * compuerta es un acto expreso del owner: no lo hace el código ni una
  * actualización automática.
  *
  * CÓMO SE LEE
@@ -520,6 +538,8 @@ const _TABLA_RESPALDO = Object.freeze({
   aplicacion: Object.freeze({
     activada: false,
     estado: 'PROPUESTA',
+    // El respaldo no tiene fecha de apertura: la compuerta sigue cerrada.
+    activado_at: null,
     validado_por: null,
     validado_at: null,
   }),
@@ -609,9 +629,14 @@ function tablaActivada(opts = {}) {
  * La tabla declara su propia activación (`aplicacion.activada`). El código no
  * la deduce ni la deduce por defecto: la lee.
  *
- * Por qué existe: la tabla administra plazos que el abogado todavía no validó
- * (los de diez (10) y cinco (5) años), y el Acuerdo que describe este
- * mecanismo (la v1.4) no está aprobado. Mientras la compuerta está cerrada:
+ * Por qué existe: la tabla administra plazos por defecto (los de diez (10) y
+ * cinco (5) años) que K+AIR administra con su propio fundamento. El Acuerdo
+ * vigente (la v1.6, publicada y activa desde el 11-nov-2026) la DESCRIBE en su
+ * numeral 8.6(a): la tabla supletoria la administra K+AIR, es configurable, cada
+ * regla ha de tener fundamento y punto de inicio, se publica en el Anexo de
+ * Encargo y un cambio en ella no altera los plazos ya calculados. El numeral
+ * NO exige una validación escrita de un tercero. Mientras la compuerta está
+ * cerrada:
  *
  *   - el plazo por defecto de la tabla NO se aplica;
  *   - una Empresa que NO declara plazo NO recibe el plazo legado del catálogo
@@ -629,31 +654,31 @@ function tablaActivada(opts = {}) {
  * que decide cuándo se aplica un plazo es el documento que la administra, y
  * ese documento se versiona y se puede auditar.
  *
- * LO QUE SE EXIGE ADEMAS DE `activada` (12-nov-2026)
- * ---------------------------------------------------
- * Antes, cambiar `activada` a `true` bastaba para aplicar los plazos de diez
- * (10) y cinco (5) años: el archivo declara su propia activacion y el codigo
- * la leia, sin preguntar quien la habia validado. Eso dejaba la compuerta
- * como un acto de disciplina humana, y no como un acto que la maquina pueda
- * auditar: `validado_por` y `validado_at` estaban en el archivo y NO los leia
- * ningun codigo.
+ * LO QUE LA ABRE (13-nov-2026)
+ * ---------------------------
+ * `activada: true` Y `activado_at` con fecha.
  *
- * La tabla dice que abrirla es un acto del owner *con la validacion escrita
- * del abogado*. Ahora el codigo es fiel a esa frase: sin `validado_por` y
- * `validado_at` la compuerta NO se abre, por mucho que `activada` diga que si.
- * Es una linea, y evita el falso verde: un archivo con `activada: true` y sin
- * validacion aplica el retencion por defecto de categorias que nadie ha
- * validado.
+ * El `activado_at` es el rastro auditable del acto del owner. Sin fecha,
+ * `activada` seria un interruptor sin cuando, que es exactamente el defecto
+ * que motivo el cambio del 12-nov-2026 (antes bastaba cambiar la bandera y
+ * ningun codigo preguntaba nada).
  *
- * Y ADEMAS, EL MARCADOR DE PENDIENTE NO CUENTA COMO VALIDACION (12-nov-2026).
- * ---------------------------------------------------------------------
- * La tabla que se despacha trae `validado_por` con un MARCADOR legible
- * ("PENDIENTE: lo llena el abogado externo..."), para que quede a la vista que
- * la validacion falta, y `validado_at` en null. Un texto de esos no es una
- * validacion: es la ausencia de ella escrita. Si el owner abriera la compuerta
- * sin reemplazar el marcador, el codigo tendria que seguir tratandola como
- * cerrada: por eso el marcador se rechaza por nombre y no solo por estar
- * vacio.
+ * LO QUE NO LA ABRE: LA VALIDACION ESCRITA DE UN TERCERO (13-nov-2026)
+ * ----------------------------------------------------------------------
+ * Antes (12-nov-2026) la compuerta exigia ademas `validado_por` y
+ * `validado_at`: la validacion escrita de un abogado. El owner decidio el
+ * 13-nov-2026 que ese escrito formal NO es requisito. La regla cambio, no el
+ * nombre de nadie: el codigo nunca exigio un abogado por nombre (cualquier
+ * texto no vacio y que no empezara por `PENDIENTE` pasaba). Hoy
+ * `validado_por` y `validado_at` son un REGISTRO informativo -la consulta al
+ * abogado, archivada- y no una condicion: la compuerta se abre con el acto
+ * fechado del owner.
+ *
+ * Y EL MARCADOR DE PENDIENTE NO CUENTA COMO ACTO (13-nov-2026).
+ * --------------------------------------------------------------
+ * Si el owner abriera la compuerta sin poner la fecha real, el codigo tiene que
+ * seguir tratandola como cerrada: un marcador es la ausencia del acto escrita.
+ * Por eso el marcador se rechaza por nombre y no solo por estar vacio.
  *
  * @param {object|null} tabla - la tabla supletoria
  * @returns {boolean}
@@ -661,12 +686,11 @@ function tablaActivada(opts = {}) {
 function _tablaActivada(tabla) {
   const aplicacion = tabla && typeof tabla.aplicacion === 'object' ? tabla.aplicacion : null;
   if (!aplicacion || aplicacion.activada !== true) return false;
-  const validadoPor = typeof aplicacion.validado_por === 'string' ? aplicacion.validado_por.trim() : '';
-  const validadoAt = typeof aplicacion.validado_at === 'string' ? aplicacion.validado_at.trim() : '';
-  if (validadoPor === '' || validadoAt === '') return false;
-  // El marcador de "lo falta el abogado externo" no es una validacion: es la
-  // ausencia de ella escrita. La compuerta sigue cerrada.
-  if (/^PENDIENTE\b/i.test(validadoPor)) return false;
+  const activadoAt = typeof aplicacion.activado_at === 'string' ? aplicacion.activado_at.trim() : '';
+  if (activadoAt === '') return false;
+  // El marcador de "lo falta el owner" no es un acto: es la ausencia de el
+  // escrita. La compuerta sigue cerrada.
+  if (/^PENDIENTE\b/i.test(activadoAt)) return false;
   return true;
 }
 
@@ -1327,7 +1351,11 @@ function planificar({
     hold = {
       actor: 'sistema',
       motivo: 'tabla_supletoria_pendiente_validacion',
-      alcance: 'No calcular ni ejecutar supresión hasta que la tabla supletoria esté validada y activada expresamente por el owner.',
+      // El NOMBRE del hold conserva la palabra "validacion" por compatibilidad
+      // con las filas ya escritas en la base: es un identificador, no una
+      // frase. Lo que espera desde el 13-nov-2026 es la ACTIVACION de la
+      // tabla (un acto fechado del owner), no una validacion de un tercero.
+      alcance: 'No calcular ni ejecutar supresión hasta que la tabla supletoria esté activada expresamente por el owner, con la fecha de su acto.',
     };
   }
 
@@ -1380,8 +1408,9 @@ function planificar({
       + (regla.notaSistema ? ' ' + regla.notaSistema : '');
   } else if (fuente === 'tabla_supletoria_pendiente') {
     // La COMPUERTA de la tabla supletoria está CERRADA: los plazos por
-    // defecto (diez (10) y cinco (5) años) todavía no los validó el abogado,
-    // y el catálogo legado de veinte (20) años desde la firma se RETIRÓ
+    // defecto (diez (10) y cinco (5) años) todavía no aplican, porque la
+    // apertura es un acto del owner que no se ha hecho (13-nov-2026), y el
+    // catálogo legado de veinte (20) años desde la firma se RETIRÓ
     // (J8 y J9 del abogado, 30-oct-2026).
     //
     // El texto que ve el Trabajador NO puede prometer un plazo que el sistema
@@ -1391,9 +1420,9 @@ function planificar({
     // dice la verdad: no hay fecha de supresión calculada y el registro queda
     // retenido.
     texto = 'La Empresa no ha declarado un plazo en su tabla de retención documental y la tabla de '
-      + 'conservación por defecto del sistema todavía no ha sido validada, de modo que este documento '
+      + 'conservación por defecto del sistema todavía no está activada, de modo que este documento '
       + 'no tiene una fecha de supresión calculada: queda retenido y no se suprime mientras esa '
-      + 'declaración o esa validación se formalicen.';
+      + 'declaración o la apertura de esa tabla se formalicen.';
   } else if (fuente === 'empresa' && textoEmpresa) {
     texto = textoEmpresa;
   } else {

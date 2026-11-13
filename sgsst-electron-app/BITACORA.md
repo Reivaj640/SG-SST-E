@@ -10433,3 +10433,41 @@ pendientes**. Candidatos: `anexo-nube-v1.4.html` **111 462 B / `ba664e6f…e3b47
 **intactos** (`fdd10551…`, `6308b1f7…`, `d9b59699…`). El motor `determinaciones-v1.4.js` **sí cambió** (22 902 B /
 , el generador `generar-candidatos-v1.4.js` **también** (sus diez `§` pasaron a `Seccion`: su cabecera afirma que es ASCII puro y el guard ahora lo comprueba — **14 549 B / `323d6d87…`**), y el dictamen L1 quedó en **114 882 B / `d77e6d8b…`**.
 
+## 2026-11-13 (tarde, novena parte) — la compuerta que pedía un escrito que ya no es requisito, y el §8 que seguía diciendo que sí
+
+**El hallazgo que abrió la ronda.** Antes de tocar la regla se leyó el **Acuerdo vigente**: la **v1.6**,
+publicada y activa desde el 11-nov-2026. Su **numeral 8.6(a)** dice que la tabla supletoria de conservación
+la administra K+AIR, que es configurable, que **cada regla ha de tener fundamento y punto de inicio**, que
+se publica en el Anexo de Encargo y que un cambio en ella no altera los plazos ya calculados. La tabla
+cumple los cuatro: las ocho categorías declaran su fundamento y su punto de inicio, y la tabla se publica
+en el Anexo de Encargo. Y el numeral **no exige** una validación escrita de un tercero.
+
+**Lo que el código exigía y por qué estaba mal.** Desde el 12-nov-2026, `_tablaActivada()` exigía
+`activada: true` **y** `validado_por` **y** `validado_at` reales, y rechazaba el marcador `PENDIENTE`. El
+motivo era bueno (un interruptor sin rastro no es auditable) pero la condición elegida era de K+AIR, no
+de la norma: el Acuerdo no pedía ninguna validación. Y el campo nunca exigía **un abogado**: exigía un
+texto no vacío. Cambiar la regla **no es cambiar el nombre de nadie**.
+
+**La regla nueva.** `aplicacion.activada` en `true` **más** `activado_at` con fecha. La fecha es lo que
+sustituye al escrito: es el rastro auditable del acto del owner. Sin ella, `activada` volvería a ser el
+interruptor sin cuándo que el 12-nov se tapó. El rechazo del marcador se conserva (un `PENDIENTE` es la
+ausencia del acto escrita), y el *hold* `tabla_supletoria_pendiente_validacion` conserva su nombre porque
+es un identificador de las filas ya escritas en la base, no una frase: lo que espera es la **activación**.
+
+**Por qué el texto que se firma también tenía que cambiar.** El §8 del Anexo de Encargo **firmado** el
+11-jun-2026 dice que la tabla «existe una vez validada y activada» y que sus plazos «están sujetos a la
+validación jurídica pendiente». Un texto suscrito no se corrige: **se sustituye**. El v1.4 es un texto
+nuevo, así que el generador de candidatos recibió una **fase 3** —cuatro anclas literales, solo en el
+Anexo de Encargo— que deja el §8 diciendo la regla vigente, y que hace que el §8 publique la **fecha real
+de su fuente**. El Anexo de Nube no se tocó, y su huella no se movió.
+
+**Los guards, en las dos direcciones.** La prueba que fija la regla nueva es «la compuerta **no** exige la
+validación escrita de un tercero»: si alguien volviera a meter `validado_por` como condición, falla. Y
+falla la que exige la fecha. Los **dos mutantes se aplicaron y se verificaron**: reintroducir la
+validación **mata doce pruebas** (entre ellas la de la regla nueva) y quitar la fecha **mata** la que la
+fija. Un guard que solo mira un lado no sabe qué regla está vigente.
+
+**Lo que se dejó intacto a propósito.** La compuerta **sigue cerrada** (`activada: false`,
+`activado_at: null`): abrirla es un acto del owner, con su fila (S-25) y su fecha. El texto firmado no se
+tocó. El manifiesto no se tocó. Y la ratificación externa de L1, L2, L4, L5 y de las condiciones C1 a C4
+sigue pendiente **en el mundo**: la regla del código cambió, no el mundo.

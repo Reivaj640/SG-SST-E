@@ -9,7 +9,7 @@
 | Archivo | Bytes | SHA-256 | Que es |
 |---|---|---|---|
 | `anexo-nube-v1.4.html` | 111 462 | `ba664e6f1ad130c968b6224ab71ed66a52017e96ac578b8b0e740fd55f9e3b47` | Candidato del Anexo de Nube v1.4 (6 anclas de C1 a C7 + 39 determinaciones de L1, L4 y L5) |
-| `anexo-encargo-2026-11-12.html` | 100 153 | `d4df187a4070a847a1259e2bacffdead3251579c3fea38ec294f07f82a4e2967` | Candidato del Anexo de Encargo del 12-nov-2026 (5 anclas de C1 a C7 + 11 determinaciones de L1, L4 y L5) |
+| `anexo-encargo-2026-11-12.html` | 100 396 | `b345ab87a816eddb98bf79c30be6de38d9d1fbe90f2682c89d8e7560bbe3a749` | Candidato del Anexo de Encargo del 12-nov-2026 (5 anclas de C1 a C7 + 11 determinaciones de L1, L4 y L5 + 4 anclas de la regla de la compuerta) |
 
 ## Que NO se toco
 
@@ -23,7 +23,7 @@ estos candidatos.
 
 ## Como se armaron
 
-En **dos fases**, con `firma-service/scripts/generar-candidatos-v1.4.js`:
+En **tres fases**, con `firma-service/scripts/generar-candidatos-v1.4.js`:
 
 1. **Fase 1 — las siete divergencias (C1 a C7)**: los literales ya escritos de
    `../propuesta-v1.4-anexo-nube-2026-11-12.md` (6 anclas en el Nube, 5 en el Encargo).
@@ -32,9 +32,11 @@ En **dos fases**, con `firma-service/scripts/generar-candidatos-v1.4.js`:
    `../pedido-6-backblaze-v1-4-2026-11-12.md` para L4 y L5), con el motor de
    `firma-service/scripts/determinaciones-v1.4.js`. **El texto no se transcribe**: lo que esta escrito en la
    determinacion es lo que queda en el candidato, byte a byte. Son 39 cambios en el Nube y 11 en el Encargo.
+3. **Fase 3 — la regla de la compuerta de la tabla supletoria** (decision del owner del 13-nov-2026): cuatro
+   anclas literales en el Anexo de Encargo, que es donde esta la tabla del §8. El Anexo de Nube **no se mueve**.
 
-El script **se niega a escribir** si una ancla no casa **exactamente una vez**: con las 11 de la fase 1 y las
-50 de la fase 2 bien, la salida es reproducible.
+El script **se niega a escribir** si una ancla no casa **exactamente una vez**: con las 11 de la fase 1, las
+50 de la fase 2 y las 4 de la fase 3 bien, la salida es reproducible.
 
 ```powershell
 node firma-service/scripts/generar-candidatos-v1.4.js --estado   # solo mide: imprime hashes
@@ -76,6 +78,20 @@ de referencia y **no verificados**), la **region US del bucket es decision conse
 exigencia legal, la **transferencia del software a la Empresa si cae en el supuesto (ii)** de la Circular
 002 de 2025, y los **hechos contractuales del CDPA** quedan **pendientes de confirmacion contra el
 contrato**. La redaccion final la hizo K+AIR con la autorizacion del owner.
+
+**Lo que cambio con la fase 3 (13-nov-2026, decision del owner).** La **validacion escrita de un tercero
+dejo de ser requisito** para abrir la compuerta de la tabla supletoria: la abre un acto expreso y
+**fechado** de K+AIR. El texto firmado del Anexo de Encargo (el del 11-jun-2026, que **no se toca**) decia
+en su §8 que la tabla «existe una vez validada y activada» y que «los plazos que esta tabla declara como
+supletorios estan sujetos a la validacion juridica pendiente»: ese texto ya no describia la regla
+vigente. Como el v1.4 es un texto **nuevo**, las dos frases se corrigen **en el candidato**, por ancla
+literal, y el §8 pasa a decir que la apertura es un acto expreso y fechado de K+AIR, que los plazos no
+dependen de una validacion de un tercero y que el numeral 8.6(a) del Acuerdo exige fundamento y punto de
+inicio (que la tabla declara en sus ocho categorias). El §8 **sigue** publicando la fecha de la
+**tabla** (31 de octubre de 2026): los plazos no cambiaron, y esa fecha esta en el texto firmado del
+11-jun-2026 (moverla haria que el generador reescribiera el anexo firmado). La fecha de la **regla** va en
+su propio campo del config (`regla_de_apertura_actualizada_at`). El Anexo de Nube **no cambio de bytes**:
+`ba664e6f…e3b47`.
 
 **El invariante que el motor sostiene.** El candidato tiene que ser **byte a byte** el literal de la
 determinacion: si el motor reescribiera el literal por su cuenta, el texto que se firma no seria el texto

@@ -468,14 +468,16 @@ function main() {
   cuerpo.push('- Las EXCEPCIONES LEGALES no dependen de la tabla y siguen aplicando con la compuerta');
   cuerpo.push('  cerrada: el piso de veinte (20) anos desde el cese de los registros del 8.6(b), y el hold');
   cuerpo.push('  sin termino del contrato del 8.6(c).');
-  cuerpo.push('- Abrir la compuerta es un acto expreso del owner, con la validacion escrita del abogado sobre');
-  cuerpo.push('  los plazos de diez (10) y cinco (5) anos. Ni el codigo ni una actualizacion automatica lo');
-  cuerpo.push('  hacen.');
+  cuerpo.push('- Abrir la compuerta es un acto expreso y FECHADO del owner: `aplicacion.activada` en true');
+  cuerpo.push('  y `aplicacion.activado_at` con la fecha del acto. Ni el codigo ni una actualizacion');
+  cuerpo.push('  automatica lo hacen. La validacion escrita de un tercero NO es requisito (decision del');
+  cuerpo.push('  owner del 13-nov-2026): el codigo no la exige, y nunca exigio el nombre de un abogado.');
   cuerpo.push('');
-  cuerpo.push('La razon es juridica, no tecnica: el Acuerdo vigente en produccion es la v1.0, cuyo 8.6');
-  cuerpo.push('remite a la tabla de retencion documental de la Empresa y no describe estos plazos. Aplicar');
-  cuerpo.push('en produccion un plazo que el Acuerdo en vigor no dice seria exactamente el defecto que el');
-  cuerpo.push('texto no puede prometer lo que el codigo no cumple.');
+  cuerpo.push('El Acuerdo vigente en produccion es la v1.6 (publicada y activa desde el 11-nov-2026) y su');
+  cuerpo.push('numeral 8.6(a) SI describe esta tabla: la administra K+AIR, es configurable, cada regla ha de');
+  cuerpo.push('tener fundamento y punto de inicio, se publica en el Anexo de Encargo y un cambio en ella no');
+  cuerpo.push('altera los plazos ya calculados. La tabla cumple los cuatro requisitos. El numeral no exige');
+  cuerpo.push('una validacion escrita de un tercero, y por eso la compuerta tampoco.');
   cuerpo.push('');
 
   fs.writeFileSync(salida, cuerpo.join('\n'), 'utf8');

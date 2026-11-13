@@ -1519,6 +1519,56 @@ suscripción y SHA-256) para cerrar la **S-02**, **firmar el procedimiento** (S-
 v1.4** con huella real (M.18) con el manifiesto al día, y los **17 actos de ejecución** de producción. El
 detalle, en el CONTEXT y en el Historial.
 
+### 5.48 🔴 Una compuerta se abre con un acto expreso y fechado; si el owner cambia la regla, la regla cambia en el código, en la fuente y en el texto que se firma
+
+**El caso real (13-nov-2026), la ronda 23.** El owner decidió que **el escrito formal de un abogado no es
+requisito** para la compuerta de la tabla supletoria de conservación. La regla que estaba en el código
+(12-nov-2026) exigía `activada: true` **y** `validado_por` **y** `validado_at` reales. La regla nueva es:
+`activada: true` **y** `activado_at` con fecha.
+
+Tres cosas de ese cambio que se confunden fácil y que este archivo fija:
+
+1. **El código nunca exigía un abogado por nombre.** Exigía un campo no vacío que no empezara por `PENDIENTE`:
+   cualquier texto servía. Cambiar la regla **no es inventar ni quitar un nombre de abogado**; es cambiar qué
+   condición se cumple.
+2. **La fecha es lo que hace auditable el acto.** Sin `activado_at`, `activada` sería un interruptor sin
+   cuándo —que es exactamente el defecto que el 12-nov se tapó—. Por eso el acto del owner es **expreso y
+   fechado**: es la única huella de que alguien lo hizo.
+3. **Un texto suscrito no se corrige, se sustituye.** El §8 del Anexo de Encargo firmado el 11-jun-2026 dice
+   que la tabla «existe una vez validada y activada» y que sus plazos «están sujetos a la validación jurídica
+   pendiente». Ese texto no se toca. El **v1.4 es un texto nuevo** y el generador corrige esas frases **en el
+   candidato**, por ancla literal, con su propio guard.
+
+**Reglas:**
+
+1. **Una regla que cambia, cambia en los tres lugares donde vive**: el código (`_tablaActivada()`), la fuente
+   de datos (`config/tabla-conservacion.json`, con la nota que la explica) y el texto que se firma (el
+   candidato, por el generador). Si uno de los tres queda atrás, hay dos verdades.
+2. **La nota que explica la regla se reescribe, no se deja**: la anterior afirmaba «el Acuerdo vigente no
+   describe estos plazos», y era **falso** —el Acuerdo vigente es la **v1.6** (publicada y activa desde el
+   11-nov-2026) y su **numeral 8.6(a)** sí describe la tabla, con cuatro exigencias que la tabla cumple: K+AIR
+   la administra, es configurable, cada regla tiene fundamento y punto de inicio, y se publica en el Anexo de
+   Encargo.
+3. **El guard vigila las dos caras**: la frase nueva **tiene que estar** y la vieja **no puede quedar**. Un
+   guard que solo comprueba la ausencia pasa solo.
+4. **El mutante tiene que morder en los dos sentidos**: reintroducir la exigencia de la validación escrita
+   (mata doce pruebas, entre ellas la que fija la regla nueva) y quitar la exigencia de la fecha (mata la que
+   la fija). Un guard que solo mira un lado no sabe qué regla está vigente.
+5. **Cerrar una fila por resolución se anota en la fila**, con la misma honestidad que un cierre por respuesta:
+   «resuelto por decisión del owner, sin ratificación externa». Un cierre por resolución **no** finge una
+   ratificación, y la ratificación que falta sigue pendiente **en el mundo**, con su bloque y su dueño.
+6. **Cambiar la regla no abre la compuerta.** `aplicacion.activada` sigue en `false` y `activado_at` en `null`:
+   la apertura es un acto **del owner**, con su fila (la **S-25**) y su fecha.
+7. **Lo que no cambia con la regla**: el *hold* `tabla_supletoria_pendiente_validacion` conserva su nombre (es
+   un identificador de las filas ya escritas en la base, no una frase) y las excepciones legales del SG-SST
+   siguen aplicando con la compuerta cerrada.
+
+**Estado al cierre de la ronda 23 (13-nov-2026).** La compuerta **sigue CERRADA**; la tabla quedó
+`PREPARADA` (13 445 B / `96681805…`), `activada: false` y `activado_at: null`; la **S-02** quedó `CERRADA` por
+resolución y la tabla de solicitudes pasó a **25 solicitudes: 19 `EMITIDA`, 0 `RESPONDIDA`, 6 `CERRADA`**, con
+la **S-25** nueva (el acto de apertura). El candidato del Anexo de Encargo 2026-11-12 se regeneró (**100 398 B
+/ `4b9726bf…d46ce`**); el del Anexo de Nube **no se movió** (`ba664e6f…e3b47`).
+
 ### 6.1 Backend — bridges
 
 Sufijo **`-bridge.js`** (no `bridge-*.js`). Hay 30 en `main/`.
@@ -2326,6 +2376,8 @@ Caso real (31-oct-2026): al corregir el único rojo de la suite del `firma-servi
 | 168 | 🔴 **Un fragmento de sustitución cuyo destino cae dentro de un rango reescribe el literal nuevo: el texto que se firma deja de ser el texto que se aprobó, y el generador no se queja** | `sgsst-electron-app/firma-service/scripts/determinaciones-v1.4.js` (los fragmentos y los rangos), `sgsst-electron-app/docs/gestion-humana/firma-electronica/dictamen-legal-l1-2026-11-12.md` (el literal B.8.5 y la fila 535 de B.6.4), `sgsst-electron-app/firma-service/tests/scripts/generar-candidatos-v1.4.test.js` (el guard de identidad byte a byte y el guard estructural) | Caso real (13-nov-2026), la ronda 22 (tarde): el rango `L1-B85` sustituía el párrafo entero «Lo que queda pendiente» del Anexo de Encargo y su literal **B.8.5** copiaba del texto base la línea «…esta versión **2026-11-11** del Anexo de Encargo…», mientras el motor resolvía la fecha con un fragmento aparte (`B6.4-535`) que sustituía `2026-11-11` por `2026-11-12`. Al insertar el literal, **el fragmento cayó dentro del rango** y pasó a reescribirlo: el candidato salió con `2026-11-12` y **el dictamen decía `2026-11-11`**. El texto que se iba a firmar no era el texto que estaba escrito, y **el generador no se quejó** —el ancla casaba exactamente una vez—. Reglas: (1) **el literal es lo que se firma**: el guard `el texto del candidato es byte a byte el de la determinacion` tiene que pasar, y si falla, **el literal se corrige en el dictamen** (fecha `2026-11-12`) y el fragmento **se elimina**; (2) **un fragmento no puede tocar el literal de una determinación**: guard estructural que compara cada ancla de cada fragmento contra todos los literales del dictamen y del pedido; (3) **el mutante tiene que ser el defecto completo** —el dictamen con la fecha vieja **más** el fragmento—: un mutante a medias falla por otra razón y no prueba nada; (4) **una corrección que no cambia los bytes se anota igual**: aquí las huellas de los candidatos no se movieron (`ba664e6f…` y `d4df187a…`) y lo que cambió fue **de dónde salía** el texto; (5) **la fuente que cambia obliga a re-medir lo que la declara**: el escrito al abogado declaraba huellas que ya no correspondían a los archivos, y se anotó con las vigentes |
 
 | 169 | 🔴 **El estado del remoto se escribe medido, no recordado: un hash viejo en un documento o en el cuerpo de un commit es una afirmación falsa que no se puede reescribir** | `Historial.md` (la línea del commit), `sgsst-electron-app/CONTEXT.md` (lo mismo), `PROMPT.md` (§5.47) | Caso real (13-nov-2026), la ronda 22: al cerrar se escribió en el Historial y en el CONTEXT que «`origin/Dev` sigue en `d8e59dcc`», un dato tomado del resumen de la sesión anterior, cuando **el remoto ya estaba en `72a06dda`** (el 📦1062 se había pusheado). El error quedó además en el **cuerpo de dos commits**, que no se reescriben: solo pudo registrarse en el commit siguiente. Reglas: (1) **el remoto se mide con `git ls-remote origin Dev`** antes de escribir dónde está; (2) **la referencia local `origin/Dev` dice lo que pusheaste vos**, no lo que hay en el remoto ahora; (3) **un resumen de sesión es una pista, no una fuente** (§5.43 aplicada al estado del repo); (4) **la anotación de un commit no cita el hash del commit que la contiene**: un `--amend` lo invalida (§5.47); (5) **un commit ya pusheado no se `--amend`ea** (§5.31): se corrige en otro commit |
+| 170 | 🔴 **Una regla que cambia en el código y no en el texto que se firma deja dos verdades: el servicio hace una cosa y el anexo que se firma dice otra** | `sgsst-electron-app/firma-service/src/services/retencion.js` (`_tablaActivada`), `sgsst-electron-app/firma-service/config/tabla-conservacion.json` (la nota de `aplicacion`), `sgsst-electron-app/firma-service/scripts/generar-candidatos-v1.4.js` (la fase de la regla de la compuerta), `sgsst-electron-app/firma-service/tests/scripts/generar-candidatos-v1.4.test.js` (el guard del texto de la compuerta), `PROMPT.md` (§5.48) | Caso real (13-nov-2026), la ronda 23: el owner decidió que la **validación escrita de un tercero no es requisito** para abrir la compuerta de la tabla supletoria, y la regla nueva quedó `activada: true` **más** `activado_at` con fecha. Pero el §8 del Anexo de Encargo —el texto que se va a **firmar**— decía que la tabla «existe una vez validada y activada» y que sus plazos «están sujetos a la validación jurídica pendiente». El texto firmado del 11-jun no se puede tocar (un texto suscrito no se corrige, se sustituye), y el v1.4 es un texto **nuevo**: la frase se corrige **en el candidato**, por ancla literal y en el generador, con un guard de dos caras. La nota del config, además, afirmaba que «el Acuerdo vigente no describe estos plazos», y era **falso**: el §8.6(a) de la v1.6, vigente desde el 11-nov, sí la describe. Reglas: (1) **una regla que cambia cambia en los tres lugares donde vive** —código, fuente y texto que se firma—; (2) **la nota que explica la regla se reescribe**: si queda la explicación vieja, el registro miente aunque el código esté bien; (3) **el guard vigila las dos caras** (la frase nueva está y la vieja no) y **el mutante muerde en los dos sentidos** —reintroducir la validación mata doce pruebas y quitar la fecha mata una—; (4) **la cifra que se publica se deriva de la fuente** (la tabla de solicitudes) y se regenera con script, no se escribe a mano |
+| 171 | 🔴 **Una fuente que se publica en un texto suscrito no puede cambiar de valor sin que ese texto cambie: el test que regenera el anexo firmado lo reescribe, y nadie lo ve hasta que una prueba se cae** | `sgsst-electron-app/firma-service/config/tabla-conservacion.json` (`actualizado_at`), `sgsst-electron-app/firma-service/scripts/generar-anexo-encargo.js` (el §8 de la tabla), `sgsst-electron-app/firma-service/tests/scripts/generar-anexo-encargo.test.js`, `PROMPT.md` (§5.48) | Caso real (13-nov-2026), la ronda 23: el §8 del Anexo de Encargo publica la fecha de `config/tabla-conservacion.json` («versión 1.0, actualizada el 31 de octubre de 2026»), y el test `generar-anexo-encargo.test.js` **comprueba que el anexo del repositorio esté al día con sus fuentes — regenerándolo**. Al mover la fecha del config para registrar el cambio de regla, **la corrida de pruebas reescribió `legal/anexo-encargo.html` y `sitio/anexo-encargo.html`**: los dos textos que «no se tocan» dejaron de ser los que estaban, y **21 pruebas** de preflight y de manifiesto se cayeron con ellos (el preflight compara la huella del archivo del servidor con la del manifiesto). Se restauraron con `git checkout` y la causa se corrigió: `actualizado_at` es la fecha de la **tabla** (cuyos plazos no cambiaron) y la fecha de la **regla** va en su campo propio (`regla_de_apertura_actualizada_at`). Reglas: (1) **una fuente que se publica en un texto suscrito no cambia de valor**: si el valor aparece en un texto firmado, ese texto se vuelve irreproducible; (2) **un cambio de regla que no cambia el texto va en un campo nuevo**, no en el que el texto firmado publica; (3) **después de una corrida de pruebas se mira `git status`**: un archivo que «no se toca» y aparece modificado es un texto suscrito reescrito; (4) **las huellas de los textos firmados se comparan con las conocidas** en el barrido de cierre, no se dan por buenas: son el único control de ese tipo de efecto |
 
 **Formato de commit real** (verificá con `git log` antes de cada uno, la convención migró varias veces):
 

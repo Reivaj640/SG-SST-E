@@ -5,10 +5,12 @@
  * QUE HACE ESTE TEST
  * ------------------
  * Los candidatos de la v1.4 y del Encargo 2026-11-12 se arman por un programa
- * (`scripts/generar-candidatos-v1.4.js`) en dos fases: C1 a C7, y las
- * determinaciones legales de la mesa L1 a L7. Ese programa **se niega a
- * escribir** si una ancla no casa exactamente una vez, pero un candida que
- * "sale sin error" no es lo mismo que un candida que dice lo que debe decir.
+ * (`scripts/generar-candidatos-v1.4.js`) en tres fases: C1 a C7, las
+ * determinaciones legales de la mesa L1 a L7, y la regla de la compuerta de la
+ * tabla supletoria (decision del owner del 13-nov-2026). Ese programa **se
+ * niega a escribir** si una ancla no casa exactamente una vez, pero un
+ * candidato que "sale sin error" no es lo mismo que un candidato que dice lo
+ * que debe decir.
  *
  * LO QUE SE VERIFICA ACA
  * ----------------------
@@ -19,6 +21,9 @@
  *   art. 26 que no se activa, la auditoria que no se activa, Backblaze.
  * - Que el candidato del Encargo lleva la version 2026-11-12 unificada y el
  *   papel de Google como Encargado.
+ * - Que el candidato del Encargo dice la regla de la compuerta (13-nov-2026):
+ *   la apertura es un acto expreso y fechado de K+AIR, y no queda la frase que
+ *   exigia una validacion escrita de un tercero.
  * - Que **el texto del candidato es byte a byte el de la determinacion**: no
  *   hay texto inventado entre el dictamen y el candidato.
  * - Que el generador **se niega** cuando una ancla no casa.
@@ -194,6 +199,52 @@ test('el Anexo de Encargo 2026-11-12 lleva la version unificada', () => {
     'la remision dice certificaciones y revisiones, no auditoria');
   assert.ok(plano(texto).includes('los dos instrumentos anteriores no son pasos pendientes'),
     'la prevalencia declara los actos ya ejecutados');
+});
+
+test('el candidato del Encargo dice la regla de la compuerta (13-nov-2026)', () => {
+  // El owner decidio el 13-nov-2026 que la validacion escrita de un tercero no
+  // es requisito para abrir la compuerta: la abre K+AIR, con un acto
+  // expreso y fechado. El texto firmado del 11-jun-2026 dice lo contrario en
+  // dos frases del seccion 8, y el v1.4 es un texto NUEVO: lo que no se hace
+  // es corregir un texto suscrito, se sustituye.
+  //
+  // El guard tiene las dos caras: la frase nueva TIENE que estar (si no, la
+  // prueba pasaria sola) y las dos frases viejas NO pueden quedar.
+  const planoEncargo = plano(fs.readFileSync(ENCARGO_CANDIDATO, 'utf8'));
+
+  assert.ok(planoEncargo.includes('una vez activada por K+AIR con la fecha de su acto'),
+    'la tabla se abre con un acto expreso y fechado de K+AIR');
+  assert.ok(planoEncargo.includes('no est&aacute;n sujetos a la validaci&oacute;n de un tercero'),
+    'los plazos supletorios no dependen de una validacion de un tercero');
+  assert.ok(planoEncargo.includes('la apertura de la tabla es un acto expreso y fechado de K+AIR'),
+    'dice quien abre la compuerta y como');
+
+  assert.equal(planoEncargo.includes('una vez validada y activada'), false,
+    'no queda la frase que exigia una validacion');
+  assert.equal(planoEncargo.includes('validaci&oacute;n jur&iacute;dica pendiente'), false,
+    'no queda la frase que decia que los plazos esperan una validacion');
+
+  // La fecha que publica el seccion 8 es la de la TABLA (version 1.0), y la tabla no
+  // cambio de plazos: la fecha de la REGLA va en su propio campo del config.
+  // (Mover 'actualizado_at' haria que el generador del Anexo de Encargo
+  // firmado produjera un texto distinto del suscrito, y una corrida de
+  // pruebas reescribiria el texto firmado y la copia publica de 'sitio/'.)
+  assert.ok(planoEncargo.includes('actualizada el 31 de octubre de 2026'),
+    'el seccion 8 publica la fecha real de la tabla, que no cambio');
+  const config = JSON.parse(fs.readFileSync(
+    path.join(SERVICIO, 'config', 'tabla-conservacion.json'), 'utf8'));
+  assert.equal(config.actualizado_at, '2026-10-31',
+    'la fecha de la tabla no se mueve: el texto firmado la publica');
+  assert.equal(config.regla_de_apertura_actualizada_at, '2026-11-13',
+    'la fecha de la regla de apertura va en su propio campo');
+
+  // Y el Anexo de Nube NO se movio: la compuerta de la tabla se describe en el
+  // Anexo de Encargo, que es donde esta la tabla del seccion 8.
+  assert.equal(
+    sha256(NUBE_CANDIDATO),
+    'ba664e6f1ad130c968b6224ab71ed66a52017e96ac578b8b0e740fd55f9e3b47',
+    'el candidato del Anexo de Nube v1.4 sigue byte a byte el que estaba'
+  );
 });
 
 test('el texto del candidato es byte a byte el de la determinacion', () => {

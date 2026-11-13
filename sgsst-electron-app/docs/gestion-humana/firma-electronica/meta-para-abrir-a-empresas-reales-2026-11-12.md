@@ -16,11 +16,10 @@
 > emitido y medido»**, no «el acto esta cumplido». Los actos de un tercero —una firma, una credencial,
 > una ventana de mantenimiento, una respuesta— **no** cierran un bloque: lo que lo cierra es que el
 > pedido salio, con su destinatario, su fecha y su verificacion. Esos actos se siguen en
-> **`tabla-de-solicitudes-2026-11-13.md`**, que es la tabla de las 24 solicitudes: hoy estan **18
-> `EMITIDA`, 5 `CERRADA`, 1 `RESPONDIDA`** (la S-22 por respuesta aplicada; S-01, S-03, S-04 y S-23 por
-> resolucion, todas el 13-nov-2026, con la anotacion «resuelto por decision del owner, sin ratificacion
-> externa»; y la S-02 respondida por el escrito del abogado matriculado del 13-nov-2026, que **no es
-> formal** y por eso **no cierra** esa fila).
+> **`tabla-de-solicitudes-2026-11-13.md`**, que es la tabla de las 25 solicitudes: hoy estan **19
+> `EMITIDA`, 6 `CERRADA`, 0 `RESPONDIDA`** (la S-22 por respuesta aplicada; S-01, S-02, S-03, S-04 y S-23
+> por resolucion, todas el 13-nov-2026, con la anotacion «resuelto por decision del owner, sin ratificacion
+> externa»; y la S-25, que es el acto del owner para **abrir la compuerta** de la tabla supletoria).
 > **Este mapa no afirma que el servicio pueda abrirse a empresas
 > reales**: los hechos de cada bloque (que no hay empresa real suscrita, que la compuerta sigue
 > apagada, que los permisos siguen en 777, que no hay respaldo fuera del servidor) siguen siendo
@@ -269,26 +268,43 @@ firmas).
 aplicable entro a la v1.4 (que se regenero). Esta en `tabla-de-solicitudes-2026-11-13.md`, con
 su destinatario, su verificacion y su fecha limite.
 
-### M.6 - La tabla supletoria de conservacion sigue sin validar, con su compuerta cerrada a proposito, y la validacion escrita ya esta SOLICITADA — CERRADO. Solicitud S-02 emitida el 13-nov-2026
+### M.6 - La tabla supletoria de conservacion esta PREPARADA, con su compuerta cerrada a proposito; la validacion escrita de un tercero ya no es requisito (decision del owner del 13-nov-2026) — CERRADO. Solicitud S-02 cerrada por resolucion el 13-nov-2026
 
 **Origen.** J8 del informe al abogado; la fila 3.1 y 3.2 del cuadro canonico.
 
 **Qué se verificó.** `config/tabla-conservacion.json` tiene `aplicacion.activada = false`: la
-compuerta de conservacion esta **cerrada a proposito** y asi debe seguir hasta que el abogado valide
-la tabla y los plazos de 10 y 5 anos. El catalogo legado de 20 anos desde la firma no esta alineado
-con la precedencia del 8.6(a).
+compuerta de conservacion esta **cerrada a proposito** y asi sigue. El catalogo legado de 20 anos
+desde la firma no esta alineado con la precedencia del 8.6(a), y el sistema no lo aplica.
 
-**Decisión tomada (12-nov-2026).** La compuerta **sigue cerrada**, y esa es la decision. Al abogado se le
-entrega la tabla **ya alineada** (ocho categorias, plazos de 10 y 5 anos). Si la validacion procede, la
-apertura es un acto del owner **despues**, en el orden que el bloque ya declara: **validar, alinear,
-reejecutar las pruebas, abrir**. El paso de reejecutar las pruebas no es opcional: abrir la compuerta
-cambia el comportamiento del servicio. Detalle en `decisiones-de-fondo-2026-11-12.md`, bloque M.6.
+**Lo que cambio el 13-nov-2026 (decision del owner).** La **validacion escrita de un tercero dejo de ser
+requisito** para abrir la compuerta. Antes la regla era: `activada: true` **y** `validado_por` **y**
+`validado_at` reales. Ahora la regla es: `activada: true` **y** `activado_at` con fecha. El cambio esta
+en el codigo (`retencion.js`, `_tablaActivada()`), en la tabla (`config/tabla-conservacion.json`, con
+la nota que dice que la abre y que ya no se exige) y en los candidatos de la v1.4, que se regeneraron
+con el texto que dice la regla nueva. La compuerta **sigue cerrada**: lo que falta es el acto del owner
+(**S-25**), no un escrito de un tercero.
+
+**Lo que dice el Acuerdo vigente (13-nov-2026).** El Acuerdo vigente es la **v1.6**, publicada y activa
+desde el 11-nov-2026, y su numeral **8.6(a)** describe esta tabla: la administra K+AIR, es configurable,
+cada regla ha de tener fundamento y punto de inicio, se publica en el Anexo de Encargo y un cambio en
+ella no altera los plazos ya calculados. Esta tabla cumple los cuatro requisitos, con sus ocho
+categorias. El numeral **no exige** una validacion escrita de un tercero: lo que la exigia era el codigo
+de K+AIR, por decision propia del 12-nov-2026. Antes este mapa decia que «el Acuerdo vigente no
+describe estos plazos»: era falso, y quedo corregido.
+
+**Decisión tomada (12-nov-2026) y lo que hizo el owner el 13-nov-2026.** El 12-nov-2026 la compuerta
+**sigue cerrada**, y esa es la decision: al abogado se le entrega la tabla **ya alineada** (ocho
+categorias, plazos de 10 y 5 anos) y el orden declarado es **validar, alinear, reejecutar las pruebas,
+abrir**. El paso de reejecutar las pruebas no es opcional: abrir la compuerta cambia el comportamiento
+del servicio. El 13-nov-2026 el owner cambio el **paso (i)**: la validacion escrita ya no es requisito,
+y el paso (iv) —abrir— es un acto expreso y **fechado** del owner. Detalle en
+`decisiones-de-fondo-2026-11-12.md`, bloque M.6.
 
 **Lo que la determinacion legal del 12-nov-2026 corrigio en este bloque (M.6).** Tres cosas, todas
 verificadas contra el codigo y contra la tabla:
 
 1. **La tabla tiene OCHO categorias, no cinco.** Las cinco son los registros del SG-SST del literal (b) del
-   §8.6; la tabla supletoria tiene ocho filas con cinco plazos distintos. La validacion debe cubrir las ocho.
+   §8.6; la tabla supletoria tiene ocho filas con cinco plazos distintos.
 2. **La regla `CUSTODIA_20_ANOS` sigue en el codigo**: lo que se retiro fue su **aplicacion automatica como
    plazo por defecto** (el planificador ya no la usa). Por eso el fondo del punto (el catalogo no manda
    sobre la precedencia del §8.6(a)) se sostiene, y la frase «ya esta retirado del codigo» no.
@@ -307,14 +323,15 @@ puede ser bajado por la tabla de la Empresa; **C4**, la fecha de cese la informa
 escrito.
 
 **Y un defecto que la determinacion destapo y que ya quedo corregido (M.30):** `validado_por` y
-`validado_at` **no los leia ningun codigo**, de modo que la compuerta se podia abrir con la bandera sola,
-sin que nada exigiera la validacion que el propio archivo dice que la precede. Ahora `_tablaActivada()`
-exige los dos campos, con tres pruebas que fijan las tres formas (sin validacion, a medias, completa).
+`validado_at` **no los leia ningun codigo**, de modo que la compuerta se podia abrir con la bandera sola.
+El 12-nov-2026 se tapo con esos dos campos; el 13-nov-2026 **la regla cambio** y el codigo quedo fiel a
+la regla nueva: ahora lo que se exige es el **acto fechado** del owner, y `validado_por`/`validado_at`
+dejaron de ser condicion (quedan como registro informativo de la consulta, que esta archivada).
 
 **Y las cuatro condiciones ya estan EN EL CODIGO, no solo escritas (12-nov-2026).** La determinacion de L3
 propuso C1 a C4; el worker las implemento y cada una tiene su prueba:
 
-- **C1** (el registro de operaciones sigue al documento asociado con piso legal o hold sin termino):
+- **C1** (el registro de operaciones sigue al del documento asociado con piso legal o hold sin termino):
   `retencion.js` -> `plazoRegistroOperaciones()`, con sus tres casos (piso legal, sin termino, resto).
 - **C2** (el computo en **anos calendario**): se corrigio una contradiccion real: el sistema sumaba **dias**
   (3650) y el texto al Trabajador decia **«10 anos (3650 dias)»**, que es una equivalencia **falsa** (3650 dias
@@ -328,36 +345,33 @@ propuso C1 a C4; el worker las implemento y cada una tiene su prueba:
 - **C4** (la fecha de cese la informa y valida la Empresa por escrito, y la firma no la sustituye): el
   planificador no calcula fecha de supresion sin fecha de cese y deja el registro con el hold que lo dice.
 
-**Y la compuerta no se puede abrir con el marcador (12-nov-2026).** El archivo que se despacha trae
-`validado_por` con un **marcador legible** («PENDIENTE: lo llena el abogado externo…») y `validado_at` en
-`null`, mas `validado_por_documento` y `activado_at` en `null`. Para que nadie abra la compuerta creyendo que
-«el campo esta lleno», `_tablaActivada()` **rechaza el marcador** por nombre: un «PENDIENTE…» **no es una
-validacion escrita**, es la ausencia de ella escrita. El nombre del abogado **no se inventa**: lo llena el
-abogado externo.
+**Y la compuerta no se puede abrir con el marcador (13-nov-2026).** `_tablaActivada()` **rechaza el
+marcador** por nombre: un «PENDIENTE…» en `activado_at` **no es el acto del owner**, es la ausencia de
+el escrita. Y el **nombre de nadie se inventa**: `validado_por` queda en `null`, con la consulta al abogado
+registrada aparte, en `consulta_juridica`, con su huella.
 
 **Evidencia.** `sgsst-electron-app/firma-service/config/tabla-conservacion.json` ->
-`aplicacion.activada = false`; `10-informe-correcciones-para-asesor-juridico.md`, fila J8 (PENDIENTE:
-el catalogo legado no esta alineado y la compuerta sigue cerrada porque depende de su validacion);
-`dictamen-legal-2026-11-12-tandas-2-y-3.md`, seccion 2 (L3).
+`aplicacion.activada = false`, `aplicacion.activado_at = null`, y la nota de `aplicacion` que dice que
+la abre el acto fechado del owner; `src/services/retencion.js` (`_tablaActivada`);
+`dictamen-legal-2026-11-12-tandas-2-y-3.md`, seccion 2 (L3); `scripts/fixtures/acuerdo-v1.6.txt`,
+numeral 8.6(a).
 
 **Qué falta.** Ya **no** falta nada del lado de la maquina: la tabla esta alineada, las cuatro
 condiciones estan en el codigo con sus pruebas, la compuerta esta cerrada por codigo y el marcador
-no la abre. El 13-nov-2026 se emitio la solicitud **S-02** al abogado matriculado. Lo que queda: (i)
-la **validacion escrita** sobre los plazos de diez (10) y cinco (5) anos y sobre las condiciones C1
-a C4, con `validado_por`, `validado_at` y `validado_por_documento` mas su SHA-256; (ii) **despues**,
-la **apertura** por parte del owner, que es un acto **separado y posterior**: cambiar `activada` a
-`true` y llenar `activado_at`; y (iii) la **reejecucion de la suite** entre validacion y apertura,
-porque abrir la compuerta cambia el comportamiento del servicio.
+no la abre. Lo que queda es **un solo acto**: la **apertura** por parte del owner, que es un acto
+expreso y **fechado** (cambiar `activada` a `true` y llenar `activado_at`), con la **reejecucion de la
+suite** antes, porque abrir la compuerta cambia el comportamiento del servicio. Eso es la **S-25** (M.30).
+Lo que **no** queda: la validacion escrita de un tercero, que el owner declaro que no es requisito.
 
-**Quién lo tiene.** El abogado matriculado (la validacion) y el owner (la apertura, despues).
+**Quién lo tiene.** El owner (la apertura).
 
-**Solicitud.** **S-02**, emitida el 13-nov-2026 y **respondida el mismo dia** por el escrito del abogado
-matriculado: **la sustancia queda validada** (los 10 y 5 anos son el sistema de archivo o retencion
-documental del art. 2.2.4.6.13 y son compatibles con el art. 2.2.2.25.2.8), pero **el escrito no es
-formal** y el propio abogado escribio que **no cierra** la fila, porque el candado del codigo exige
-`validado_por` **y** `validado_at` de un abogado matriculado y **no los sustituye**. Por eso la fila
-esta **`RESPONDIDA`**, no `CERRADA`. Esta en `tabla-de-solicitudes-2026-11-13.md`, con
-su destinatario, su verificacion y su fecha limite.
+**Solicitud.** **S-02**, emitida el 13-nov-2026, **respondida el mismo dia** por el escrito del abogado
+matriculado (la **sustancia quedo validada**: los 10 y 5 anos son el sistema de archivo o retencion
+documental del art. 2.2.4.6.13 y son compatibles con el art. 2.2.2.25.2.8, aunque el escrito no es formal
+y el propio abogado escribio que no cerraba la fila). El 13-nov-2026 el owner decidio que esa validacion
+**no es requisito**, cambio la regla de la compuerta en el codigo y en la tabla, y **la fila se CERRO por
+resolucion** —sin ratificacion externa, y con el escrito archivado como ratificacion, sin reabrir—. Esta
+en `tabla-de-solicitudes-2026-11-13.md`, con su destinatario, su verificacion y su fecha limite.
 
 ### M.7 - No hay copia de los respaldos fuera del servidor, y los actos del P8 aun no estan en ninguno: el destino y la activacion ya estan SOLICITADOS — CERRADO. Solicitud S-09 emitida y Solicitud S-04 emitida el 13-nov-2026
 
@@ -895,7 +909,7 @@ suscrito no se toca) y corregir la tabla de instrumentos»); `verificacion-cierr
 requisitos 5.5 y 5.6 (**PENDIENTE** y **PARCIALMENTE**: ambos exigen «una version nueva del Anexo de
 Nube (v1.4)»); `sgsst-electron-app/legal/anexo-nube-v1.3.html` (los §1 y §5);
 `sgsst-electron-app/legal/anexo-encargo.html` (la remision); `candidatos-v1.4/` (candidato Nube v1.4:
-111 462 B, `ba664e6f...e3b47`; candidato Encargo 12-nov: 100 153 B, `d4df187a...4e2967`; vigentes
+111 462 B, `ba664e6f...e3b47`; candidato Encargo 12-nov: 100 396 B, `b345ab87...3a749`; vigentes
 intactos: `fdd10551...b585d` y `6308b1f7...b8948`).
 
 **LO QUE LA MESA DE DETERMINACIONES LE METIO (12-nov-2026).** El generador de candidatos ahora arma el texto
@@ -930,7 +944,7 @@ vuelve a armar.
 13-nov-2026 **no es formal** y se archivo **como ratificacion, sin reabrir la fila**; el **texto final lo
 redacto K+AIR con la autorizacion del owner** y los candidatos se **regeneraron**
 (`candidatos-v1.4/anexo-nube-v1.4.html`, 111 462 B / `ba664e6f…e3b47`;
-`candidatos-v1.4/anexo-encargo-2026-11-12.html`, 100 153 B / `d4df187a…4e2967`). Esta en
+`candidatos-v1.4/anexo-encargo-2026-11-12.html`, 100 396 B / `b345ab87…3a749`). Esta en
 `tabla-de-solicitudes-2026-11-13.md`, con
 su destinatario, su verificacion y su fecha limite.
 ## 3. Riesgos y deuda
@@ -1391,11 +1405,11 @@ salida de la prueba, en el servidor.
 
 **Quien lo tiene.** —
 
-### M.30 - La compuerta de conservacion se abria con la bandera sola: la validacion escrita no la exigia nadie — CERRADO
+### M.30 - La compuerta de conservacion se abria con la bandera sola: hoy la abre un acto FECHADO del owner, y la validacion escrita de un tercero ya no es requisito — CERRADO. Solicitud S-25 emitida el 13-nov-2026
 
-**Origen.** La determinacion legal del 12-nov-2026 (punto L3).
+**Origen.** La determinacion legal del 12-nov-2026 (punto L3); la decision del owner del 13-nov-2026.
 
-**Que se verifico.** La tabla supletoria declara su propia activacion (`aplicacion.activada`) y el codigo
+**Que se verifico (12-nov-2026).** La tabla supletoria declara su propia activacion (`aplicacion.activada`) y el codigo
 la leia: `_tablaActivada()` devolvia `true` con solo que `activada` valiera `true`. Pero
 `validado_por` y `validado_at` —los dos campos que guardan **quien** valido los plazos de diez (10) y
 cinco (5) anos y **cuando**— **no los leia ningun codigo**: el respaldo congelado en el propio codigo
@@ -1403,26 +1417,39 @@ tambien los trae en `null`. En los hechos la compuerta era un acto de disciplina
 `activada` a `true` aplicaba los plazos de la tabla **sin que nada exigiera la validacion que el
 archivo mismo dice que los precede**.
 
-**Defecto real corregido.** `src/services/retencion.js`: `_tablaActivada()` exige ahora `validado_por`
-**y** `validado_at`. Sin los dos, la compuerta **no** se abre, por mucho que la bandera diga que si. Es
-el cambio minimo que hace que la maquina sea fiel a lo que el texto promete, y evita el falso verde:
-un archivo con `activada: true` y sin validacion aplicaba los plazos de categorias que nadie habia
-validado.
+**Defecto real corregido.** `src/services/retencion.js`: `_tablaActivada()` dejo de abrirse con la bandera
+sola. La primera correccion (12-nov-2026) fue exigir `validado_por` **y** `validado_at`.
 
-**Como se valido.** Con **tres pruebas nuevas** que fijan las tres formas que importan: sin validacion
-(no se abre), con la validacion a medias (no se abre) y con la validacion completa (si se abre). El
-helper de pruebas (`tests/helpers.js`) inyecta una validacion **ficticia**, porque lo que se prueba es
-el mecanismo de la tabla y no la validacion de sus plazos (que es un acto del abogado). El area de
-conservacion: **24 de 24**.
+**La regla nueva (13-nov-2026, decision del owner).** La validacion escrita de un tercero **no es
+requisito**: la compuerta la abre un acto expreso y **fechado** del owner, o sea `aplicacion.activada`
+en `true` **y** `aplicacion.activado_at` con fecha. `_tablaActivada()` exige las dos cosas y **ya no
+mira** `validado_por` ni `validado_at`: esos campos quedan como registro informativo de la consulta al
+abogado (archivada, con su huella, en `consulta_juridica` dentro de la propia tabla). Motivo de pedir la
+fecha: `activada` sola seria un interruptor **sin cuando**, que es el defecto que este mismo bloque
+destapo el 12-nov-2026.
+
+**Como se valido.** Con **cuatro pruebas** que fijan las formas que importan: sin la fecha del acto (no
+se abre), con un marcador de pendiente en vez de fecha (no se abre), con el acto fechado (si se abre) y
+**la que muerde el cambio de regla**: la compuerta se abre **sin** `validado_por` ni `validado_at`. El
+helper de pruebas (`tests/helpers.js`) inyecta una **fecha de apertura ficticia**, porque lo que se
+prueba es el mecanismo de la tabla y no el acto del owner (que es un acto humano). Los dos **mutantes**
+se aplicaron y se verificaron: reintroducir la exigencia de la validacion escrita **mata** doce
+pruebas (entre ellas la que fija la regla nueva), y quitar la exigencia de la fecha **mata** la prueba
+que la fija.
 
 **Evidencia.** `src/services/retencion.js` (`_tablaActivada`); `tests/services/conservacion-supletoria.test.js`
-(los tres casos); `tests/helpers.js` (`tablaConservacionActivada`).
+(las cuatro formas y el guard de la regla nueva); `tests/helpers.js` (`tablaConservacionActivada`);
+`config/tabla-conservacion.json` (`aplicacion.activada = false`, `aplicacion.activado_at = null`, y la
+nota que dice que la abre el acto fechado del owner).
 
-**Que falta.** Nada: quedo corregido y con prueba. **Lo que sigue igual** es un acto del owner y del
-abogado, y no cambia: la **validacion** de los plazos (M.6) y la apertura de la compuerta. Lo que
-cambio es que **la apertura ahora exige la validacion escrita en el archivo**, no solo la decision.
+**Que falta.** El **acto de apertura** del owner, que es un acto expreso y **fechado**, con la suite
+reejecutada antes (abrir la compuerta cambia el comportamiento del servicio: los plazos por defecto de
+diez (10) y cinco (5) anos empiezan a aplicar). Eso es la **S-25**. La **validacion escrita de un
+tercero ya no es requisito** y no se espera: lo que sigue pendiente en el mundo es la ratificación
+externa de L1, L2, L4, L5 y las condiciones C1 a C4 (M.5, M.18, M.28/M.7), que es otra cosa y no bloquea
+la apertura.
 
-**Quien lo tiene.** —
+**Quien lo tiene.** El owner.
 
 ### M.31 - El procedimiento del canal de `fecha_terminacion` ya tiene las cinco decisiones del owner: falta la validacion del abogado, la firma del owner y la primera operacion real: el codigo existe y el Anexo lo exige — CERRADO. Solicitudes S-22 (respondida y cerrada), S-23 (cerrada por resolucion) y S-24 (emitida) el 13-nov-2026
 
@@ -1486,6 +1513,11 @@ solicitudes: su escrito **no es formal** (sin nombre, fecha de suscripcion ni hu
 como ratificacion **sin reabrir** las cuatro filas ya cerradas y **movo la S-02 a `RESPONDIDA`**, con la
 sustancia validada y el candado de la compuerta **sin abrir**. La tabla quedo en **24 solicitudes: 18
 `EMITIDA`, 5 `CERRADA` y 1 `RESPONDIDA`** (S-01, S-03, S-04, S-22, S-23; y S-02 respondida).
+
+**Anotacion del 13-nov-2026 (tarde, novena parte).** La S-02 **se cerro por resolucion** del owner, que
+declaro que la validacion escrita de un tercero **no es requisito** para la compuerta; la regla cambio en
+el codigo y en la tabla, y la tabla de solicitudes quedo en **25 solicitudes: 19 `EMITIDA`, 6 `CERRADA`, 0
+`RESPONDIDA`** (con la S-25 nueva: el acto del owner para abrir la compuerta).
 **El codigo no se toca**: la decision era de procedimiento y de escritura.
 
 **Medido en produccion el 13-nov-2026 (SSH, solo lectura).** Las dos tablas del canal existen
@@ -1528,11 +1560,10 @@ operacion real del canal).
 | 3. Deuda y riesgo | 13 | 0 | 0 | 13 |
 | **TOTAL** | **31** | **0** | **0** | **31** |
 
-Los 0 pendientes concilian: ninguno = 0. Las 24 solicitudes de la tabla
-(`tabla-de-solicitudes-2026-11-13.md`): 18 EMITIDA, 1 RESPONDIDA, 5 CERRADA. Cerrado en
-este mapa significa que el pedido esta emitido y medido, no que el acto este cumplido:
-cada acto de un tercero se sigue en esa tabla, con su estado, su destinatario y su
-fecha.
+Los 0 pendientes concilian: ninguno = 0. Las 25 solicitudes de la tabla
+(`tabla-de-solicitudes-2026-11-13.md`): 19 EMITIDA, 6 CERRADA. Cerrado en este mapa
+significa que el pedido esta emitido y medido, no que el acto este cumplido: cada acto
+de un tercero se sigue en esa tabla, con su estado, su destinatario y su fecha.
 
 ---
 

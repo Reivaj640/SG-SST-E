@@ -99,13 +99,14 @@ determinación» sino **el acto concreto, con su responsable**. Ese es el avance
 > **Actualización del 13-nov-2026 (esta acta mide la mesa del 12-nov y eso no cambia).** El owner **cambió el
 > criterio de cierre del mapa**: un bloque cierra cuando **el pedido está emitido y medido** —con su
 > destinatario, su fecha y su verificación—, y los actos de un tercero (firma, credencial, ventana,
-> respuesta) **no** cierran un bloque: se siguen en `tabla-de-solicitudes-2026-11-13.md` (24 solicitudes: **18 `EMITIDA`, 1 `RESPONDIDA` y 5 `CERRADA`** —la S-02, respondida el
+> respuesta) **no** cierran un bloque: se siguen en `tabla-de-solicitudes-2026-11-13.md` (25 solicitudes: **19 `EMITIDA`, 0 `RESPONDIDA` y 6 `CERRADA`** —la S-02, respondida el
 > 13-nov-2026 por el abogado matriculado con un escrito **no formal** (sin nombre, sin fecha de
-> suscripción y sin huella), que **no cierra** la fila; la S-22, que el owner
+> suscripción y sin huella) y **cerrada por resolucion** ese mismo dia, al declarar el owner que esa
+> validacion **no es requisito**; la S-22, que el owner
 > respondio el 13-nov-2026 y que quedo escrita en el procedimiento del canal de `fecha_terminacion`, y
 > S-01, S-03, S-04 y S-23, cerradas por resolucion ese mismo dia: «resuelto por decision del owner, sin
 > ratificacion externa»— y
-> **1 `RESPONDIDA`**). Con ese criterio el mapa quedó en **31 cerrados / 0 pendientes**, y
+> **0 `RESPONDIDA`**). Con ese criterio el mapa quedó en **31 cerrados / 0 pendientes**, y
 > **no afirma que el servicio pueda abrirse a empresas reales**. La cifra de arriba (9 cerrados / 21
 > pendientes) es la de esta acta, con la regla de entonces.
 >

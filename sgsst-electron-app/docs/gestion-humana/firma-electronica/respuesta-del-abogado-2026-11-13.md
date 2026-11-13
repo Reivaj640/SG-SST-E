@@ -120,6 +120,12 @@ Backblaze) y los candidatos se **regeneraron**; los textos ya suscritos **no se 
 Textos suscritos **intactos**: Nube v1.3 `fdd10551…585d` (85 143 B) y Encargo 2026-11-11 `6308b1f7…b8948`
 (94 923 B). Manifiesto `legal-readiness.json` **intacto**: `d9b59699…c9097b`.
 
+**Re-medido el 13-nov-2026 (tarde, misma fecha).** El candidato del Anexo de Encargo **cambió de bytes**:
+passó de 100 153 B / `d4df187a…4e2967` a **100 396 B / `b345ab87…3a749`**. La razón no es este escrito:
+es el **cambio de la regla de la compuerta** de la tabla supletoria (decision del owner), que el
+generador aplica como fase 3 sobre el §8 del candidato. El candidato del Anexo de Nube **no se movió**
+(`ba664e6f…e3b47`). Los textos suscritos y el manifiesto **siguen intactos**.
+
 ---
 
 ## 5. Lo que este escrito no cierra
@@ -127,6 +133,12 @@ Textos suscritos **intactos**: Nube v1.3 `fdd10551…585d` (85 143 B) y Encargo 
 - **No es el escrito formal.** Sin nombre, fecha de suscripción y SHA-256 de un documento firmado, **no puede
   cerrar** ninguna fila que exija validación formal. La **S-02** lo dice el propio abogado: el candado exige
   `validado_por` **y** `validado_at` de un abogado matriculado, y «yo no lo sustituyo».
+- **Lo que pasó después (13-nov-2026, tarde).** El owner decidió que **la validación escrita de un tercero no
+  es requisito** para la compuerta de la tabla supletoria: la abre un acto expreso y **fechado** de K+AIR
+  (`aplicacion.activada` en `true` más `aplicacion.activado_at` con fecha). La regla cambió en el código y en
+  la tabla, y con eso **la S-02 se cerró por resolución**, con el escrito archivado como ratificación y **sin
+  reabrir** la fila. Eso **no** es una ratificación de este escrito: L1, L2, L4, L5 y las condiciones C1 a C4
+  **siguen** sin ratificación externa en el mundo.
 - **No ratifica L1, L2, L4 ni L5**, ni cierra **M.5**, **M.28/M.7** ni **M.31**: lo deja **para el mundo**, como
   quedó anotado en cada fila.
 - **No cierra M.18.** La suscripción de la v1.4 con huella real y su publicación **siguen siendo actos**, no

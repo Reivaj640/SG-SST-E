@@ -373,10 +373,11 @@ los **cerro el equipo** en la misma ronda.
 > cierre del mapa**: un bloque cierra cuando **el pedido esta emitido y medido**, y los actos de un tercero
 > (firma, credencial, ventana, respuesta) **no** cierran un bloque: se siguen en
 > `tabla-de-solicitudes-2026-11-13.md`. Con ese criterio el mapa queda en **31 bloques: 31 cerrados / 0
-> pendientes**, con **24 solicitudes: 18 `EMITIDA`, 1 `RESPONDIDA` y 5 `CERRADA`** (la S-02, respondida el
+> pendientes**, con **25 solicitudes: 19 `EMITIDA`, 0 `RESPONDIDA` y 6 `CERRADA`** (la S-02, respondida el
 > 13-nov-2026 por el abogado matriculado con un escrito **no formal** —sin nombre, sin fecha de
-> suscripción y sin huella—, que **no cierra** la fila; la S-22, que el owner respondio el
-> 13-nov-2026 y que quedo escrita en el procedimiento del canal de `fecha_terminacion`; y S-01, S-03,
+> suscripción y sin huella— y **cerrada por resolucion** ese mismo dia, al declarar el owner que esa
+> validacion **no es requisito**; la S-22, que el owner respondio el
+> 13-nov-2026 y que quedo escrita en el procedimiento del canal de `fecha_terminacion`; y S-01, S-02, S-03,
 > S-04 y S-23, cerradas por resolucion ese mismo dia: «resuelto por decision del owner, sin ratificacion
 > externa») y **1
 > `RESPONDIDA`**, y **no afirma que el servicio pueda abrirse

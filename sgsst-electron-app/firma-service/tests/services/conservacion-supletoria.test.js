@@ -81,11 +81,11 @@ const TABLA_MODIFICADA = {
   version: 'test-modificada',
   aplicacion: {
     activada: true,
-    estado: 'PROPUESTA',
-    // La compuerta exige la validacion escrita (12-nov-2026): sin estos dos
-    // campos NO se abre, por mucho que `activada` diga que si.
-    validado_por: 'PRUEBA automatica: validacion ficticia',
-    validado_at: '2026-11-12T00:00:00.000Z',
+    estado: 'PREPARADA',
+    // La compuerta exige el ACTO FECHADO del owner (13-nov-2026): sin
+    // `activado_at` NO se abre, por mucho que `activada` diga que si. La
+    // validacion escrita de un tercero ya no es requisito.
+    activado_at: '2026-11-13T00:00:00.000Z',
   },
   categorias: [
     { id: 'DOCUMENTO_FIRMADO', plazo_dias: 1000, punto_inicio: 'fecha_firma', piso_legal: false, hold_siempre: false },
@@ -520,20 +520,24 @@ test('la tabla que se despacha viene con la compuerta CERRADA', () => {
   assert.equal(retencion.tablaActivada(), false);
 });
 
-// LA COMPUERTA NO SE ABRE CON LA BANDERA SOLA (12-nov-2026).
+// LA COMPUERTA SE ABRE CON EL ACTO FECHADO DEL OWNER (13-nov-2026).
 //
-// El hallazgo: `validado_por` y `validado_at` estaban en el archivo de la
-// tabla y NO los leia ningun codigo. La compuerta era, en los hechos, un acto
-// de disciplina humana: cambiar `activada` a `true` aplicaba los plazos de
-// diez (10) y cinco (5) años sin que nada exigiera la validacion que el
-// propio archivo dice que los precede.
+// El cambio de regla: hasta el 12-nov-2026 la compuerta exigia `activada: true`
+// Y ADEMAS la validacion escrita de un tercero (`validado_por` y `validado_at`).
+// El owner decidio el 13-nov-2026 que ese escrito formal NO es requisito, y el
+// codigo cambio con la regla: la compuerta se abre con `activada: true` y
+// `activado_at` con fecha, que es el rastro auditable del acto.
 //
-// Aqui se fija lo contrario, y con las tres formas que importan: sin
-// validacion, con la validacion a medias, y con la validacion completa.
-test('la compuerta NO se abre con `activada: true` y sin validacion escrita', () => {
-  const sinValidacion = {
-    version: 'test-sin-validacion',
-    aplicacion: { activada: true, estado: 'VALIDADA', validado_por: null, validado_at: null },
+// Aqui se fija lo contrario, y con las tres formas que importan: sin fecha,
+// con un marcador en vez de fecha, y con el acto completo. Y el guard de que la
+// validacion escrita YA NO ES REQUISITO: sin `validado_por` ni `validado_at`,
+// la compuerta se abre igual. Ese ultimo es el mutante que tiene que morder:
+// si alguien vuelve a meter la validacion como condicion, esta prueba falla.
+
+test('la compuerta NO se abre con `activada: true` y sin la fecha del acto', () => {
+  const sinActo = {
+    version: 'test-sin-acto',
+    aplicacion: { activada: true, estado: 'PREPARADA', activado_at: null },
     categorias: TABLA_MODIFICADA.categorias,
     mapeo_codigo: TABLA_MODIFICADA.mapeo_codigo,
   };
@@ -541,22 +545,21 @@ test('la compuerta NO se abre con `activada: true` y sin validacion escrita', ()
     categoria_retencion: 'TABLA_EMPRESA',
     fecha_creacion: FIRMA_BASE,
     empresa: EMPRESA_SIN_PLAZO,
-    tabla_conservacion: sinValidacion,
+    tabla_conservacion: sinActo,
   });
   assert.equal(plan.plazo_conservacion_fuente, 'tabla_supletoria_pendiente',
-    'sin validacion escrita, la tabla no aplica sus plazos aunque la bandera diga que si');
+    'sin la fecha del acto, la tabla no aplica sus plazos aunque la bandera diga que si');
   assert.equal(plan.fecha_conservacion, null,
     'y por eso el registro queda retenido, sin fecha de supresion');
 });
 
-test('la compuerta tampoco se abre con la validacion a medias', () => {
-  const mediaValidacion = {
-    version: 'test-validacion-a-medias',
+test('la compuerta tampoco se abre con un marcador de pendiente en vez de fecha', () => {
+  const conMarcador = {
+    version: 'test-marcador',
     aplicacion: {
       activada: true,
-      estado: 'VALIDADA',
-      validado_por: 'Abogado externo (solo el nombre)',
-      validado_at: null,
+      estado: 'PREPARADA',
+      activado_at: 'PENDIENTE: lo llena el owner',
     },
     categorias: TABLA_MODIFICADA.categorias,
     mapeo_codigo: TABLA_MODIFICADA.mapeo_codigo,
@@ -565,20 +568,19 @@ test('la compuerta tampoco se abre con la validacion a medias', () => {
     categoria_retencion: 'TABLA_EMPRESA',
     fecha_creacion: FIRMA_BASE,
     empresa: EMPRESA_SIN_PLAZO,
-    tabla_conservacion: mediaValidacion,
+    tabla_conservacion: conMarcador,
   });
   assert.equal(plan.plazo_conservacion_fuente, 'tabla_supletoria_pendiente',
-    'la validacion esta a medias: falta la fecha, y la compuerta sigue cerrada');
+    'un marcador es la ausencia del acto escrita: la compuerta sigue cerrada');
 });
 
-test('la compuerta SI se abre con la validacion escrita completa', () => {
-  const conValidacion = {
-    version: 'test-validacion-completa',
+test('la compuerta SI se abre con el acto fechado del owner', () => {
+  const conActo = {
+    version: 'test-acto-completo',
     aplicacion: {
       activada: true,
-      estado: 'VALIDADA',
-      validado_por: 'Abogado externo (ficticio, para la prueba)',
-      validado_at: '2026-11-12T00:00:00.000Z',
+      estado: 'ACTIVADA',
+      activado_at: '2026-11-13T00:00:00.000Z',
     },
     categorias: TABLA_MODIFICADA.categorias,
     mapeo_codigo: TABLA_MODIFICADA.mapeo_codigo,
@@ -587,14 +589,34 @@ test('la compuerta SI se abre con la validacion escrita completa', () => {
     categoria_retencion: 'TABLA_EMPRESA',
     fecha_creacion: FIRMA_BASE,
     empresa: EMPRESA_SIN_PLAZO,
-    tabla_conservacion: conValidacion,
+    tabla_conservacion: conActo,
   });
   assert.notEqual(plan.plazo_conservacion_fuente, 'tabla_supletoria_pendiente',
-    'con la validacion escrita, la tabla aplica su plazo por defecto');
+    'con el acto fechado, la tabla aplica su plazo por defecto');
   assert.ok(plan.fecha_conservacion, 'y el registro deja de quedar retenido sin fecha');
 });
 
-test('con la compuerta cerrada, no hay plazo por defecto: la tabla sigue sin validar', () => {
+test('la compuerta NO exige la validacion escrita de un tercero (13-nov-2026)', () => {
+  // EL GUARD DE LA REGLA NUEVA. Si alguien volviera a meter `validado_por` y
+  // `validado_at` como condicion, esta prueba falla: no hay forma de abrir la
+  // compuerta sin un escrito formal de un abogado.
+  const sinValidacion = {
+    version: 'test-sin-validacion',
+    aplicacion: {
+      activada: true,
+      estado: 'ACTIVADA',
+      activado_at: '2026-11-13T00:00:00.000Z',
+    },
+    categorias: TABLA_MODIFICADA.categorias,
+    mapeo_codigo: TABLA_MODIFICADA.mapeo_codigo,
+  };
+  assert.equal(retencion.tablaActivada({ tabla: sinValidacion }), true,
+    'la validacion escrita ya no es requisito: la abre el acto fechado del owner');
+  assert.equal(retencion.tablaActivada({ tabla: TABLA_MODIFICADA }), true,
+    'tampoco la exige cuando los campos ni siquiera estan');
+});
+
+test('con la compuerta cerrada, no hay plazo por defecto: la tabla sigue sin activar', () => {
   const plan = retencion.planificar({
     categoria_retencion: 'TABLA_EMPRESA',
     fecha_creacion: FIRMA_BASE,
@@ -742,21 +764,29 @@ test('el respaldo congelado también arranca con la compuerta cerrada', () => {
 //   C4  la fecha de cese la informa y valida la Empresa por escrito.
 // ─────────────────────────────────────────────────────────────────────────────
 
-test('la tabla que se despacha está PREPARADA para la validación, y CERRADA', () => {
+test('la tabla que se despacha está PREPARADA para su apertura, y CERRADA', () => {
   const tabla = retencion.tablaConservacion();
   const aplicacion = tabla.aplicacion;
 
   assert.equal(aplicacion.activada, false, 'la compuerta sigue CERRADA');
-  assert.equal(aplicacion.estado, 'PROPUESTA',
-    'preparada no es validada: su estado sigue siendo PROPUESTA');
-  assert.equal(aplicacion.validado_at, null,
-    'no hay fecha de validación: el abogado todavía no ha firmado');
-  assert.match(aplicacion.validado_por, /^PENDIENTE/,
-    'el campo de validación es un MARCADOR: no se inventa el nombre de un abogado');
-  assert.equal(aplicacion.validado_por_documento, null,
-    'el escrito del abogado (y su huella) todavía no existen');
+  assert.equal(aplicacion.estado, 'PREPARADA',
+    'preparada no es activada: su estado dice PREPARADA, no ACTIVADA');
   assert.equal(aplicacion.activado_at, null,
-    'la apertura es un acto POSTERIOR y separado: su fecha aún no existe');
+    'el acto de apertura no existe todavia: lo hace el owner, con su fecha');
+  assert.equal(aplicacion.validado_por, null,
+    'no hay validacion escrita de un tercero, y ya no se exige una');
+  assert.equal(aplicacion.validado_at, null,
+    'idem: no hay fecha de validacion');
+  assert.equal(aplicacion.validado_por_documento, null,
+    'idem: no hay escrito de validacion');
+
+  // La consulta al abogado SI existe, y queda como REGISTRO, no como
+  // condicion de apertura: eso es exactamente lo que cambio el 13-nov-2026.
+  assert.ok(aplicacion.consulta_juridica,
+    'la consulta al abogado queda registrada, aunque no sea requisito');
+  assert.equal(aplicacion.consulta_juridica.estado, 'RESPONDIDA, NO FORMAL');
+  assert.match(aplicacion.consulta_juridica.sha256, /^[0-9a-f]{64}$/,
+    'la consulta se registra con la huella del documento archivado');
 
   // Las cuatro condiciones están declaradas en la tabla.
   assert.ok(Array.isArray(aplicacion.condiciones));
@@ -773,30 +803,29 @@ test('la tabla que se despacha está PREPARADA para la validación, y CERRADA', 
   assert.equal(aplicacion.alcance_validado.length, 8);
 });
 
-test('el marcador de "PENDIENTE" no abre la compuerta aunque se ponga la fecha', () => {
-  // El archivo que se despacha trae `validado_por` con un marcador y
-  // `validado_at` en null. Si alguien abriera la compuerta sin reemplazar el
-  // marcador, el código tiene que seguir tratándola como cerrada: el
-  // marcador es la ausencia de validación escrita, no una validación.
+test('el marcador de "PENDIENTE" no abre la compuerta aunque se ponga la bandera', () => {
+  // El archivo que se despacha trae la compuerta cerrada. Si alguien abriera
+  // la bandera sin poner la fecha real del acto, el código tiene que seguir
+  // tratándola como cerrada: el marcador es la ausencia del acto escrita, no
+  // un acto.
   const tabla = retencion.tablaConservacion();
-  const conFecha = Object.assign({}, tabla, {
+  const conMarcador = Object.assign({}, tabla, {
     aplicacion: Object.assign({}, tabla.aplicacion, {
       activada: true,
-      validado_at: '2026-11-12T19:20:00-05:00',
+      activado_at: 'PENDIENTE: lo llena el owner',
     }),
   });
-  assert.equal(retencion.tablaActivada({ tabla: conFecha }), false,
-    'un marcador de pendiente no es una validación escrita');
+  assert.equal(retencion.tablaActivada({ tabla: conMarcador }), false,
+    'un marcador de pendiente no es el acto del owner');
 
-  // Con la validación de verdad (los dos campos con contenido), se abre.
-  const conValidacion = Object.assign({}, tabla, {
+  // Con el acto de verdad (la bandera y la fecha), se abre.
+  const conActo = Object.assign({}, tabla, {
     aplicacion: Object.assign({}, tabla.aplicacion, {
       activada: true,
-      validado_por: 'Abogado externo (ficticio, para la prueba)',
-      validado_at: '2026-11-12T19:20:00-05:00',
+      activado_at: '2026-11-13T19:20:00-05:00',
     }),
   });
-  assert.equal(retencion.tablaActivada({ tabla: conValidacion }), true);
+  assert.equal(retencion.tablaActivada({ tabla: conActo }), true);
 });
 
 test('C2: el plazo por defecto se computa en años calendario y el texto lo dice', () => {

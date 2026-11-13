@@ -1001,15 +1001,17 @@ async function capturarLogs(fn) {
  * con la compuerta abierta. Este helper la arma a partir de la real, sin
  * tocar el archivo: el archivo es la fuente legal y los tests no lo modifican.
  *
- * LA VALIDACION TAMBIEN SE INYECTA (12-nov-2026)
- * ---------------------------------------------
- * La compuerta no se abre solo con `activada: true`: desde el 12-nov-2026 el
- * codigo exige ademas `validado_por` y `validado_at`, que son la constancia de
- * que un abogado matriulado valido los plazos. Si este helper solo abriera la
- * bandera, la compuerta seguiria cerrada y los tests del mecanismo probarian
- * nada. Por eso inyecta tambien una validacion FICTICIA, propia de los tests:
- * lo que se prueba aqui es el mecanismo de la tabla, no la validacion de
- * sus plazos (que es un acto del abogado, no del codigo).
+ * EL ACTO DE APERTURA TAMBIEN SE INYECTA (13-nov-2026)
+ * ---------------------------------------------------
+ * Desde el 13-nov-2026 la compuerta no se abre solo con `activada: true`: el
+ * codigo exige ademas `activado_at` con fecha, que es el rastro auditable del
+ * acto del owner. Si este helper solo abriera la bandera, la compuerta
+ * seguiria cerrada y los tests del mecanismo probarian nada. Por eso inyecta
+ * tambien una fecha de apertura FICTICIA, propia de los tests: lo que se
+ * prueba aqui es el mecanismo de la tabla, no el acto del owner (que es un
+ * acto humano, no del codigo). La validacion escrita de un tercero NO es
+ * requisito desde el 13-nov-2026 (decision del owner), asi que este helper ya
+ * no inyecta ninguna.
  *
  * @returns {object} la tabla con `aplicacion.activada` en true
  */
@@ -1019,8 +1021,7 @@ function tablaConservacionActivada() {
   return Object.assign({}, base, {
     aplicacion: Object.assign({}, base.aplicacion, {
       activada: true,
-      validado_por: 'PRUEBA automatica: validacion ficticia para verificar el mecanismo de la tabla',
-      validado_at: '2026-11-12T00:00:00.000Z',
+      activado_at: '2026-11-13T00:00:00.000Z',
     }),
   });
 }
