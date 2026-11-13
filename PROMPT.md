@@ -1519,6 +1519,8 @@ suscripción y SHA-256) para cerrar la **S-02**, **firmar el procedimiento** (S-
 v1.4** con huella real (M.18) con el manifiesto al día, y los **17 actos de ejecución** de producción. El
 detalle, en el CONTEXT y en el Historial.
 
+**Estado al cierre de la ronda 23 (13-nov-2026).** El **📦1066** (`40cd4891`, 25 archivos) quedó **pusheado** a `origin/Dev`, verificado con `git ls-remote origin Dev`; la anotación de este commit viaja en el **📦1067**, que se pushea encima. La compuerta de la tabla supletoria sigue **CERRADA**: la abre la **S-25**, que es un acto expreso y fechado del owner. La cola del owner: **firmar y actuar la S-25**, **suscribir y publicar la v1.4** con huella real (M.18) con el manifiesto al día (103 B atras), los **19 actos `EMITIDA`** para empresas reales, las **5 ratificaciones externas** (M.5, M.18, M.28/M.7, M.31) que **ya no son requisito** para abrir la compuerta pero siguen pendientes en el mundo, y **producción** (`proxy-addr 2.0.7` crítica, 236 archivos en 777, compuerta apagada, solo ASEPLUS, 0 comunicaciones). El detalle, en el CONTEXT y en el Historial.
+
 ### 5.48 🔴 Una compuerta se abre con un acto expreso y fechado; si el owner cambia la regla, la regla cambia en el código, en la fuente y en el texto que se firma
 
 **El caso real (13-nov-2026), la ronda 23.** El owner decidió que **el escrito formal de un abogado no es
