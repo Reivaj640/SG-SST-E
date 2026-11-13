@@ -17,7 +17,28 @@ dueño y fecha.
 | `PREPARADA` | El pedido está escrito, pero **no ha salido**. |
 | `EMITIDA` | El pedido **salió** y está con su destinatario. Falta la respuesta. |
 | `RESPONDIDA` | El destinatario respondió. Falta aplicar lo que dijo. |
-| `CERRADA` | La respuesta se aplicó y se verificó. |
+| `CERRADA` | La respuesta se aplicó y se verificó, **o el problema de fondo quedó resuelto y verificado en el repositorio (cierre por resolución)**. |
+
+**El cierre por resolución (13-nov-2026).** Una fila se cierra de dos formas, y las dos quedan
+dichas en la fila: **por respuesta aplicada** (el destinatario contestó, se aplicó y se verificó) y
+**por resolución** (el problema de fondo está **resuelto y verificado en el repositorio**, aunque el
+destinatario no haya contestado con nombre, fecha y SHA). Si la respuesta formal llega después, se
+**archiva como ratificación sin reabrir la fila**. El registro es honesto: un cierre por resolución
+lleva la anotación **«resuelto por decisión del owner, sin ratificación externa»** — no se finge
+validación externa—. **Excepción: la S-02 no se cierra por resolución**: el código de la compuerta
+(`retencion.js:632-664`) exige para cerrar `validado_por` **y** `validado_at` reales, y un marcador
+no los reemplaza. Esa fila se cierra con la validación escrita del abogado, o —si el owner lo
+decide— cambiando la regla en el documento de la tabla, **documentado y no en silencio**.
+
+**Una respuesta que no es formal (13-nov-2026).** El escrito del abogado matriculado del 13-nov-2026 **no
+lleva nombre, fecha de suscripción ni huella de un documento firmado**: es una respuesta **no formal**. Eso
+**no cierra** una fila que exija validación formal, pero **tampoco la deja como si nadie hubiera
+contestado**: la fila pasa a `RESPONDIDA` (el destinatario respondió) y **lo que dijo se aplica al texto
+que lo necesita**. En este caso el escrito **se archivó** en `respuesta-del-abogado-2026-11-13.md` (la
+huella del **original** recibido es `cf300b15…52c0e`, 8 451 B; la del archivo está en §2.2), **se aplicó a
+la v1.4** —que se regeneró— y **las cuatro filas ya cerradas por resolución se anotaron** con la nota de
+que el escrito **se archiva como ratificación, sin reabrir**. La **S-02**, que estaba abierta, pasó a
+`RESPONDIDA`: es la **única** fila que este escrito mueve de estado.
 
 **El criterio del mapa cambió el 13-nov-2026.** Un bloque del mapa se marca **CERRADO** cuando **el
 pedido está emitido y medido**, no cuando el acto está cumplido. Los actos de terceros se siguen
@@ -26,14 +47,27 @@ verificado; lo que falta es que un tercero conteste o ejecute, y eso tiene dueñ
 verificación*. El mapa nunca afirma que el servicio pueda abrirse a empresas reales: eso lo dicen los
 hechos de cada bloque y el estado de esta tabla.
 
-**Estado de hoy: 24 solicitudes — 23 `EMITIDA`, 1 `CERRADA` (S-22), 0 `RESPONDIDA`.** La única
-cerrada es la **S-22**, que el owner **respondió el 13-nov-2026**: las cinco decisiones del
-procedimiento del canal de `fecha_terminacion` quedaron escritas en el procedimiento, con su
-fecha y su responsable, y la solicitud se cerró al **aplicar y verificar** lo que dijo (§2.1). Las
-23 restantes están `EMITIDA`: el pedido salió y falta la respuesta de su destinatario. Las cinco
-solicitudes al abogado matriculado (S-01 a S-04 y S-23) están escritas y con su huella; **su envío
-por el canal que use el owner queda pendiente de su confirmación**, y el registro las marca `EMITIDA`
-porque el owner así lo decidió (13-nov-2026).
+**Estado de hoy: 24 solicitudes — 18 `EMITIDA`, 5 `CERRADA` (S-01, S-03, S-04, S-22 y S-23), 1 `RESPONDIDA` (S-02).**
+Se cierran de dos formas, y las dos quedan escritas en su fila:
+
+- **Por respuesta aplicada: la S-22.** El owner **respondió el 13-nov-2026**: las cinco decisiones del
+  procedimiento del canal de `fecha_terminacion` quedaron escritas en el procedimiento, con su fecha y
+  su responsable, y la solicitud se cerró al **aplicar y verificar** lo que dijo (§2.1).
+- **Por resolución: S-01, S-03, S-04 y S-23.** El problema de fondo de cada una quedó **resuelto y
+  verificado en el repositorio** el 13-nov-2026, con la anotación **«resuelto por decisión del owner,
+  sin ratificación externa»**: la respuesta formal del abogado, si llega, se archiva como ratificación
+  **sin reabrir la fila** (el detalle de qué resolvió cada una está en «Cierres por resolución», más
+  abajo). Lo que estos cuatro cierres **no** dicen: que el abogado haya ratificado nada — eso sigue
+  pendiente en el mundo, con su bloque y su dueño.
+
+Las **18 restantes** están `EMITIDA`: el pedido salió y falta la respuesta o el acto de su
+destinatario. **La S-02 pasó a `RESPONDIDA` el 13-nov-2026**: el abogado matriculado **respondió por
+escrito** (archivado en `respuesta-del-abogado-2026-11-13.md`), y la **sustancia queda validada** —los 10
+y 5 años son el «sistema de archivo o retención documental» del art. 2.2.4.6.13 y, como topes de custodia,
+son compatibles con el art. 2.2.2.25.2.8—. Pero **la fila no se cierra**: el código de la compuerta
+(`retencion.js:632-664`) exige para cerrarla `validado_por` **y** `validado_at` reales, y el propio
+abogado escribió que **no los sustituye** (§2.2). **S-24 sigue `EMITIDA`** porque es un acto del owner
+pendiente: **firmar** el procedimiento del canal (§2.1).
 
 **La S-24: la firma del owner sobre el procedimiento.** El 13-nov-2026 el owner volvió a escribir las
 cinco decisiones del canal (§2.1) y el procedimiento quedó con el estado «**pendiente de firma del
@@ -45,9 +79,12 @@ matriculado pasaron por una revisión de la **asesoría jurídica** (9 132 B, `7
 huella en `revision-asesoria-s01-s04-2026-11-13.md`. Traía **una corrección obligatoria** (la cita del
 Decreto 1377: las definiciones están en el **art. 3**, no en el art. 2), **dos avisos** y un punto a
 favor. La corrección ya está aplicada **en la fuente y en el documento enviable**; los dos avisos se
-incorporaron **como preguntas al abogado**. **El estado no cambia por eso**: la revisión **no es la
-respuesta del abogado matriculado** —el propio escrito lo dice: «No sustituye la decisión del abogado
-matriculado ni del representante legal»—, de modo que **S-01 a S-04 siguen `EMITIDA` y 0 `RESPONDIDA`**.
+incorporaron **como preguntas al abogado**. **Eso no cerró nada**: la revisión **no es la respuesta
+del abogado matriculado** —el propio escrito lo dice: «No sustituye la decisión del abogado
+matriculado ni del representante legal»—, de modo que en ese momento había **0 `RESPONDIDA`**: **S-02 seguía
+`EMITIDA`**, y **S-01, S-03 y S-04 se cerraron ese mismo día por resolución** (ver «Cierres por resolución»), no
+por la revisión ni por respuesta. **Hoy la S-02 está `RESPONDIDA`**, pero por el escrito del abogado
+matriculado del 13-nov-2026 (§2.2), no por la revisión.
 
 ---
 
@@ -58,15 +95,17 @@ documento que se le manda.
 
 | ID | Bloque | Destinatario | Qué se pide | Cómo se verifica | Estado | Vence |
 |---|---|---|---|---|---|---|
-| S-01 | M.5 | Abogado matriculado | Ratificar (o corregir) L1 —el papel de Google: Google LLC, doble papel Responsable/Encargado, transmisión internacional y no transferencia, art. 26 no se activa— y L2 —la Circular Externa 002/2025, cuyo contenido **no está verificado por nosotros** y cuya aplicación al canal de correo y a la transferencia del software **confirma el abogado**, y el RNBD—; y pronunciarse sobre las correcciones 0.5 y 0.6 del texto | Escrito con nombre, fecha y SHA-256 del documento | EMITIDA | 2026-11-20 |
-| S-02 | M.6 | Abogado matriculado | Validar por escrito los plazos de conservación de 10 y 5 años y las condiciones C1 a C4 de la tabla supletoria | `validado_por` (nombre y tarjeta o CC), `validado_at` (fecha de la opinión), `validado_por_documento` (ruta) y SHA-256 del escrito | EMITIDA | 2026-11-20 |
-| S-03 | M.18 | Abogado matriculado | Revisar y redactar la v1.4 del Anexo de Nube y el Anexo de Encargo 2026-11-12, y opinar sobre las nueve identificaciones de versión marcadas `ext` | Texto final devuelto, con su huella, o sus correcciones sobre el candidato | EMITIDA | 2026-11-20 |
-| S-04 | M.28 y M.7 | Abogado matriculado | Ratificar L4 y L5 (el respaldo en Backblaze B2: transmisión, no transferencia; Backblaze como subencargado; bucket en la región US) y validar las cláusulas mínimas del art. 25 del Decreto 1377 para el contrato con el proveedor; y contestar **de forma expresa** si la condición de región US es **exigencia legal** o **decisión conservadora de K+AIR** | Texto final de la cláusula, con su huella, y la respuesta a la pregunta de la región | EMITIDA | 2026-11-20 |
+| S-01 | M.5 | Abogado matriculado | Ratificar (o corregir) L1 —el papel de Google: Google LLC, doble papel Responsable/Encargado, transmisión internacional y no transferencia, art. 26 no se activa— y L2 —la Circular Externa 002/2025, cuyo contenido **no está verificado por nosotros** y cuya aplicación al canal de correo y a la transferencia del software **confirma el abogado**, y el RNBD—; y pronunciarse sobre las correcciones 0.5 y 0.6 del texto | Escrito con nombre, fecha y SHA-256 del documento — **cerrada por resolución** (13-nov-2026): resuelto por decisión del owner, sin ratificación externa; **el escrito del abogado (no formal) se archivó el 13-nov-2026 como ratificación, sin reabrir la fila** | CERRADA | 2026-11-20 |
+| S-02 | M.6 | Abogado matriculado | Validar por escrito los plazos de conservación de 10 y 5 años y las condiciones C1 a C4 de la tabla supletoria | `validado_por` (nombre y tarjeta o CC), `validado_at` (fecha de la opinión), `validado_por_documento` (ruta) y SHA-256 del escrito — **respondida** (13-nov-2026): el abogado validó la sustancia (los 10 y 5 años son el sistema de archivo o retención documental del art. 2.2.4.6.13 y son compatibles con el art. 2.2.2.25.2.8) y dijo que **no cierra**: el candado exige `validado_por` y `validado_at` de un abogado matriculado y **no los sustituye**. La enumeración de C1 a C4 **no se recibió** (el original está truncado) | RESPONDIDA | 2026-11-20 |
+| S-03 | M.18 | Abogado matriculado | Revisar y redactar la v1.4 del Anexo de Nube y el Anexo de Encargo 2026-11-12, y opinar sobre las nueve identificaciones de versión marcadas `ext` | Texto final devuelto, con su huella, o sus correcciones sobre el candidato — **cerrada por resolución** (13-nov-2026): resuelto por decisión del owner, sin ratificación externa; **el escrito del abogado (no formal) se archivó el 13-nov-2026 como ratificación, sin reabrir la fila**; el texto final lo redacta K+AIR con la autorización del owner | CERRADA | 2026-11-20 |
+| S-04 | M.28 y M.7 | Abogado matriculado | Ratificar L4 y L5 (el respaldo en Backblaze B2: transmisión, no transferencia; Backblaze como subencargado; bucket en la región US) y validar las cláusulas mínimas del art. 25 del Decreto 1377 para el contrato con el proveedor; y contestar **de forma expresa** si la condición de región US es **exigencia legal** o **decisión conservadora de K+AIR** | Texto final de la cláusula, con su huella, y la respuesta a la pregunta de la región — **cerrada por resolución** (13-nov-2026): resuelto por decisión del owner, sin ratificación externa; **el escrito del abogado (no formal) se archivó el 13-nov-2026 como ratificación, sin reabrir la fila**, y **contestó de forma expresa la pregunta**: la región US **no es una exigencia legal**, es **decisión conservadora de K+AIR** | CERRADA | 2026-11-20 |
 
 ### Qué cambió con la revisión de la asesoría (13-nov-2026)
 
-Lo que sigue **cambia el pedido, no el estado**. Las cuatro filas de arriba siguen `EMITIDA`: una revisión
-de la asesoría **no es una respuesta del abogado**.
+Lo que sigue **cambia el pedido, no el estado**: una revisión de la asesoría **no es una respuesta del
+abogado**. Ese día **S-01, S-03 y S-04 se cerraron después por resolución** — no por la revisión ni
+por respuesta— y **S-02 seguía `EMITIDA`** (es la excepción de la compuerta); hoy está `RESPONDIDA` por el
+escrito del abogado del 13-nov-2026 (§2.2).
 
 - **S-01.** Dos cambios. La cita de la transmisión internacional quedó corregida en la fuente: **art. 3
   num. 5** del Decreto 1377 de 2013 (las definiciones están en el art. 3, no en el art. 2), y lo mismo
@@ -90,7 +129,7 @@ sino una **validación** sobre un documento que ya existe.
 
 | ID | Bloque | Destinatario | Qué se pide | Cómo se verifica | Estado | Vence |
 |---|---|---|---|---|---|---|
-| S-23 | M.31 | Abogado matriculado | Validar por escrito el **procedimiento del canal de `fecha_terminacion`** (`procedimiento-canal-fecha-terminacion-2026-10-31.md`) como **evidencia del canal del §6 del Anexo de Encargo**: es el **punto 1.3 de su propio plan de cierre** del 31-oct-2026 | Escrito con nombre, fecha y SHA-256, con su pronunciamiento sobre el §9.2 del procedimiento; si corrige algo, con la redacción literal | EMITIDA | 2026-11-27 |
+| S-23 | M.31 | Abogado matriculado | Validar por escrito el **procedimiento del canal de `fecha_terminacion`** (`procedimiento-canal-fecha-terminacion-2026-10-31.md`) como **evidencia del canal del §6 del Anexo de Encargo**: es el **punto 1.3 de su propio plan de cierre** del 31-oct-2026 | Escrito con nombre, fecha y SHA-256, con su pronunciamiento sobre el §9.2 del procedimiento; si corrige algo, con la redacción literal — **cerrada por resolución** (13-nov-2026): resuelto por decisión del owner, sin ratificación externa; **el escrito del abogado (no formal) se archivó el 13-nov-2026 como ratificación, sin reabrir la fila**, y **validó la solidez jurídica del procedimiento**, pero **no** dio la validación formal del §9.2 | CERRADA | 2026-11-27 |
 
 **Por qué se registró el 13-nov-2026, y por qué estabasepues.** Las **cinco decisiones del owner** del
 procedimiento quedaron escritas ese día (§2.1): con ellas se cerró la **S-22**. Pero el §9 del procedimiento
@@ -98,6 +137,40 @@ tiene **dos mitades**, y la otra es del abogado: el **§9.2**, que es la validac
 evidencia del canal. **Esa mitad nunca se le pidió por escrito**, así que no tenía ni bloque en el mapa, ni
 fila en esta tabla, ni dueño, ni fecha: era un hueco invisible. Ahora es una fila con las cinco cosas que
 esta tabla exige de un pedido.
+
+### Cierres por resolución (13-nov-2026)
+
+Cuatro filas pasaron de `EMITIDA` a `CERRADA` ese día por **resolución**, no por respuesta: el
+problema de fondo de cada una quedó **resuelto y verificado en el repositorio**, y la anotación de las
+cuatro es la misma: **«resuelto por decisión del owner, sin ratificación externa»**. Lo que esto
+**no** dice: que el abogado haya ratificado nada. Si su escrito llega después —con nombre, fecha y
+SHA-256— se **archiva como ratificación** en esta tabla, **sin reabrir la fila**. Riesgo asumido y
+registrado: **L1, L4 y L5 quedan como criterio interno de K+AIR sin ratificación externa**; si el
+abogado vuelve y corrige, la corrección se aplica en la siguiente versión de los textos y la
+ratificación queda retroactiva (precedente M.15).
+
+- **S-01.** *Quedó resuelto y verificado:* el dictamen L1 está escrito con sus trece correcciones
+  (incluida la **0.13**, la cita del Decreto 1377 en el **art. 3 num. 5**), la Circular Externa 002/2025
+  quedó marcada como **contenido no verificado** y como pregunta expresa al abogado, y el pedido salió
+  con su insumo y su huella (`dictamen-legal-l1-2026-11-12.md`, 114 882 B / `d77e6d8b…87a04`, re-medido
+  el 13-nov-2026 después de aplicar el escrito del abogado).
+  *Sigue pendiente en el mundo:* la **ratificación externa** de L1 y L2 (M.5).
+- **S-03.** *Quedó resuelto y verificado:* los dos candidatos de la **v1.4** ya existen con la
+  corrección de la cita aplicada por el generador en runtime (`candidatos-v1.4/anexo-nube-v1.4.html`,
+  **111 462 B / `ba664e6f…e3b47`**; `candidatos-v1.4/anexo-encargo-2026-11-12.html`, **100 153 B /
+  `d4df187a…4e2967`**, cifras del 13-nov-2026 tras el escrito del abogado, §2.2), y el pedido quedó con su
+  insumo y su huella. *Sigue pendiente en el mundo:* la **suscripción y publicación** de la v1.4 con huella
+  real (M.18) y la revisión del abogado, si llega.
+- **S-04.** *Quedó resuelto y verificado:* las cláusulas L4 y L5 y las cláusulas mínimas del **art. 25
+  del Decreto 1377** quedaron escritas en los candidatos, y la condición de **región US** del bucket
+  quedó declarada como **decisión conservadora de K+AIR** —no como exigencia legal verificada—, con la
+  pregunta expresa al abogado. *Sigue pendiente en el mundo:* la ratificación de L4/L5 (M.28 y M.7) y la
+  verificación del **Título V**, que el escrito del 13-nov-2026 declaró **no verificado**. La **pregunta de
+  la región** sí quedó contestada de forma expresa ese día: **no es una exigencia legal**.
+- **S-23.** *Quedó resuelto y verificado:* el **procedimiento del canal** quedó con las cinco
+  decisiones escritas y medido con su huella (16 872 B / `5a817b38…e04e`), y el pedido quedó emitido
+  con su documento. *Sigue pendiente en el mundo:* la **validación formal** del abogado sobre el §9.2
+  (M.31).
 
 ---
 
@@ -129,7 +202,9 @@ esta tabla exige de un pedido.
 
 Una sola respuesta, y es la del **owner**: la **S-22**. Se aplicó el mismo día y se verificó, así que
 la fila pasó de `EMITIDA` a `CERRADA` —el ciclo completo, con la respuesta aplicada y comprobada,
-no solo registrada—.
+no solo registrada—. Ese mismo día se cerraron además **cuatro filas de la sección 1 por resolución**
+(S-01, S-03, S-04 y S-23): no hubo respuesta, hubo decisión del owner; el detalle está en «Cierres
+por resolución».
 
 | Quién respondió | ID | Qué respondió | Dónde quedó escrito | Fecha |
 |---|---|---|---|---|
@@ -146,8 +221,28 @@ el mismo**: las cinco ya estaban escritas desde la ronda anterior, con su *por q
 encabezado del procedimiento declara «**pendiente de firma del owner**», y ese pendiente quedó
 registrado como la **S-24**; y el §9.1 del procedimiento nombra la firma que falta. **La S-22 no se
 reabre** —sus cinco decisiones estaban escritas y verificadas; lo que el owner mandó fue repetirlas,
-no corregirlas— y **la S-23 no se cierra**: se cierra cuando el abogado devuelva su escrito con
-nombre, fecha y SHA-256.
+no corregirlas— y **la S-23 se cerró más tarde ese mismo día por resolución** (ver «Cierres por
+resolución»): el problema de fondo —el procedimiento con las cinco decisiones— quedó resuelto y
+verificado con su huella, y la validación formal del abogado, si llega, se archiva **sin reabrir la
+fila**.
+
+### 2.2 Lo que respondió el abogado matriculado el 13-nov-2026 (escrito no formal)
+
+| Quién respondió | ID | Qué respondió | Dónde quedó escrito | Fecha |
+|---|---|---|---|---|
+| Abogado matriculado (escrito **no formal**) | S-01, S-02, S-03, S-04, S-23 | El **núcleo normativo verificado**: doble papel de Google, transmisión y no transferencia, art. 26 **no** activado, art. 24 num. 2 + art. 25; la Circular 002 leída **en su literal** (el canal de correo **fuera** de su alcance, la **transferencia del software a la Empresa dentro de su supuesto (ii)**); el RNBD medido por los activos de cada Responsable; la transmisión de Backblaze y las tres obligaciones del art. 25; y la **respuesta expresa**: la región US **no es una exigencia legal**, es **decisión conservadora de K+AIR** | `respuesta-del-abogado-2026-11-13.md` (**18 980 B**), con el **original verbatim** de 8 451 B / `cf300b15…52c0e` (SHA-256 del original recibido) | 13-nov-2026 |
+
+**Qué se hizo con ese escrito.** Se **archivó** (el original está **truncado** en «Las condiciones se
+sostienen:», y el **punto 4** (S-23) llegó aparte), **se aplicó a la v1.4** —los cambios entraron por la
+**fuente** (el dictamen L1 y el pedido de Backblaze) y los candidatos se **regeneraron**— y **se anotaron
+las cuatro filas ya cerradas por resolución** con la nota de que el escrito **se archiva como ratificación,
+sin reabrir**. El detalle de los cinco cambios de texto está en el §4 del archivo.
+
+**Qué NO hizo.** No llevaba **nombre**, **fecha de suscripción** ni **huella de un documento firmado**, así que
+**no cierra ninguna fila** por sí solo; y el propio abogado escribió que **no puede sustituir la redacción**
+(S-03) ni **dar la validación formal del §9.2** (S-23). Por eso **la S-02 es la única fila que este escrito
+mueve de estado**: pasa de `EMITIDA` a **`RESPONDIDA`**, con la sustancia validada y con el candado de
+`retencion.js:632-664` **sin abrir** (`validado_por` y `validado_at` reales siguen siendo lo que falta).
 
 ---
 
@@ -156,8 +251,12 @@ nombre, fecha y SHA-256.
 - **No abren el servicio a empresas reales.** El mapa sigue diciendo, bloque por bloque, qué hecho falta
   en el mundo: que haya una empresa real, que la compuerta esté encendida, que los permisos no sean
   777, que el respaldo exista fuera del servidor. Emitir un pedido no cambia ninguno de esos hechos.
-- **No sustituyen la respuesta del abogado.** Las cuatro solicitudes al abogado están `EMITIDA`: se
-  pidieron, no se respondieron. La v1.4 sigue sin firmar y el manifiesto legal sigue con sus dos notas.
+- **No sustituyen la respuesta del abogado.** De las cinco solicitudes al abogado, **cuatro están
+  `CERRADA` por resolución y sin ratificación externa** —el cierre lo dice en su fila: «resuelto por
+  decisión del owner, sin ratificación externa»—, y la **S-02 está `RESPONDIDA`**: el abogado respondió por
+  escrito, la sustancia quedó validada y aplicada al texto, pero **el escrito no es formal** (sin nombre,
+  fecha de suscripción ni huella) y **no cierra** la fila. Ninguna se cerró **con** la respuesta formal del
+  abogado: la v1.4 sigue sin firmar y el manifiesto legal sigue con sus dos notas.
 - **No cierran los textos suscritos.** La v1.3 del Anexo de Nube y el Anexo de Encargo 2026-11-11
   quedan como están, con su huella.
 - **No authorizes el despliegue.** Cada ejecución de esta tabla es un acto del owner, con su `sudo`.
@@ -165,10 +264,14 @@ nombre, fecha y SHA-256.
   `fecha_terminacion` ya existe y ya tiene prueba, y lo que faltaban eran **cinco decisiones escritas del
   owner** (quién opera, quién llama, qué evidencia se acepta, el plazo máximo de espera y la frecuencia
   de la revisión) más la validación del abogado sobre el procedimiento. Emitir la solicitud no escribía
-  esas decisiones: las escribió el owner el 13-nov-2026, y por eso es **la única fila `CERRADA`** de la
-  tabla. La **validación del abogado** sobre el procedimiento **sigue pendiente**, y es de otro dueño:
-  es lo que pide la **S-23**.
+  esas decisiones: las escribió el owner el 13-nov-2026, y por eso esa fue **la primera fila
+  `CERRADA`** de la tabla —hoy son cinco: la S-22 por respuesta y cuatro por resolución—. La
+  **validación del abogado** sobre el procedimiento **sigue pendiente en el mundo**, y es de otro
+  dueño: es lo que pedía la **S-23**, que se cerró por resolución, no por respuesta.
 - **Ninguna respuesta del owner sustituye al abogado.** Las cinco decisiones de la S-22 son del **owner**
   y son de **procedimiento**: dicen quién opera y qué evidencia se acepta. No ratifican ni validan nada
   del abogado matriculado, y no pueden hacerlo: una decisión de K+AIR no es una determinación jurídica.
-  Por eso la S-22 se cerró **sin** que se cerrara ninguna de las cinco solicitudes al abogado.
+  Por eso la S-22 se cerró **sin** que se cerrara ninguna de las cinco solicitudes al abogado, y por eso
+  los cierres por resolución de **S-01, S-03, S-04 y S-23** cierran **el pedido**, no la ratificación:
+  la anotación lo dice («sin ratificación externa»), y la ratificación sigue pendiente en M.5, M.18,
+  M.28/M.7 y M.31.

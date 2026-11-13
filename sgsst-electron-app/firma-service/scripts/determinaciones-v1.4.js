@@ -154,17 +154,53 @@ const NUBE_RANGOS = [
     desde: 530, hasta: 530,
     dest: [
       { t: 'dict', k: 'A.5' },
+      { t: 'dict', k: 'B.8.0' },
       { t: 'txt', s: '' },
       { t: 'txt', s: '  <h2>5. Seguridad</h2>' },
     ],
     nota: 'El dictamen da la linea de opinion pero no dice donde va: se pone al '
-      + 'final de la seccion 4, que es la seccion de la que habla ("en esta seccion").',
+      + 'final de la seccion 4, que es la seccion de la que habla ("en esta seccion"). '
+      + 'Detras va el parrafo de revision del abogado matriculado del 13-nov-2026 (B.8.0).',
   },
   {
     id: 'L1-B2',
     donde: 'Anexo de Nube v1.4, seccion 4, el parrafo del contrato de transmision',
-    desde: 488, hasta: 496,
+    desde: 488, hasta: 507,
     dest: [{ t: 'dict', k: 'B.2', i: 1 }],
+    nota: 'El rango era 488-496 y dejaba fuera las lineas 497-507 del texto base: '
+      + 'el parrafo quedaba roto y con el fragmento "que no estan en el CDPA." duplicado. '
+      + 'El rango ahora es el parrafo completo (13-nov-2026).',
+  },
+  {
+    id: 'L1-B81',
+    donde: 'Anexo de Nube v1.4, seccion 5, el parrafo de la Circular 002 de 2025',
+    desde: 401, hasta: 417,
+    dest: [{ t: 'dict', k: 'B.8.1' }],
+    nota: 'El texto anterior solo decia que el canal de correo queda fuera del alcance '
+      + 'literal de la Circular. El escrito del abogado matriculado del 13-nov-2026 anade '
+      + 'que la transferencia del software a la Empresa SI cae en el supuesto (ii).',
+  },
+  {
+    id: 'L1-B82',
+    donde: 'Anexo de Nube v1.4, seccion 4, el bloque de las tres preguntas del abogado',
+    desde: 508, hasta: 528,
+    dest: [{ t: 'dict', k: 'B.8.2' }],
+    nota: 'La respuesta a la pregunta 2 ("debe verificarse si existe una operacion especifica '
+      + 'comprendida en su ambito") quedo respondida por el abogado del 13-nov-2026.',
+  },
+  {
+    id: 'L1-B83',
+    donde: 'Anexo de Nube v1.4, seccion 8, el parrafo de auditoria y de incidentes',
+    desde: 788, hasta: 800,
+    dest: [{ t: 'dict', k: 'B.8.3' }],
+    nota: 'El texto base afirmaba el derecho de auditoria del apartado 7.5.2(a) sin la condicion '
+      + 'de la Ley Europea, y trataba el plazo de 48 horas como si fuera un plazo del CDPA.',
+  },
+  {
+    id: 'L1-B84',
+    donde: 'Anexo de Nube v1.4, seccion 11, la vineta de la Circular 002',
+    desde: 898, hasta: 902,
+    dest: [{ t: 'dict', k: 'B.8.4' }],
   },
   {
     id: 'L1-A23',
@@ -234,6 +270,22 @@ const NUBE_RANGOS = [
 ];
 
 const ENCARGO_RANGOS = [
+  {
+    id: 'L1-B85',
+    donde: 'Anexo de Encargo 2026-11-12, seccion 5, el parrafo de lo que queda pendiente',
+    desde: 524, hasta: 537,
+    dest: [{ t: 'dict', k: 'B.8.5' }],
+    nota: 'El texto base decia que la Circular 002 "no aplica a este canal" y nada mas: '
+      + 'el escrito del abogado del 13-nov-2026 anade que la transferencia del software a '
+      + 'la Empresa si cae en el supuesto (ii) de esa Circular.',
+  },
+  {
+    id: 'L1-B86',
+    donde: 'Anexo de Encargo 2026-11-12, seccion 12, las vinetas del Titulo V y de la Circular 002',
+    desde: 964, hasta: 969,
+    dest: [{ t: 'dict', k: 'B.8.6' }],
+    nota: 'El Titulo V se cita con la salvedad de que su contenido no fue verificado.',
+  },
   {
     id: 'L1-B63',
     donde: 'Anexo de Encargo 2026-11-12, seccion 12, la constancia de la version',
@@ -413,11 +465,15 @@ const ENCARGO_TEXTOS = [
     antes: 'contenida en este Anexo de Encargo de Tratamiento de Datos Personales del servicio de firma electr&oacute;nica K+AIR, versi&oacute;n 2026-11-11, fechada el 11 de noviembre de 2026, y en el Acuerdo de uso',
     despues: 'contenida en este Anexo de Encargo de Tratamiento de Datos Personales del servicio de firma electr&oacute;nica K+AIR, versi&oacute;n 2026-11-12, fechada el 12 de noviembre de 2026, y en el Acuerdo de uso',
   },
-  {
-    id: 'B6.4-535', ext: false,
-    antes: '  Gesstiar S.A.S.; y (ix) la suscripci&oacute;n de esta versi&oacute;n 2026-11-11 del Anexo de Encargo por la Empresa y su',
-    despues: '  Gesstiar S.A.S.; y (ix) la suscripci&oacute;n de esta versi&oacute;n 2026-11-12 del Anexo de Encargo por la Empresa y su',
-  },
+  // El fragmento `B6.4-535` (la misma sustitucion de `2026-11-11` por `2026-11-12`
+  // en la linea que nombra la suscripcion del Anexo de Encargo) **ya no esta
+  // aqui**, y no por descuido: la linea 535 del texto base esta DENTRO del
+  // parrafo que el rango `L1-B85` sustituye entero, y el literal de B.8.5 ya
+  // dice `2026-11-12`. Si el fragmento se dejara, casaria una vez contra el
+  // literal nuevo (no contra el texto base), reescribiria el texto de la
+  // determinacion y el candidato saldria con una fecha que el dictamen no
+  // dice: el guard de identidad byte a byte lo detecta.
+  // (Correccion del 13-nov-2026; el dictamen B.6.4 lo anota.)
 ];
 
 // ---------------------------------------------------------------------------

@@ -315,8 +315,12 @@ en el mapa y en `verificacion-cierre/`):
   (**4 cerrados / 23 pendientes** al cierre de la 12.ª ronda; **9 cerrados / 21 pendientes** el 12-nov;
   **hoy 31 cerrados / 0 pendientes**). Desde el **13-nov-2026** un bloque cierra cuando **el pedido esta
   emitido y medido**, no cuando el acto esta cumplido: las **24 solicitudes** de
-  `tabla-de-solicitudes-2026-11-13.md` son **23 `EMITIDA` y 1 `CERRADA`** (la S-22, que el owner
-  respondio el 13-nov-2026 y que se aplico al procedimiento del canal de `fecha_terminacion`), y **esto no
+  `tabla-de-solicitudes-2026-11-13.md` son **18 `EMITIDA`, 1 `RESPONDIDA` y 5 `CERRADA`** (la S-02, que el
+  abogado matriculado respondio el 13-nov-2026 con un escrito **no formal** —sin nombre, sin fecha de
+  suscripcion y sin huella—, que por eso **no cierra**; la S-22, que el owner
+  respondio el 13-nov-2026 y que se aplico al procedimiento del canal de `fecha_terminacion`; y
+  S-01, S-03, S-04 y S-23, cerradas por resolucion ese mismo dia con la anotacion «resuelto por
+  decision del owner, sin ratificacion externa»), y **esto no
   dice que el
   servicio pueda abrirse a empresas reales**. Los actos de terceros se siguen en esa tabla.
 - La **reconciliación del cuadro canónico** (34 requisitos medidos; de 62 a **76 cerrados**).

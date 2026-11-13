@@ -1279,9 +1279,12 @@ un punto a favor. Alguien podía leer eso como «ya está, el abogado respondió
 
 **Reglas:**
 
-1. **Una revisión cambia el pedido, no el estado.** Las cuatro solicitudes **siguen `EMITIDA` y 0
-   `RESPONDIDA`**: lo que se corrige es **lo que se manda**, no lo que el destinatario contestó. El
-   registro de solicitudes es el que dice si alguien respondió.
+1. **Una revisión cambia el pedido, no el estado.** La revisión **dejó las cuatro sin `RESPONDIDA`**:
+   lo que se corrige es **lo que se manda**, no lo que el destinatario contestó. El registro de
+   solicitudes es el que dice si alguien respondió. (Más tarde ese mismo día, 13-nov-2026, S-01, S-03
+   y S-04 se cerraron **por resolución del owner** —«resuelto por decisión del owner, sin ratificación
+   externa», no por la revisión ni por respuesta—; **S-02 sigue `EMITIDA`** porque la compuerta exige
+   `validado_por` y `validado_at` reales.)
 2. **Una corrección va a la FUENTE, y la salida se regenera.** No se parchea el documento final: se
    corrige el texto legal que lo alimenta y se **regenera**. Un texto **ya suscrito no se corrige**: se
    sustituye, y la corrección vive en la versión nueva.
@@ -1321,7 +1324,7 @@ pendientes desde el 31-oct-2026 (las del §9 de `procedimiento-canal-fecha-termi
    para responderla, **eso es un hallazgo**: un requisito que el expediente no conoce es un requisito que
    nadie está midiendo.
 
-### 5.42 🔴 Una decisión del owner se escribe en el documento que la pide, y su solicitud se cierra cuando la respuesta se aplica y se verifica
+### 5.42 🔴 Una decisión del owner se escribe en el documento que la pide; su solicitud se cierra cuando la respuesta se aplica y se verifica — o, sin respuesta, cuando el problema de fondo quedó resuelto y verificado (cierre por resolución)
 
 **El caso real (13-nov-2026), la ronda 19.** La ronda 18 dejó registrada la **S-22** con las cinco
 decisiones del owner sobre el canal de `fecha_terminacion`, y el bloque **M.31** en el mapa, con las
@@ -1347,6 +1350,15 @@ no en un chat, en un correo ni en una nota del `Historial.md`.
 5. **Un guard que no se ha visto fallar no es un guard.** El test nuevo comprueba que las cinco decisiones
    **están escritas** en el procedimiento y que la S-22 está `CERRADA`; si alguien borra el Anexo A o
    devuelve la decisión a «pendiente», el test **falla**.
+6. **Hay una segunda forma de cerrar: por resolución (13-nov-2026).** Cuando el problema de fondo quedó
+   **resuelto y verificado en el repositorio**, la fila se cierra aunque el destinatario no conteste con
+   nombre, fecha y SHA, y la anotación de la propia fila dice **«resuelto por decisión del owner, sin
+   ratificación externa»** — el registro no finge una validación externa que no hubo —. Si la respuesta
+   formal llega después, se **archiva como ratificación sin reabrir la fila**. **Excepción: la S-02** (la
+   compuerta de la tabla supletoria): `retencion.js:632-664` exige `validado_por` **y** `validado_at`
+   reales, y un marcador no los reemplaza — o el abogado valida, o el owner cambia la regla documentada
+   en el documento de la tabla, pero no en silencio —. La leyenda completa, con lo que cada cierre **no**
+   dice, está en `tabla-de-solicitudes-2026-11-13.md`.
 
 ### 5.43 🔴 Medir y mutar no pueden ocurrir a la vez: la huella que sale es la del mutante, no la del archivo
 
@@ -1397,6 +1409,83 @@ más, con destinatario, qué se pide, cómo se verifica y fecha.
    difiere, la solicitud se reabre y se vuelve a aplicar, y la fila dice por qué.
 4. **El estado del documento y el estado de la fila son el mismo hecho.** Si el encabezado dice
    «firmado» y la fila dice `EMITIDA`, una de las dos está mintiendo. El guard compara los dos.
+
+### 5.45 🔴 Una respuesta que no es formal mueve la fila a `RESPONDIDA`: no la cierra, y lo que no se verificó queda declarado como no verificado en el texto
+
+**El caso real (13-nov-2026), la ronda 22.** Un abogado matriculado respondió por escrito a las cinco
+solicitudes al abogado (**S-01, S-02, S-03, S-04 y S-23**). El escrito **verificó la norma** en fuente
+oficial y **contestó de forma expresa la pregunta de la región** (la condición de región United States **no
+es una exigencia legal**: es una decisión conservadora de K+AIR). Pero **no llevaba nombre, fecha de
+suscripción ni huella de un documento firmado**: es un escrito **no formal**. Y su propio texto decía tres
+cosas que el registro tiene que respetar: «la fila NO cierra», «yo no puedo sustituir la redacción» y «lo
+que no puedo verificar **es un hecho, no una norma**».
+
+**Reglas:**
+
+1. **Una respuesta no formal no cierra una fila que exige validación formal.** El estado que le
+   corresponde es **`RESPONDIDA`**: el destinatario respondió y falta aplicar/completar lo que dijo. La
+   fila que tiene un **candado en el código** (`retencion.js:632-664` exige `validado_por` **y**
+   `validado_at` reales) **no se cierra con un marcador**, ni aunque la sustancia esté validada: el propio
+   abogado lo escribió.
+2. **Una respuesta que llega después de un cierre por resolución se archiva como ratificación, sin
+   reabrir la fila** —y la fila lo dice: «el escrito del abogado se archivó como ratificación, sin
+   reabrir». Reabrir una fila cerrada por resolución contradice la regla que la cerró.
+3. **Lo que no se verificó se escribe como no verificado, en el texto que se firma.** Un documento que
+   afirma «Estados Unidos es país con nivel adecuado» sobre una norma que el abogado **no verificó** es un
+   documento que miente (art. 4 literal d de la Ley 1581: veracidad). La redacción honesta cita la norma
+   **como marco sectorial de referencia, no como fundamento**, y dice que **no fue verificada**.
+4. **Un hecho contractual que no se verificó es un pendiente, no un hecho.** La entidad que el contrato
+   asigna, la huella y la efectividad del instrumento, el alcance de una cláusula y un plazo de
+   notificación quedan **declarados como pendientes de confirmación contra el contrato**; un plazo propio
+   se declara como **propio**, nunca como reflejo del plazo del proveedor.
+5. **El escrito se archiva verbatim, con su huella y con su defecto.** El original puede venir
+   **truncado**: eso se dice, se señala dónde se corta, y lo que llegó aparte se separa. Se archiva el
+   **texto recibido**, no un resumen.
+6. **Una corrección de contenido no se aplica al final del texto: se aplica a la fuente y se regenera.**
+   El v1.4 se arma desde `legal/anexo-nube-v1.3.html` (suscrito) más las determinaciones; **editar el
+   HTML a mano se pierde** en la próxima generación. Y **un texto suscrito no se corrige**: se sustituye.
+7. **Un rango de sustitución tiene que cubrir el párrafo entero.** Un rango que se queda corto deja un
+   fragmento huérfano del texto base pegado al texto nuevo: el documento sale con un párrafo roto y un
+   texto duplicado, y **el generador no se queja** (trampa 166).
+8. **Cuando la fuente cambia, los documentos que declaran su huella se vuelven a medir y se anotan.**
+   Un escrito que se va a enviar con la huella vieja del insumo no es un escrito con una huella: es un
+   escrito con una afirmación falsa (trampa 161). Los registros con fecha **se anotan, no se reescriben**.
+
+### 5.46 🔴 El candidato tiene que ser byte a byte el literal del dictamen: un fragmento que reescribe el literal hace que el texto que se firma no sea el texto que se aprobó
+
+**El caso real (13-nov-2026), la ronda 22 (tarde).** La determinación **B.8.5** sustituye el párrafo
+completo «Lo que queda pendiente» del Anexo de Encargo (el rango `L1-B85`, líneas 524-537). El literal
+nuevo copió del texto base la línea que nombra la suscripción —«…esta versión **2026-11-11** del Anexo
+de Encargo…»—, porque en el texto base esa era la versión; en el candidato la versión que se suscribe es
+la **2026-11-12**, y el motor lo resolvía con un fragmento aparte (`B6.4-535`) que sustituía
+`2026-11-11` por `2026-11-12`.
+
+El resultado: **el fragmento cayó dentro del rango**. Cuando el motor insertó el literal de B.8.5, el
+fragmento pasó a reescribir **el literal recién insertado**. El candidato salió con `2026-11-12` y el
+dictamen decía `2026-11-11`: **el texto que se iba a firmar no era el texto que estaba escrito**. El
+generador **no se quejó** —el ancla casaba exactamente una vez—, y el defecto solo apareció cuando el
+guard de identidad byte a byte comparó el candidato con el dictamen.
+
+**Reglas:**
+
+1. **El literal de una determinación es lo que se firma.** El candidato tiene que contenerlo **byte a
+   byte**, y el guard lo dice: `el texto del candidato es byte a byte el de la determinacion`. Un motor
+   que «corrige» el literal por su cuenta rompe esa garantía.
+2. **Un fragmento (`B.6.x`) nunca reescribe el literal de una determinación.** Es una comodidad para
+   anclas cortas. Si su destino cae **dentro** de un rango, hay dos salidas malas: el fragmento queda
+   muerto (casa cero veces y el generador se niega) o reescribe el literal nuevo (y el texto firmado deja
+   de ser el aprobado). La salida buena es la de la fuente: **el literal lleva la versión correcta y el
+   fragmento se elimina**.
+3. **El motor no sabe lo que ya está bien.** Solo conoce anclas: si una fecha ya quedó correcta en el
+   literal, el motor la vuelve a cambiar si encuentra el fragmento. Por eso la corrección va en el
+   literal, no en un parche del motor.
+4. **Un guard de esta clase tiene que haber mordido.** El mutante es el defecto completo —el dictamen
+   con la fecha vieja **más** el fragmento—: así se verifica que fallan el guard de identidad byte a byte
+   y el guard estructural. Un mutante a medias (solo el fragmento) falla por otra razón y **no prueba
+   nada**.
+5. **La corrección que no cambia los bytes se anota igual.** Los candidatos de esta ronda **no
+   cambiaron** de huella (`ba664e6f…` y `d4df187a…`): lo que cambió fue **de dónde salía** el texto. Una
+   corrección invisible en el resultado visible es la más fácil de perder.
 
 ### 6.1 Backend — bridges
 
@@ -2198,7 +2287,14 @@ Caso real (31-oct-2026): al corregir el único rojo de la suite del `firma-servi
 
 | 165 | 🔴 **Un guard que busca la cifra en todo el documento se satisface con una entrada histórica: la línea viva puede quedar vieja y nadie lo ve** | `sgsst-electron-app/CONTEXT.md` (la línea que describe la META), `sgsst-electron-app/firma-service/tests/scripts/contar-estados-meta-apertura.test.js` (el guard de la línea viva) | Caso real (13-nov-2026), la ronda 21: el CONTEXT publicaba en su **línea viva** —la que describe la META, la que se lee antes de tocar nada— la cifra de la ronda anterior (**22 solicitudes** con **21 `EMITIDA` y 1 `CERRADA`**), mientras la tabla ya iba en **23: 22 `EMITIDA` y 1 `CERRADA`**. El check de la ronda 20 buscaba `/22\s+EMITIDA…1\s+CERRADA/` en **todo** el CONTEXT: lo satisfacía la **entrada histórica** de la ronda 20 (que sí decía 22 `EMITIDA` y 1 `CERRADA`), así que la deriva no la vio nadie — llevaba una ronda entera publicada. Reglas: (1) **la cifra se propaga a la línea viva y se verifica en esa línea**: un guard que busca en todo el documento se cumple con la coincidencia más antigua; (2) **un registro con fecha es un registro**: la entrada de una ronda anterior se anota, no se reescribe, y por eso convive con la línea viva y la puede tapar; (3) **el guard deriva el número de la fuente** —la tabla de solicitudes— y no de una constante escrita a mano, para que no se pueda quedar viejo sin que nadie lo note; (4) **un guard que no se ha visto fallar no es un guard**: el mutante de la ronda 21 devuelve la línea viva a la cifra de la ronda anterior y el test tiene que ponerse en rojo; (5) **la deriva se busca, no se supone**: en cada ronda se comparan una por una las publicaciones de la cifra contra la fuente, porque un script de propagación que dice «OK» no prueba que la línea viva haya quedado actualizada |
 
+| 166 | 🔴 **Un rango de sustitución que no cubre el párrafo entero deja un fragmento huérfano: el documento sale con un párrafo roto y un texto duplicado, y el generador no se queja** | `sgsst-electron-app/firma-service/scripts/determinaciones-v1.4.js` (los rangos), `sgsst-electron-app/docs/gestion-humana/firma-electronica/dictamen-legal-l1-2026-11-12.md` (los bloques literales), `sgsst-electron-app/firma-service/tests/scripts/contar-estados-meta-apertura.test.js` (el guard del fragmento duplicado) | Caso real (13-nov-2026), la ronda 22: la determinación **B.2** sustituía las líneas **488-496** del texto base cuando el párrafo entero llegaba hasta la **507**. El texto nuevo terminaba en «… que no están en el CDPA.» y el texto base continuaba con «<strong>Lo que el CDPA sí establece</strong>…»: el resultado era un **párrafo roto con el fragmento duplicado** («que no están en el CDPA.» dos veces seguidas) en el §4 del Anexo de Nube v1.4. **El generador no lo detectó**: su guard comprueba que el ancla case **una** vez, y el ancla sí casaba una vez —lo que quedaba fuera del rango no lo comprobaba nadie—. Reglas: (1) **un rango tiene que cubrir la unidad completa** —un párrafo, una fila de tabla, una viñeta—, y el bloque nuevo tiene que **incorporar** lo que el texto base tenía después; (2) **la costura se mira**: el verificador compara el texto final con el base y **busca fragmentos repetidos en la unión** (una línea que repite el final de la anterior); (3) **el guard cuenta el fragmento**: si «que no están en el CDPA» aparece dos veces, el test falla; (4) **el rango se corrige en el motor y el bloque se completa en la fuente**, no parcheando la salida |
+
+| 167 | 🔴 **Un texto que se firma no puede afirmar lo que nadie verificó: la norma no verificada se cita como marco de referencia, y el hecho no verificado se declara pendiente de confirmación** | `sgsst-electron-app/docs/gestion-humana/firma-electronica/dictamen-legal-l1-2026-11-12.md` (los bloques A.1, A.2.2, A.4, A.5, B.1, B.2, B.3 y B.8), `sgsst-electron-app/docs/gestion-humana/firma-electronica/candidatos-v1.4/anexo-nube-v1.4.html`, `sgsst-electron-app/docs/gestion-humana/firma-electronica/respuesta-del-abogado-2026-11-13.md` | Caso real (13-nov-2026), la ronda 22: la v1.4 candidata afirmaba, en ocho lugares distintos, que «Estados Unidos es país con nivel adecuado de protección» y que la **región US del bucket** era «condición de esta declaración» —todo ello sobre el **numeral 3.2 del Título V de la Circular Única**, que el abogado matriculado declaró por escrito **no verificado**. Un documento que se firma afirmando una norma no verificada es un documento que miente (art. 4 literal d de la Ley 1581) y que además **atribuye al cliente un riesgo que él no eligió**. Reglas: (1) **lo no verificado se dice no verificado, en el texto que se firma**: «marco sectorial de referencia, no como fundamento» y «no fue verificado el 13-nov-2026»; (2) **una condición que no es legal no se presenta como legal**: la región US pasó a ser **decisión conservadora de K+AIR**, con su fundamento (el art. 24 num. 2 y el art. 25 **no condicionan el país**); (3) **una cita normativa que sale de la lista de referencias es una contradicción interna**: la viñeta del Título V se había comido un rango mal acotado y el cuerpo la citaba sin que la lista la nombrara; (4) **el guard vigila el texto, no solo el conteo**: el test comprueba que el candidato dice «marco sectorial de referencia», «no fueron verificados», «decisión conservadora de K+AIR» y «supuesto (ii)» |
+
+| 168 | 🔴 **Un fragmento de sustitución cuyo destino cae dentro de un rango reescribe el literal nuevo: el texto que se firma deja de ser el texto que se aprobó, y el generador no se queja** | `sgsst-electron-app/firma-service/scripts/determinaciones-v1.4.js` (los fragmentos y los rangos), `sgsst-electron-app/docs/gestion-humana/firma-electronica/dictamen-legal-l1-2026-11-12.md` (el literal B.8.5 y la fila 535 de B.6.4), `sgsst-electron-app/firma-service/tests/scripts/generar-candidatos-v1.4.test.js` (el guard de identidad byte a byte y el guard estructural) | Caso real (13-nov-2026), la ronda 22 (tarde): el rango `L1-B85` sustituía el párrafo entero «Lo que queda pendiente» del Anexo de Encargo y su literal **B.8.5** copiaba del texto base la línea «…esta versión **2026-11-11** del Anexo de Encargo…», mientras el motor resolvía la fecha con un fragmento aparte (`B6.4-535`) que sustituía `2026-11-11` por `2026-11-12`. Al insertar el literal, **el fragmento cayó dentro del rango** y pasó a reescribirlo: el candidato salió con `2026-11-12` y **el dictamen decía `2026-11-11`**. El texto que se iba a firmar no era el texto que estaba escrito, y **el generador no se quejó** —el ancla casaba exactamente una vez—. Reglas: (1) **el literal es lo que se firma**: el guard `el texto del candidato es byte a byte el de la determinacion` tiene que pasar, y si falla, **el literal se corrige en el dictamen** (fecha `2026-11-12`) y el fragmento **se elimina**; (2) **un fragmento no puede tocar el literal de una determinación**: guard estructural que compara cada ancla de cada fragmento contra todos los literales del dictamen y del pedido; (3) **el mutante tiene que ser el defecto completo** —el dictamen con la fecha vieja **más** el fragmento—: un mutante a medias falla por otra razón y no prueba nada; (4) **una corrección que no cambia los bytes se anota igual**: aquí las huellas de los candidatos no se movieron (`ba664e6f…` y `d4df187a…`) y lo que cambió fue **de dónde salía** el texto; (5) **la fuente que cambia obliga a re-medir lo que la declara**: el escrito al abogado declaraba huellas que ya no correspondían a los archivos, y se anotó con las vigentes |
+
 **Formato de commit real** (verificá con `git log` antes de cada uno, la convención migró varias veces):
+
 
 ```
 📦<n|range>[-fix] # <tipo>(<scope>): <síntoma que vio el usuario, en minúsculas, sin punto>

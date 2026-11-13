@@ -16,8 +16,11 @@
 > emitido y medido»**, no «el acto esta cumplido». Los actos de un tercero —una firma, una credencial,
 > una ventana de mantenimiento, una respuesta— **no** cierran un bloque: lo que lo cierra es que el
 > pedido salio, con su destinatario, su fecha y su verificacion. Esos actos se siguen en
-> **`tabla-de-solicitudes-2026-11-13.md`**, que es la tabla de las 24 solicitudes: hoy estan **23
-> `EMITIDA`, 1 `CERRADA`** (la S-22, que el owner respondio el 13-nov-2026) y **0 `RESPONDIDA`**.
+> **`tabla-de-solicitudes-2026-11-13.md`**, que es la tabla de las 24 solicitudes: hoy estan **18
+> `EMITIDA`, 5 `CERRADA`, 1 `RESPONDIDA`** (la S-22 por respuesta aplicada; S-01, S-03, S-04 y S-23 por
+> resolucion, todas el 13-nov-2026, con la anotacion «resuelto por decision del owner, sin ratificacion
+> externa»; y la S-02 respondida por el escrito del abogado matriculado del 13-nov-2026, que **no es
+> formal** y por eso **no cierra** esa fila).
 > **Este mapa no afirma que el servicio pueda abrirse a empresas
 > reales**: los hechos de cada bloque (que no hay empresa real suscrita, que la compuerta sigue
 > apagada, que los permisos siguen en 777, que no hay respaldo fuera del servidor) siguen siendo
@@ -237,7 +240,9 @@ aplica al canal de correo y que si aplica a la transferencia del software) es **
 no un hecho verificado. Por eso **S-01 lo pide expresamente** y lo marca como no verificado. Ademas, la
 cita de la transmision internacional se **corrigio en la fuente**: las definiciones del Decreto 1377 estan
 en el **art. 3**, no en el art. 2 (correccion **0.13** del dictamen de L1). Nada de esto cambia el estado:
-**S-01 sigue `EMITIDA` y sin responder.** Detalle: `revision-asesoria-s01-s04-2026-11-13.md`.
+**S-01 quedo `CERRADA` el 13-nov-2026 por resolucion del owner** —«resuelto por decision del owner, sin
+ratificacion externa», el problema de fondo esta resuelto y verificado en el repositorio; si el abogado
+contesta despues, se archiva como ratificacion sin reabrir la fila—. Detalle: `revision-asesoria-s01-s04-2026-11-13.md`.
 
 **Evidencia.** `10-informe-correcciones-para-asesor-juridico.md`, filas J6 y J7, ambas con
 **PENDIENTE**; `sgsst-electron-app/legal/anexo-nube-v1.3.html`, bloque «Revision profesional» (la
@@ -258,7 +263,10 @@ cerrar P3 y P6; suscribir y publicar la v1.4 y el Encargo 2026-11-12).
 **Quién lo tiene.** El abogado matriculado (la ratificacion) y el owner (los siete actos y las
 firmas).
 
-**Solicitud.** **S-01**, emitida el 13-nov-2026. Esta en `tabla-de-solicitudes-2026-11-13.md`, con
+**Solicitud.** **S-01**, emitida el 13-nov-2026 y **cerrada el mismo dia por resolucion del owner**
+—«resuelto por decision del owner, sin ratificacion externa»—. El escrito del abogado matriculado del
+13-nov-2026 **no es formal** y se archivo **como ratificacion, sin reabrir la fila**; su contenido
+aplicable entro a la v1.4 (que se regenero). Esta en `tabla-de-solicitudes-2026-11-13.md`, con
 su destinatario, su verificacion y su fecha limite.
 
 ### M.6 - La tabla supletoria de conservacion sigue sin validar, con su compuerta cerrada a proposito, y la validacion escrita ya esta SOLICITADA — CERRADO. Solicitud S-02 emitida el 13-nov-2026
@@ -343,7 +351,12 @@ porque abrir la compuerta cambia el comportamiento del servicio.
 
 **Quién lo tiene.** El abogado matriculado (la validacion) y el owner (la apertura, despues).
 
-**Solicitud.** **S-02**, emitida el 13-nov-2026. Esta en `tabla-de-solicitudes-2026-11-13.md`, con
+**Solicitud.** **S-02**, emitida el 13-nov-2026 y **respondida el mismo dia** por el escrito del abogado
+matriculado: **la sustancia queda validada** (los 10 y 5 anos son el sistema de archivo o retencion
+documental del art. 2.2.4.6.13 y son compatibles con el art. 2.2.2.25.2.8), pero **el escrito no es
+formal** y el propio abogado escribio que **no cierra** la fila, porque el candado del codigo exige
+`validado_por` **y** `validado_at` de un abogado matriculado y **no los sustituye**. Por eso la fila
+esta **`RESPONDIDA`**, no `CERRADA`. Esta en `tabla-de-solicitudes-2026-11-13.md`, con
 su destinatario, su verificacion y su fecha limite.
 
 ### M.7 - No hay copia de los respaldos fuera del servidor, y los actos del P8 aun no estan en ninguno: el destino y la activacion ya estan SOLICITADOS — CERRADO. Solicitud S-09 emitida y Solicitud S-04 emitida el 13-nov-2026
@@ -400,12 +413,15 @@ States**, pero **la razon que se da para exigirlo no esta verificada**: por el *
 Decreto 1377** la transmision a un encargado se valida con el **contrato del art. 25**, sin remitir a la
 lista de paises con nivel adecuado de proteccion, y el alcance de esa lista **no se pudo verificar**.
 Por eso la condicion es, hasta que el abogado lo diga, una **decision conservadora de K+AIR**, y **S-04
-lo pregunta de forma expresa**. El bloque **no cambia de estado**: S-04 sigue `EMITIDA`.
+lo pregunta de forma expresa**. El bloque **no cambia de estado**: **S-04 quedo `CERRADA` el 13-nov-2026
+por resolucion del owner** —«resuelto por decision del owner, sin ratificacion externa»—, sin reabrir
+la fila si la respuesta formal llega despues.
 
 **Quién lo tiene.** El owner (el destino, las credenciales y la activacion) y el abogado matriculado
 (la ratificacion de M.28); el equipo (la instalacion y la prueba, ya hechas).
 
-**Solicitud.** **S-09** y **S-04**, emitidas el 13-nov-2026. Estan en
+**Solicitud.** **S-09** y **S-04**, emitidas el 13-nov-2026; la **S-04** quedo **cerrada el mismo dia
+por resolucion del owner** —«resuelto por decision del owner, sin ratificacion externa»—. Estan en
 `tabla-de-solicitudes-2026-11-13.md`, con su destinatario, su verificacion y su fecha limite.
 
 ### M.8 - El 📦1051 no esta desplegado: produccion corre las dependencias vulnerables, y el despliegue ya esta SOLICITADO — CERRADO. Solicitud S-10 emitida el 13-nov-2026
@@ -879,7 +895,7 @@ suscrito no se toca) y corregir la tabla de instrumentos»); `verificacion-cierr
 requisitos 5.5 y 5.6 (**PENDIENTE** y **PARCIALMENTE**: ambos exigen «una version nueva del Anexo de
 Nube (v1.4)»); `sgsst-electron-app/legal/anexo-nube-v1.3.html` (los §1 y §5);
 `sgsst-electron-app/legal/anexo-encargo.html` (la remision); `candidatos-v1.4/` (candidato Nube v1.4:
-103 390 B, `fae2b26b...d8b416`; candidato Encargo 12-nov: 97 962 B, `7576b1a1...d9f3c`; vigentes
+111 462 B, `ba664e6f...e3b47`; candidato Encargo 12-nov: 100 153 B, `d4df187a...4e2967`; vigentes
 intactos: `fdd10551...b585d` y `6308b1f7...b8948`).
 
 **LO QUE LA MESA DE DETERMINACIONES LE METIO (12-nov-2026).** El generador de candidatos ahora arma el texto
@@ -909,7 +925,13 @@ vuelve a armar.
 **Quién lo tiene.** El abogado matriculado (la redaccion) y el owner (las firmas). El equipo
 (huellas, manifiesto y firmas) ya tiene los candidatos armados y **verificados**.
 
-**Solicitud.** **S-03**, emitida el 13-nov-2026. Esta en `tabla-de-solicitudes-2026-11-13.md`, con
+**Solicitud.** **S-03**, emitida el 13-nov-2026 y **cerrada el mismo dia por resolucion del owner**
+—«resuelto por decision del owner, sin ratificacion externa»—. El escrito del abogado matriculado del
+13-nov-2026 **no es formal** y se archivo **como ratificacion, sin reabrir la fila**; el **texto final lo
+redacto K+AIR con la autorizacion del owner** y los candidatos se **regeneraron**
+(`candidatos-v1.4/anexo-nube-v1.4.html`, 111 462 B / `ba664e6f…e3b47`;
+`candidatos-v1.4/anexo-encargo-2026-11-12.html`, 100 153 B / `d4df187a…4e2967`). Esta en
+`tabla-de-solicitudes-2026-11-13.md`, con
 su destinatario, su verificacion y su fecha limite.
 ## 3. Riesgos y deuda
 
@@ -1315,13 +1337,22 @@ entra por el camino de las **transferencias**, art. 24 num. 1 y art. 26 de la Le
 la lista publicada por la SIC **no se pudo verificar**. Por eso **S-04 ahora lo pregunta de forma
 expresa**: ¿es exigencia legal o decision conservadora de K+AIR? De la respuesta depende como se
 redacta la v1.4: como obligacion normativa o como decision propia declarada. El bucket se sigue creando
-en la region United States en cualquier caso. El bloque **no cambia de estado**: S-04 sigue `EMITIDA`.
+en la region United States en cualquier caso. El bloque **no cambia de estado**: **S-04 quedo `CERRADA`
+el 13-nov-2026 por resolucion del owner** —«resuelto por decision del owner, sin ratificacion externa»—,
+sin reabrir la fila si la respuesta formal llega despues.
 
 **Quién lo tiene.** El abogado matriculado (la ratificacion y la redaccion final) y el owner (el
 contrato y la cuenta).
 
-**Solicitud.** **S-04**, emitida el 13-nov-2026. Esta en `tabla-de-solicitudes-2026-11-13.md`, con
-su destinatario, su verificacion y su fecha limite.
+**Solicitud.** **S-04**, emitida el 13-nov-2026 y **cerrada el mismo dia por resolucion del owner**
+—«resuelto por decision del owner, sin ratificacion externa»—. El escrito del abogado matriculado del
+13-nov-2026 **no es formal** y se archivo **como ratificacion, sin reabrir la fila**, pero **si contesto
+de forma expresa la pregunta de la region**: la condicion de region United States **NO es una exigencia
+legal** del art. 24 num. 2 ni del art. 25 del Decreto 1377 —esos articulos **no condicionan el pais**
+del encargado—, de modo que es una **decision conservadora de K+AIR**. El **Titulo V** y la lista de
+paises con nivel adecuado de la SIC **no fueron verificados** y quedan como **marco sectorial de
+referencia, no como fundamento**. Esta en
+`tabla-de-solicitudes-2026-11-13.md`, con su destinatario, su verificacion y su fecha limite.
 
 ### M.29 - La poda del respaldo en el destino no miraba el deber legal de conservacion — CERRADO
 
@@ -1393,7 +1424,7 @@ cambio es que **la apertura ahora exige la validacion escrita en el archivo**, n
 
 **Quien lo tiene.** —
 
-### M.31 - El procedimiento del canal de `fecha_terminacion` ya tiene las cinco decisiones del owner: falta la validacion del abogado, la firma del owner y la primera operacion real: el codigo existe y el Anexo lo exige — CERRADO. Solicitudes S-22 (respondida y cerrada), S-23 (emitida) y S-24 (emitida) el 13-nov-2026
+### M.31 - El procedimiento del canal de `fecha_terminacion` ya tiene las cinco decisiones del owner: falta la validacion del abogado, la firma del owner y la primera operacion real: el codigo existe y el Anexo lo exige — CERRADO. Solicitudes S-22 (respondida y cerrada), S-23 (cerrada por resolucion) y S-24 (emitida) el 13-nov-2026
 
 **Origen.** El §6 del Anexo de Encargo y el §8.6(b) del Acuerdo (J9), y
 `docs/gestion-humana/firma-electronica/procedimiento-canal-fecha-terminacion-2026-10-31.md`.
@@ -1443,9 +1474,19 @@ procedimiento), que es de otro dueño y que **el 13-nov-2026 se pidio por escrit
 **S-23** (vence el **2026-11-27**); la **firma del owner** sobre el procedimiento, que el
 13-nov-2026 quedo registrada como la solicitud **S-24** (vence el **2026-11-20**); y la **primera
 operacion real** del canal con una empresa real.
+El escrito del abogado matriculado del 13-nov-2026 **valido la solidez juridica del procedimiento**
+—«con sus cinco decisiones del owner, es legalmente solido y consistente con el texto firmado»— pero
+**no dio la validacion formal del §9.2**: dijo que esa es «el punto 1.3 de mi propio plan de cierre»,
+con nombre, fecha y huella. Esa mitad **sigue pendiente**, con su dueño.
 El 13-nov-2026 el owner respondio la solicitud **S-22** con las cinco decisiones, se aplicaron al
-procedimiento y se verificaron: **S-22 quedo CERRADA**, y es la **unica fila cerrada** de la tabla de
-solicitudes. **El codigo no se toca**: la decision era de procedimiento y de escritura.
+procedimiento y se verificaron: **S-22 quedo CERRADA**. Ese mismo dia **S-01, S-03, S-04 y S-23
+quedaron `CERRADA` por resolucion del owner** —«resuelto por decision del owner, sin ratificacion
+externa»—, y mas tarde ese mismo dia el **abogado matriculado respondio por escrito** a las cinco
+solicitudes: su escrito **no es formal** (sin nombre, fecha de suscripcion ni huella), **se archivó**
+como ratificacion **sin reabrir** las cuatro filas ya cerradas y **movo la S-02 a `RESPONDIDA`**, con la
+sustancia validada y el candado de la compuerta **sin abrir**. La tabla quedo en **24 solicitudes: 18
+`EMITIDA`, 5 `CERRADA` y 1 `RESPONDIDA`** (S-01, S-03, S-04, S-22, S-23; y S-02 respondida).
+**El codigo no se toca**: la decision era de procedimiento y de escritura.
 
 **Medido en produccion el 13-nov-2026 (SSH, solo lectura).** Las dos tablas del canal existen
 (`gh_firma_fecha_terminacion` y `gh_firma_fecha_terminacion_eventos`, migraciones 052 y 053) y **la ruta
@@ -1467,7 +1508,10 @@ operacion real del canal).
 - **S-23**, emitida el 13-nov-2026 al **abogado matriculado**: validar el procedimiento como
   evidencia del canal del §6 del Anexo de Encargo (el punto 1.3 de su plan de cierre). Va en su
   propio documento, `solicitud-al-abogado-validacion-procedimiento-2026-11-13.md`, y vence el
-  **2026-11-27**.
+  **2026-11-27**. **Cerrada el 13-nov-2026 por resolucion del owner** —«resuelto por decision del
+  owner, sin ratificacion externa»—; el escrito del abogado matriculado de ese dia **se archivo como
+  ratificacion sin reabrir la fila**: valido la solidez juridica del procedimiento, pero **no** dio la
+  validacion formal del §9.2, que sigue pendiente.
 - **S-24**, emitida el 13-nov-2026 al **owner**: **firmar el procedimiento**. El documento quedo con
   el estado «pendiente de firma del owner» (16 872 B, sha256 `5a817b38…e04e`), y ese estado es un
   pendiente con dueño: sin la fila, la firma que falta seria un hueco invisible. Vence el
@@ -1485,9 +1529,10 @@ operacion real del canal).
 | **TOTAL** | **31** | **0** | **0** | **31** |
 
 Los 0 pendientes concilian: ninguno = 0. Las 24 solicitudes de la tabla
-(`tabla-de-solicitudes-2026-11-13.md`): 23 EMITIDA, 1 CERRADA. Cerrado en este mapa
-significa que el pedido esta emitido y medido, no que el acto este cumplido: cada acto
-de un tercero se sigue en esa tabla, con su estado, su destinatario y su fecha.
+(`tabla-de-solicitudes-2026-11-13.md`): 18 EMITIDA, 1 RESPONDIDA, 5 CERRADA. Cerrado en
+este mapa significa que el pedido esta emitido y medido, no que el acto este cumplido:
+cada acto de un tercero se sigue en esa tabla, con su estado, su destinatario y su
+fecha.
 
 ---
 

@@ -226,6 +226,44 @@ test('el texto del candidato es byte a byte el de la determinacion', () => {
   assert.ok(comprobados >= 15, 'se comprobaron al menos quince textos literales');
 });
 
+test('ningun fragmento del motor reescribe el literal de una determinacion', () => {
+  // Un FRAGMENTO (B.6.x) es una sustitucion por ancla corta que el motor hace
+  // sobre el texto; un RANGO (L1-Bxx) sustituye una unidad completa con el
+  // literal del dictamen. Si el destino de un fragmento cae DENTRO de un rango,
+  // el fragmento pasa a reescribir el literal recien insertado: el candidato
+  // sale con un texto que el dictamen no dice, el generador no se queja (el
+  // ancla casa una vez) y la identidad byte a byte se rompe en silencio.
+  // Caso real (13-nov-2026): el fragmento B6.4-535 metia la fecha
+  // 2026-11-12 dentro del literal B.8.5. Se quito el fragmento y la fecha
+  // la trae el literal.
+  const det = require(DETERMINACIONES);
+  const dict = det.leerBloques(det.DICTAMEN);
+  const ped = det.leerBloques(det.PEDIDO);
+
+  const literales = [];
+  for (const fuente of [dict, ped]) {
+    for (const clave of Object.keys(fuente)) {
+      fuente[clave].forEach((t, i) => literales.push({ clave: clave + '[' + i + ']', texto: t }));
+    }
+  }
+  assert.ok(literales.length > 0, 'el dictamen tiene literales');
+
+  const fragmentos = []
+    .concat(det.NUBE_TEXTOS.map((f) => ({ donde: 'NUBE', f: f })))
+    .concat(det.ENCARGO_TEXTOS.map((f) => ({ donde: 'ENCARGO', f: f })));
+  assert.ok(fragmentos.length > 0, 'el motor tiene fragmentos');
+
+  for (const item of fragmentos) {
+    for (const l of literales) {
+      assert.ok(
+        l.texto.indexOf(item.f.antes) < 0,
+        'el fragmento ' + item.donde + '/' + item.f.id + ' esta dentro del literal ' + l.clave
+          + ': lo reescribiria y el candidato saldria distinto del dictamen'
+      );
+    }
+  }
+});
+
 test('el generador se niega cuando una ancla no casa exactamente una vez', () => {
   const det = require(DETERMINACIONES);
 
@@ -272,12 +310,15 @@ test('los textos vigentes y el manifiesto siguen intactos', () => {
   );
 });
 
-test('los dos programas nuevos son ASCII puro, LF y sin BOM', () => {
+test('los tres programas del motor son ASCII puro, LF y sin BOM', () => {
   // La cabecera de `determinaciones-v1.4.js` AFIRMA que el archivo es ASCII
   // puro, LF y sin BOM. Una afirmacion en una cabecera no es un dato: este
   // check la vuelve cierta, y muerde si alguien mete una tilde.
   // (El control de ausencia es el que sostiene la correccion.)
-  for (const archivo of [DETERMINACIONES, __filename]) {
+  // El generador tambien esta en la lista: su cabecera hace la misma
+  // declaracion y tenia diez sigilos (20 bytes) en las descripciones de los
+  // reemplazos (13-nov-2026).
+  for (const archivo of [DETERMINACIONES, GENERADOR, __filename]) {
     const b = fs.readFileSync(archivo);
     const nombre = path.basename(archivo);
 

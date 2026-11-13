@@ -97,6 +97,29 @@ const RUTA_SOLICITUD23 = path.resolve(
 const RUTA_CONTEXT = path.resolve(__dirname, '..', '..', '..', 'CONTEXT.md');
 
 /**
+ * El escrito del abogado matriculado del 13-nov-2026, archivado.
+ *
+ * Es la respuesta a las cinco solicitudes al abogado. No es formal (sin
+ * nombre, fecha de suscripcion ni huella de un documento firmado), asi que no
+ * cierra filas: se archiva, se aplica al texto y se registra como
+ * ratificacion donde la fila ya estaba cerrada.
+ */
+const RUTA_ESCRITO = path.resolve(
+  __dirname, '..', '..', '..', 'docs', 'gestion-humana', 'firma-electronica',
+  'respuesta-del-abogado-2026-11-13.md'
+);
+
+/** Los dos candidatos de la v1.4. */
+const RUTA_CAND_NUBE = path.resolve(
+  __dirname, '..', '..', '..', 'docs', 'gestion-humana', 'firma-electronica',
+  'candidatos-v1.4', 'anexo-nube-v1.4.html'
+);
+const RUTA_CAND_ENCARGO = path.resolve(
+  __dirname, '..', '..', '..', 'docs', 'gestion-humana', 'firma-electronica',
+  'candidatos-v1.4', 'anexo-encargo-2026-11-12.html'
+);
+
+/**
  * Copia el mapa a un directorio temporal para poder romperlo sin tocar el
  * documento real.
  * @returns {string} la ruta de la copia.
@@ -248,17 +271,52 @@ test('todos los bloques declaran su origen', () => {
 
 // ---------------------------------------------------------------- solicitudes
 
-test('la tabla de solicitudes declara 24 filas: 23 EMITIDA y 1 CERRADA, y el mapa las nombra todas', () => {
+test('la tabla de solicitudes declara 24 filas: 18 EMITIDA, 1 RESPONDIDA y 5 CERRADA, y el mapa las nombra todas', () => {
   const texto = fs.readFileSync(RUTA_SOLICITUDES_REAL, 'utf8');
   const ps = _parsearSolicitudes(texto);
   assert.equal(ps.errores.length, 0, 'la tabla de solicitudes no tiene errores: ' + ps.errores.join('; '));
   assert.equal(ps.solicitudes.length, 24, 'hay 24 solicitudes');
   const estados = {};
   for (const s of ps.solicitudes) estados[s.estado] = (estados[s.estado] || 0) + 1;
-  assert.equal(estados.EMITIDA, 23, 'las 23 que nadie ha respondido estan EMITIDA');
-  assert.equal(estados.CERRADA, 1, 'la S-22, respondida y aplicada, esta CERRADA');
-  assert.equal(estados.RESPONDIDA || 0, 0, 'ninguna quedo en RESPONDIDA: la que se respondio se aplico y se verifico');
+  assert.equal(estados.EMITIDA, 18, 'las 18 con la respuesta o el acto del destinatario pendientes estan EMITIDA');
+  assert.equal(estados.CERRADA, 5, 'S-22 por respuesta aplicada; S-01, S-03, S-04 y S-23 por resolucion');
+  assert.equal(estados.RESPONDIDA || 0, 1, 'la S-02 quedo RESPONDIDA: el abogado respondio el 13-nov-2026');
   assert.equal(estados.PREPARADA || 0, 0, 'ninguna quedo PREPARADA: las 24 salieron');
+
+  // Los cierres por resolucion llevan su anotacion honesta DENTRO de la fila:
+  // cerrar sin decir "sin ratificacion externa" seria fingir una validacion
+  // que no hubo. Y las cuatro llevan la nota de que el escrito del abogado
+  // matriculado del 13-nov-2026 se archivo COMO RATIFICACION, sin reabrir.
+  const porResolucion = ['S-01', 'S-03', 'S-04', 'S-23'];
+  const lineas = texto.split('\n');
+  for (const id of porResolucion) {
+    const fila = lineas.filter((l) => l.indexOf('| ' + id + ' |') === 0)[0];
+    assert.ok(fila, 'la tabla tiene la fila ' + id);
+    assert.ok(fila.indexOf('| CERRADA |') >= 0, id + ' esta CERRADA');
+    assert.ok(
+      fila.indexOf('sin ratificaci\u00f3n externa') >= 0,
+      id + ' esta cerrada por resolucion y su fila anota sin ratificacion externa'
+    );
+    assert.ok(
+      fila.indexOf('como ratificaci\u00f3n, sin reabrir') >= 0,
+      id + ' anota que el escrito del abogado se archivo como ratificacion sin reabrir la fila'
+    );
+  }
+
+  // La S-02 quedo RESPONDIDA y NO CERRADA: el codigo de la compuerta exige
+  // validado_por y validado_at reales, y el propio abogado escribio que no
+  // los sustituye. Cerrarla seria un verde falso.
+  const s02 = ps.solicitudes.filter((x) => x.id === 'S-02')[0];
+  assert.ok(s02, 'la tabla tiene la fila S-02');
+  assert.equal(s02.estado, 'RESPONDIDA',
+    'la S-02 quedo RESPONDIDA: el destinatario respondio, pero el escrito no es formal y la fila no cierra');
+  const fila02 = lineas.filter((l) => l.indexOf('| S-02 |') === 0)[0];
+  assert.ok(fila02.indexOf('| CERRADA |') < 0, 'la S-02 no puede estar CERRADA: el candado sigue cerrado');
+
+  // La S-24 sigue EMITIDA: la firma del owner no esta.
+  const s24 = ps.solicitudes.filter((x) => x.id === 'S-24')[0];
+  assert.ok(s24, 'la tabla tiene la fila S-24');
+  assert.equal(s24.estado, 'EMITIDA', 'la S-24 sigue EMITIDA: la firma del owner no esta');
 
   // Cada bloque que dice "CERRADO. Solicitud S-XX" tiene que invocar una
   // solicitud que exista.
@@ -280,7 +338,7 @@ test('la S-23 pide al abogado la validacion del procedimiento, y el documento de
   const ps = _parsearSolicitudes(texto);
   const s23 = ps.solicitudes.filter((s) => s.id === 'S-23')[0];
   assert.ok(s23, 'la tabla tiene la fila S-23');
-  assert.equal(s23.estado, 'EMITIDA', 'la S-23 esta EMITIDA: el escrito todavia no sale');
+  assert.equal(s23.estado, 'CERRADA', 'la S-23 esta CERRADA: se cerro por resolucion el 13-nov-2026');
   assert.equal(s23.bloque, 'M.31', 'la S-23 es del bloque M.31');
 
   // El pedido de la S-23 tiene su propio documento, y ese documento declara el
@@ -331,8 +389,9 @@ test('la frase de conciliacion nombra las solicitudes y dice que cerrado no es a
     'la frase nombra las solicitudes');
   assert.ok(texto.indexOf('no que el acto este cumplido') >= 0,
     'la frase aclara que cerrado no significa acto cumplido');
-  assert.ok(texto.indexOf('23 EMITIDA') >= 0, 'la frase dice cuantas hay emitidas');
-  assert.ok(texto.indexOf('1 CERRADA') >= 0, 'la frase dice cuantas hay cerradas');
+  assert.ok(texto.indexOf('18 EMITIDA') >= 0, 'la frase dice cuantas hay emitidas');
+  assert.ok(texto.indexOf('1 RESPONDIDA') >= 0, 'la frase dice cuantas hay respondidas');
+  assert.ok(texto.indexOf('5 CERRADA') >= 0, 'la frase dice cuantas hay cerradas');
 });
 
 test('las cinco decisiones del owner estan escritas en el procedimiento y la S-22 esta CERRADA', () => {
@@ -409,9 +468,80 @@ test('la linea viva del CONTEXT publica la cifra vigente de solicitudes', () => 
   const marca = ctx.indexOf('**La META (el documento que hay que leer antes de tocar nada).**');
   assert.ok(marca >= 0, 'el CONTEXT describe la META');
   const tramo = ctx.slice(marca, marca + 2500);
-  const vigente = '**' + total + ' solicitudes: ' + emitidas + ' `EMITIDA` y ' + cerradas + ' `CERRADA`**';
+  const respondidas = estados.RESPONDIDA || 0;
+  const vigente = '**' + total + ' solicitudes: ' + emitidas + ' `EMITIDA`, ' + respondidas
+    + ' `RESPONDIDA` y ' + cerradas + ' `CERRADA`**';
   assert.ok(tramo.indexOf(vigente) >= 0,
     'la linea viva de la META publica la cifra de la tabla: ' + vigente);
   assert.ok(ctx.indexOf('**22 solicitudes: 21 `EMITIDA` y 1 `CERRADA**') < 0,
     'el CONTEXT ya no publica la cifra de la ronda anterior');
+  assert.ok(tramo.indexOf('**24 solicitudes: 19 `EMITIDA` y 5 `CERRADA**') < 0,
+    'la linea viva ya no publica la cifra de la ronda anterior (19/5)');
+});
+
+test('el escrito del abogado matriculado del 13-nov-2026 esta archivado con su huella, y es el que se recibio', () => {
+  assert.ok(fs.existsSync(RUTA_ESCRITO), 'existe el archivo del escrito del abogado');
+  const doc = fs.readFileSync(RUTA_ESCRITO, 'utf8');
+
+  // El original se sella con su huella: si el original cambia, el archivo
+  // archivado tiene que volver a medirse.
+  assert.ok(
+    doc.indexOf('cf300b153d2847f1c6ea2a4a8fa16eee2969a88f0e92ac0724c9ce282ac52c0e') >= 0,
+    'el archivo declara la huella SHA-256 del original recibido'
+  );
+
+  // Y dice lo que NO es: un escrito no formal no cierra filas.
+  assert.ok(doc.indexOf('no es formal') >= 0 || doc.indexOf('no formal') >= 0,
+    'el archivo dice que el escrito no es formal');
+  assert.ok(doc.indexOf('S-01') >= 0 && doc.indexOf('S-23') >= 0,
+    'el archivo nombra las cinco solicitudes respondidas');
+
+  // El texto va verbatim: una frase literal del original tiene que estar
+  // dentro del archivo, sin reescribirla.
+  assert.ok(doc.indexOf('La determinación L1 es correcta en su núcleo') >= 0,
+    'el archivo contiene el literal del original');
+  assert.ok(doc.indexOf('Las condiciones se sostienen:') >= 0,
+    'el archivo declara el punto exacto donde el original esta truncado');
+});
+
+test('la v1.4 declara lo que el escrito del abogado NO verifico', () => {
+  const nube = fs.readFileSync(RUTA_CAND_NUBE, 'utf8');
+  const encargo = fs.readFileSync(RUTA_CAND_ENCARGO, 'utf8');
+
+  // 1. El Titulo V deja de ser fundamento: es marco sectorial de referencia.
+  assert.ok(nube.indexOf('marco sectorial de referencia') >= 0,
+    'el Nube cita el Titulo V como marco sectorial de referencia');
+  assert.ok(encargo.indexOf('marco sectorial de referencia') >= 0,
+    'el Encargo cita el Titulo V como marco sectorial de referencia');
+  assert.ok(nube.indexOf('no fueron verificados') >= 0,
+    'el Nube dice que el Titulo V no fue verificado');
+
+  // 2. La region US es decision conservative, no exigencia legal.
+  // Los candidatos se publican en ASCII puro: los acentos van como entidad.
+  assert.ok(nube.indexOf('decisi&oacute;n conservadora de K+AIR') >= 0,
+    'el Nube declara la region como decision conservadora de K+AIR');
+  assert.ok(nube.indexOf('no condicionan el pa&iacute;s') >= 0,
+    'el Nube dice que el art. 24 num. 2 y el art. 25 no condicionan el pais');
+
+  // 3. La Circular 002: el canal fuera, la transferencia del software dentro.
+  assert.ok(nube.indexOf('supuesto (ii)') >= 0,
+    'el Nube declara que la transferencia del software cae en el supuesto (ii)');
+  assert.ok(encargo.indexOf('supuesto (ii)') >= 0,
+    'el Encargo declara lo mismo');
+
+  // 4. Los hechos contractuales quedan pendientes de confirmacion.
+  assert.ok(nube.indexOf('pendientes de confirmaci&oacute;n contra el contrato') >= 0,
+    'el Nube declara los hechos contractuales como pendientes');
+
+  // 5. El defecto real del candidato anterior: el parrafo roto con el
+  // fragmento duplicado. No puede volver a aparecer.
+  const veces = (nube.match(/que no est&aacute;n en el CDPA/g) || []).length;
+  assert.ok(veces <= 1, 'el fragmento "que no estan en el CDPA" aparece una sola vez: halladas ' + veces);
+
+  // 6. Los candidatos se publican en ASCII puro (entidades, no acentos).
+  for (const [nombre, texto] of [['nube', nube], ['encargo', encargo]]) {
+    const noAscii = texto.split('\n').filter((l) => /[^\x00-\x7F]/.test(l));
+    assert.equal(noAscii.length, 0,
+      'el candidato ' + nombre + ' tiene lineas con caracteres no ASCII: ' + noAscii.length);
+  }
 });

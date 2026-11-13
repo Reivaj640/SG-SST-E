@@ -99,9 +99,13 @@ determinación» sino **el acto concreto, con su responsable**. Ese es el avance
 > **Actualización del 13-nov-2026 (esta acta mide la mesa del 12-nov y eso no cambia).** El owner **cambió el
 > criterio de cierre del mapa**: un bloque cierra cuando **el pedido está emitido y medido** —con su
 > destinatario, su fecha y su verificación—, y los actos de un tercero (firma, credencial, ventana,
-> respuesta) **no** cierran un bloque: se siguen en `tabla-de-solicitudes-2026-11-13.md` (24 solicitudes: **23 `EMITIDA` y 1 `CERRADA`** —la S-22, que el owner
-> respondio el 13-nov-2026 y que quedo escrita en el procedimiento del canal de `fecha_terminacion`— y
-> **0 `RESPONDIDA`**). Con ese criterio el mapa quedó en **31 cerrados / 0 pendientes**, y
+> respuesta) **no** cierran un bloque: se siguen en `tabla-de-solicitudes-2026-11-13.md` (24 solicitudes: **18 `EMITIDA`, 1 `RESPONDIDA` y 5 `CERRADA`** —la S-02, respondida el
+> 13-nov-2026 por el abogado matriculado con un escrito **no formal** (sin nombre, sin fecha de
+> suscripción y sin huella), que **no cierra** la fila; la S-22, que el owner
+> respondio el 13-nov-2026 y que quedo escrita en el procedimiento del canal de `fecha_terminacion`, y
+> S-01, S-03, S-04 y S-23, cerradas por resolucion ese mismo dia: «resuelto por decision del owner, sin
+> ratificacion externa»— y
+> **1 `RESPONDIDA`**). Con ese criterio el mapa quedó en **31 cerrados / 0 pendientes**, y
 > **no afirma que el servicio pueda abrirse a empresas reales**. La cifra de arriba (9 cerrados / 21
 > pendientes) es la de esta acta, con la regla de entonces.
 >
@@ -109,7 +113,9 @@ determinación» sino **el acto concreto, con su responsable**. Ese es el avance
 > **doce**. Hoy el dictamen de L1 tiene **trece**: la **0.13** (la cita del Decreto 1377: las definiciones de
 > Transferencia y Transmisión están en el **art. 3**, no en el art. 2), que entró con la revisión de la
 > asesoría jurídica del 13-nov-2026 (`revision-asesoria-s01-s04-2026-11-13.md`). Esa revisión **no es la
-> respuesta del abogado**: S-01 a S-04 **siguen `EMITIDA` y 0 `RESPONDIDA`**.
+> respuesta del abogado**: no dejó **ninguna** `RESPONDIDA`. Ese mismo día, más tarde, S-01, S-03 y S-04
+> se cerraron **por resolución** —«resuelto por decisión del owner, sin ratificación externa»— y S-02
+> sigue `EMITIDA`.
 
 ---
 

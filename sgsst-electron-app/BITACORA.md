@@ -10347,3 +10347,89 @@ corrida en solitario): **+2** sobre la corrida anterior, que son las dos pruebas
 **15/15**. Mapa **31 bloques · 31 cerrados · 0 pendientes**, **24 solicitudes (23 `EMITIDA`, 1 `CERRADA`)**. Paquete al
 abogado: **14 de 14** sumas coinciden. Barrido de los archivos de la ronda: **0 problemas**. Verificación de cierre:
 **sin inconsistencias**.
+
+## 2026-11-13 (tarde, octava parte) — el escrito que no era formal, la región que no era una exigencia legal, y el párrafo que salía roto
+
+**El abogado respondió, y su respuesta no cerraba nada.** El owner entregó el escrito de un abogado matriculado
+(13-nov-2026, 8 451 B, SHA-256 `cf300b15…52c0e`) en respuesta a las cinco solicitudes al abogado (S-01, S-02,
+S-03, S-04 y S-23). Verificó la **base normativa** en fuente oficial y confirmó el núcleo de L1: el doble papel
+de Google, la transmisión y no la transferencia, y que el art. 26 de la Ley 1581 no se activa. Pero **el escrito
+no es formal** —sin nombre, fecha de suscripción ni huella— y el propio abogado escribió tres veces que no
+cierra: «la fila NO cierra… yo no sustituyo el candado», «no puedo sustituir la redacción» y «lo que no puedo
+verificar es un hecho, no una norma». **La S-02 pasó de `EMITIDA` a `RESPONDIDA`** y las cuatro filas ya
+cerradas por resolución se anotaron como **ratificación, sin reabrir**: 24 solicitudes, **18 `EMITIDA`, 1
+`RESPONDIDA`, 5 `CERRADA`**.
+
+**El texto que se iba a firmar afirmaba lo que nadie había verificado.** El escrito dejó claro que el
+**numeral 3.2 del Título V de la Circular Única y la lista de países con nivel adecuado no fueron verificados**,
+y que **la condición de región United States no es una exigencia legal**: los arts. 24 num. 2 y 25 del
+Decreto 1377 no condicionan el país del encargado. La v1.4 candidata afirmaba lo contrario en ocho lugares
+—«Estados Unidos es país con nivel adecuado de protección» y «la región del bucket es condición de esta
+declaración»—, es decir, le atribuía al cliente un riesgo que no era legal. La redacción final (con la
+autorización del owner) cita el Título V **como marco sectorial de referencia, no como fundamento**, declara la
+región US como **decisión conservadora de K+AIR**, dice que **la transferencia del software a la Empresa sí
+cae en el supuesto (ii)** de la Circular 002 (el canal de correo sigue fuera), deja los hechos contractuales
+del CDPA **pendientes de confirmación contra el contrato** y deja el plazo de 48 h como **compromiso propio del
+Encargado**, no del CDPA.
+
+**El defecto que nadie vio: un párrafo roto con un fragmento duplicado.** La determinación B.2 sustituía las
+líneas **488-496** del texto base cuando el párrafo entero llegaba hasta la **507**: el texto nuevo terminaba
+en «… que no están en el CDPA.» y el texto base continuaba con «<strong>Lo que el CDPA sí establece</strong>…».
+El §4 del candidato salía con un párrafo roto y el fragmento duplicado. **El generador no lo detects**: su
+guard comprueba que el ancla case una vez, y el ancla sí casaba una vez. La costura se mira: un verificador
+compara el texto final con el base y busca fragmentos repetidos en la unión. Y el §8 afirmaba el derecho de
+auditoría del §7.5.2(a) **sin la condición de la Ley Europea**, que es justo lo que el abogado verificó que
+**no** se activa.
+
+**El guard nuevo.** `tests/scripts/contar-estados-meta-apertura.test.js` pasó de 15 a **17 pruebas**. Las dos
+nuevas: una exige que el **escrito del abogado esté archivado** con la huella del original y que declare el
+punto exacto donde está truncado; la otra vigila el **texto de la v1.4** —que el Título V sea marco sectorial
+y no fundamento, que la región sea decisión conservadora, que el supuesto (ii) esté declarado, que los hechos
+contractuales estén pendientes, que el fragmento huérfano **no** esté duplicado y que los candidatos sigan en
+**ASCII puro**.
+
+**Medido.** Test del script del conteo **17/17**. Mapa **31 bloques · 31 cerrados · 0 pendientes**, con la tabla
+resumen y la frase de conciliación **regeneradas por el script**. Candidatos: `anexo-nube-v1.4.html` **111 462
+B / `ba664e6f…e3b47`** y `anexo-encargo-2026-11-12.html` **100 153 B / `d4df187a…4e2967`**; texto vigente y
+manifiesto **intactos** (`fdd10551…`, `6308b1f7…`, `d9b59699…`). Barrido de caracteres prohibidos en los 12
+archivos de la ronda: **0**.
+
+## 2026-11-13 (tarde, octava parte, bis) — el guard que compara byte a byte encontró que el texto que se iba a firmar no era el texto que estaba escrito
+
+**El fallo.** La suite completa de `firma-service` **no salió en verde**: **2 de 2 695** pruebas fallaron, y las
+dos eran **de esta misma ronda**, en `tests/scripts/generar-candidatos-v1.4.test.js`.
+
+**Qué era.** La determinación **B.8.5** sustituye el párrafo entero «Lo que queda pendiente» del Anexo de
+Encargo (rango `L1-B85`, líneas 524-537). Su literal copiaba del texto base la línea que nombra la
+suscripción —«…esta versión **2026-11-11** del Anexo de Encargo…»—, porque en el texto base esa era la
+versión; en el candidato la versión que se suscribe es la **2026-11-12**, y el motor lo resolvía con un
+fragmento aparte (`B6.4-535`). Al insertar el literal, **el fragmento cayó dentro del rango** y pasó a
+reescribirlo: el **candidato** decía `2026-11-12` y el **dictamen** decía `2026-11-11`. El texto que se iba
+a firmar no era el texto que estaba escrito, y **el generador no se quejó** (el ancla casaba exactamente
+una vez). La segunda falla era más tonta y también real: el motor llevaba un `§` (2 bytes) en una nota, y
+su propia cabecera afirma que el archivo es ASCII puro.
+
+**Lo que se hizo (en la fuente, no en la salida).** El literal **B.8.5** lleva ahora `2026-11-12`, que es la
+versión que este Anexo de Encargo suscribe; el fragmento `B6.4-535` **se eliminó** del motor; la fila 535
+de **B.6.4** del dictamen quedó anotada como **ya resuelta por el literal**; y el `§` de la nota se
+escribió en ASCII. **Los candidatos no cambiaron de bytes** —`ba664e6f…e3b47` y `d4df187a…4e2967`—: lo que
+cambió fue **de dónde salía** el texto, que es justo lo que el guard mide.
+
+**Guard nuevo.** «ningún fragmento del motor reescribe el literal de una determinación»: compara cada ancla
+de cada fragmento contra todos los literales del dictamen y del pedido. **El mutante es el defecto
+completo** —el dictamen con la fecha vieja **más** el fragmento—: con él mueren el guard de identidad byte a
+byte y el guard estructural. Un mutante a medias (solo el fragmento) falla por otra razón —el generador se
+niega a escribir— y no prueba nada.
+
+**Lo que también se anotó.** El escrito al abogado (`solicitudes-al-abogado-2026-11-13.md`) y la revisión
+de asesoría declaraban huellas de insumos que ya no correspondían a los archivos del repositorio (el
+dictamen pasó de 90 936 B a **114 882 B**): los dos se **anotaron** con las huellas vigentes, sin reescribir
+el registro con fecha.
+
+**Medido.** **Medido.** Suite completa de `firma-service` (180 archivos): **2 696 tests, 2 694 pass, 0 fail, 2 skipped** (183 s).
+Test del generador **10/10** (con el guard nuevo) y test del script del conteo **17/17**. Mapa **31 bloques · 31 cerrados · 0
+pendientes**. Candidatos: `anexo-nube-v1.4.html` **111 462 B / `ba664e6f…e3b47`** y `anexo-encargo-2026-11-12.html` **100 153 B /
+`d4df187a…4e2967`** — **sin cambios de bytes**: lo que cambió fue de dónde salía el texto. Texto vigente y manifiesto
+**intactos** (`fdd10551…`, `6308b1f7…`, `d9b59699…`). El motor `determinaciones-v1.4.js` **sí cambió** (22 902 B /
+, el generador `generar-candidatos-v1.4.js` **también** (sus diez `§` pasaron a `Seccion`: su cabecera afirma que es ASCII puro y el guard ahora lo comprueba — **14 549 B / `323d6d87…`**), y el dictamen L1 quedó en **114 882 B / `d77e6d8b…`**.
+

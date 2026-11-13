@@ -312,7 +312,12 @@ en los textos que se publiquen.
         del administrador de Workspace y la teletr&iacute;a de Google no son datos del cliente:</strong> los trata
         Google por cuenta propia, con su propia base jur&iacute;dica, y quedan fuera de lo que K+AIR puede
         invocar contra Google en nombre de la Empresa</td>
-        <td>Google LLC, con sede en Estados Unidos. <strong>El &sect;10.1 del CDPA permite que los datos del
+        <td><strong>Google LLC</strong>, con sede en Estados Unidos. <strong>La entidad contractual se determina
+        por el perfil de pago de la cuenta</strong>, y el perfil de pago real de esta cuenta <strong>no est&aacute;
+        documentado en el expediente</strong>: su confirmaci&oacute;n contra el contrato (Order Form o correo de
+        renovaci&oacute;n de Google) queda pendiente, y por eso este Anexo nombra a Google LLC como la entidad que la
+        tabla de Google asigna a las ubicaciones distintas de EMEA, <strong>sin que esa atribuci&oacute;n se presente
+        como un hecho verificado</strong>. <strong>El &sect;10.1 del CDPA permite que los datos del
         cliente se procesen en cualquier pa&iacute;s en que Google o sus subencargados tengan instalaciones</strong>,
         y los Service Specific Terms de Google Workspace lo confirman: los datos del cliente que no est&aacute;n
         cubiertos por la Data Regions Policy pueden almacenarse o procesarse en cualquier pa&iacute;s de
@@ -325,10 +330,14 @@ en los textos que se publiquen.
         de 2013 (no requiere informar al Titular ni su consentimiento cuando exista contrato en los t&eacute;rminos
         del art&iacute;culo 25) y por el art&iacute;culo 25 del mismo Decreto (contenido m&iacute;nimo del contrato
         de transmisi&oacute;n y las tres obligaciones del Encargado: tratar conforme a los principios, salvaguardar
-        la seguridad y guardar confidencialidad). Como marco de referencia sectorial, el numeral 3.2 del T&iacute;tulo
-        V de la Circular &Uacute;nica de la SIC: Estados Unidos es pa&iacute;s con nivel adecuado de protecci&oacute;n
-        y el par&aacute;grafo primero obliga al Responsable a poder demostrar medidas apropiadas y efectivas y la
-        seguridad de los registros</td>
+        la seguridad y guardar confidencialidad). <strong>El numeral 3.2 del T&iacute;tulo
+        V de la Circular &Uacute;nica de la SIC se cita &uacute;nicamente como marco sectorial de referencia y no como
+        fundamento de esta calificaci&oacute;n</strong>: ni ese numeral ni la lista de pa&iacute;ses con nivel
+        adecuado de protecci&oacute;n fueron verificados por el abogado matriculado el 13 de noviembre de 2026, y
+        <strong>la calificaci&oacute;n que este Anexo declara no depende de ellos</strong>, porque el art&iacute;culo
+        24, numeral 2, y el art&iacute;culo 25 del Decreto 1377 de 2013 <strong>no condicionan el pa&iacute;s</strong>
+        del encargado. <strong>Los Estados Unidos son uno de los pa&iacute;ses posibles, no el &uacute;nico</strong>, y
+        que ese pa&iacute;s se declare <strong>no se apoya en ninguna exigencia legal verificada</strong></td>
         <td>Cloud Data Processing Addendum (Customers), el <strong>CDPA</strong>: URL can&oacute;nica de Workspace
         <code>https://admin.google.com/terms/apps/8/1/en/dpa_terms.html</code> (espejo en Cloud:
         <code>https://cloud.google.com/terms/data-processing-addendum</code>). <strong>El texto oficial no declara
@@ -402,9 +411,12 @@ en los textos que se publiquen.
   Decreto, con el CDPA y el Anexo de Encargo versi&oacute;n 2026-11-12 como base del v&iacute;nculo contractual con el
   proveedor. <strong>En consecuencia, en esta operaci&oacute;n no se activa la prohibici&oacute;n de transferencia del
   art&iacute;culo 26 de la Ley 1581 de 2012</strong>, porque el receptor no es Responsable del tratamiento. El
-  numeral 3.2 del T&iacute;tulo V de la Circular &Uacute;nica se mantiene como marco de referencia: Estados Unidos es
-  pa&iacute;s con nivel adecuado de protecci&oacute;n y su par&aacute;grafo primero obliga al Responsable a poder
-  demostrar medidas apropiadas y efectivas y la seguridad de los registros. <strong>La presencia o la ausencia de un
+  numeral 3.2 del T&iacute;tulo V de la Circular &Uacute;nica <strong>se cita solo como marco sectorial de
+  referencia, no como fundamento de esta calificaci&oacute;n</strong>: su contenido y la lista de pa&iacute;ses con
+  nivel adecuado de protecci&oacute;n <strong>no fueron verificados</strong> por el abogado matriculado el 13 de
+  noviembre de 2026, y la calificaci&oacute;n que este Anexo declara no depende de ellos, porque el art&iacute;culo
+  24, numeral 2, y el art&iacute;culo 25 del Decreto 1377 <strong>no condicionan el pa&iacute;s</strong> del
+  encargado. <strong>La presencia o la ausencia de un
   DPA no se presume: se declara</strong>, y lo que este Anexo no hace es atribuirle a Google controles que no est&eacute;n
   documentados.</p>
 ```
@@ -465,7 +477,11 @@ en los textos que se publiquen.
 > Ubicación: `candidatos-v1.4/anexo-encargo-2026-11-12.html`, **reemplaza las líneas 495-523**.
 
 ```html
-  <p><strong>Determinaci&oacute;n del papel del proveedor de correo (Google LLC).</strong> El flujo descrito incluye
+  <p><strong>Determinaci&oacute;n del papel del proveedor de correo (Google LLC).</strong> <strong>La entidad contractual
+  se determina por el perfil de pago de la cuenta</strong>, y el perfil de pago real de esta cuenta no est&aacute;
+  documentado en el expediente: queda pendiente de confirmaci&oacute;n contra el contrato, y este Anexo nombra a Google
+  LLC como la entidad que la tabla de Google asigna a las ubicaciones distintas de EMEA, sin presentarlo como un
+  hecho verificado. El flujo descrito incluye
   el correo del destinatario, el enlace individual, el c&oacute;digo OTP y metadatos t&eacute;cnicos; no incluye el
   documento laboral completo, documentos de identidad ni datos sensibles en el correo. El papel del proveedor lo
   determinan la operaci&oacute;n concreta y el v&iacute;nculo contractual: <strong>respecto de los datos del servicio
@@ -485,9 +501,11 @@ en los textos que se publiquen.
   Google no es Responsable del tratamiento de esos datos: <strong>en consecuencia no se activa la prohibici&oacute;n
   del art&iacute;culo 26 de la Ley 1581 de 2012</strong>, y el r&eacute;gimen aplicable es el del art&iacute;culo 24,
   numeral 2, y el art&iacute;culo 25 del Decreto 1377 de 2013, con el numeral 3.2 del T&iacute;tulo V de la
-  Circular &Uacute;nica como marco de referencia (Estados Unidos es pa&iacute;s con nivel adecuado de protecci&oacute;n y
-  su par&aacute;grafo primero obliga al Responsable a poder demostrar medidas apropiadas y efectivas y la seguridad
-  de los registros). Los derechos de revisi&oacute;n y de certificaciones del Cliente del &sect;7.4 y del &sect;7.5, y
+  Circular &Uacute;nica <strong>citado solo como marco sectorial de referencia y no como fundamento de esta
+  calificaci&oacute;n</strong>: su contenido y la lista de pa&iacute;ses con nivel adecuado de protecci&oacute;n
+  <strong>no fueron verificados</strong> por el abogado matriculado el 13 de noviembre de 2026, y esta
+  calificaci&oacute;n no depende de ellos, porque el art&iacute;culo 24, numeral 2, y el art&iacute;culo 25 del
+  Decreto 1377 <strong>no condicionan el pa&iacute;s</strong> del encargado. Los derechos de revisi&oacute;n y de certificaciones del Cliente del &sect;7.4 y del &sect;7.5, y
   la revisi&oacute;n de la documentaci&oacute;n de seguridad del &sect;7.5.2(c), los ejerce el Encargado, que es el
   Cliente de Google en la cuenta empresarial, y el Encargado responde frente a la Empresa por su resultado;
   <strong>el derecho de auditor&iacute;a del Cliente del &sect;7.5.2(a), con auditor independiente nombrado por el
@@ -510,12 +528,17 @@ en los textos que se publiquen.
   v&iacute;nculo contractual que es el Cloud Data Processing Addendum, de modo que <strong>no se configura una
   transferencia internacional a los efectos del art&iacute;culo 26 de la Ley 1581 de 2012</strong>, y el r&eacute;gimen
   aplicable es el del art&iacute;culo 24, numeral 2, y el art&iacute;culo 25 del Decreto 1377 de 2013, con el numeral
-  3.2 del T&iacute;tulo V de la Circular &Uacute;nica de la SIC como marco de referencia. Los datos de cuenta del
+  3.2 del T&iacute;tulo V de la Circular &Uacute;nica de la SIC <strong>citado &uacute;nicamente como marco sectorial
+  de referencia y pendiente de verificaci&oacute;n</strong>, porque su contenido y la lista de pa&iacute;ses con nivel
+  adecuado de protecci&oacute;n no fueron verificados por el abogado matriculado el 13 de noviembre de 2026 y la
+  calificaci&oacute;n que este Anexo hace no depende de ellos. Los datos de cuenta del
   administrador de Workspace y la telemetr&iacute;a del servicio no son datos del cliente: Google los trata por cuenta
   propia y no quedan cubiertos por las obligaciones que K+AIR puede invocar en nombre de la Empresa. Esta  opini&oacute;n se apoya en el texto oficial del CDPA descargado el 9 de noviembre de 2026 y verificado el 12 de
   noviembre de 2026 (SHA-256
   <code>0e1c729406410a15758ae1ceb6d93b6b4e200208b325abf17b09ef74f0dc69b1</code>), en la evidencia de aceptaci&oacute;n
   del administrador del 10 de noviembre de 2026 y en las fuentes normativas colombianas citadas en la secci&oacute;n 11.
+  <strong>El p&aacute;rrafo siguiente declara la revisi&oacute;n del abogado matriculado del 13 de noviembre de 2026 y qu&eacute; parte de
+  esta redacci&oacute;n cambia por efecto de ella.</strong>
   <strong>No sustituye la validaci&oacute;n de un abogado matriculado, no habilita el uso del canal para datos que
   aqu&iacute; no se declaran, y no habilita ning&uacute;n uso del canal que no est&eacute; en la secci&oacute;n 4.</strong></p>
 ```
@@ -564,8 +587,10 @@ en los textos que se publiquen.
   del Decreto 1377 de 2013), <strong>no una transferencia internacional</strong> (art&iacute;culo 3, numeral 4):
   <strong>en consecuencia no se activa el art&iacute;culo 26 de la Ley 1581 de 2012</strong> y el r&eacute;gimen
   aplicable es el del art&iacute;culo 24, numeral 2, y el art&iacute;culo 25 del Decreto 1377 de 2013, con el numeral
-  3.2 del T&iacute;tulo V de la Circular &Uacute;nica (Estados Unidos, pa&iacute;s con nivel adecuado de protecci&oacute;n)
-  como marco de referencia y con el deber del Responsable de poder demostrar medidas apropiadas y efectivas.
+  3.2 del T&iacute;tulo V de la Circular &Uacute;nica <strong>citado solo como marco sectorial de referencia y
+  pendiente de verificaci&oacute;n</strong> (el abogado matriculado no lo verific&oacute; el 13 de noviembre de
+  2026): la calificaci&oacute;n que este Anexo declara no depende de &eacute;l, porque el art&iacute;culo 24,
+  numeral 2, y el art&iacute;culo 25 del Decreto 1377 no condicionan el pa&iacute;s del encargado.
   <strong>Los datos del correo y los datos de cuenta o de teletr&iacute;a de Google son dos &aacute;mbitos
   distintos:</strong> los datos de la cuenta del administrador de Workspace y la teletr&iacute;a del servicio no
   forman parte de los datos del cliente que K+AIR trata por cuenta de la Empresa; esos los trata Google por cuenta
@@ -573,9 +598,9 @@ en los textos que se publiquen.
   fuera de las obligaciones que K+AIR puede invocar contra Google en nombre de la Empresa</strong>.
 ```
 
-## B.2 §4 del Anexo de Nube v1.4, párrafo «Contrato de transmisión y Normas Corporativas Vinculantes» (líneas 488-496)
+## B.2 §4 del Anexo de Nube v1.4, párrafo «Contrato de transmisión y Normas Corporativas Vinculantes» (líneas 488-507)
 
-**Texto literal ACTUAL** (líneas 488-496):
+**Texto literal ACTUAL** (líneas 488-507, el párrafo completo):
 
 ```html
   <p><strong>Contrato de transmisi&oacute;n y Normas Corporativas Vinculantes.</strong> Este Anexo <strong>no crea,
@@ -602,11 +627,32 @@ en los textos que se publiquen.
   internacional</strong> del art&iacute;culo 24, numeral 2, y del art&iacute;culo 25 del Decreto 1377 de 2013, porque
   Google trata los datos del cliente por cuenta del Responsable y con instrucciones del Encargado;
   <strong>no se trata de una transferencia internacional</strong> (art&iacute;culo 3, numeral 4), de modo que
-  <strong>no se activa el art&iacute;culo 26 de la Ley 1581 de 2012</strong>, y el numeral 3.2 del T&iacute;tulo V de
-  la Circular &Uacute;nica (Estados Unidos con nivel adecuado de protecci&oacute;n) se mantiene como marco de
-  referencia, con el deber del Responsable de poder demostrar medidas apropiadas y efectivas. A Google no se le
-  atribuyen obligaciones de Encargado que no est&eacute;n en el CDPA.
+  <strong>no se activa el art&iacute;culo 26 de la Ley 1581 de 2012</strong>. <strong>Lo que el CDPA s&iacute;
+  establece</strong> se declara en el &sect;4 de este Anexo: el papel de Subencargado del proveedor, mientras el CDPA
+  est&eacute; vigente y sea aplicable a la cuenta del Encargado, y las obligaciones de seguridad (&sect;7.1),
+  devoluci&oacute;n y supresi&oacute;n (&sect;6.2), certificaciones y revisiones (&sect;7.4, &sect;7.5 y
+  &sect;7.5.2(c)) y subencargados (&sect;11) que le aplican. <strong>El numeral 3.2 del T&iacute;tulo V de la
+  Circular &Uacute;nica (Estados Unidos con nivel adecuado de protecci&oacute;n) se cita solo como marco sectorial de
+  referencia, no como fundamento</strong>: su contenido no fue verificado por el abogado matriculado el 13 de noviembre
+  de 2026, y <strong>la calificaci&oacute;n de este Anexo no depende de &eacute;l</strong>, porque el art&iacute;culo 24,
+  numeral 2, y el art&iacute;culo 25 del Decreto 1377 no condicionan el pa&iacute;s del encargado. <strong>Lo que
+  queda pendiente, y lo confirm&oacute; un abogado matriculado, es si subsiste alguna exigencia de medidas
+  apropiadas y efectivas a cargo de la Empresa como Responsable</strong>: hasta ese pronunciamiento este Anexo no
+  afirma que exista ni que no exista. A Google no se le atribuyen obligaciones de Encargado que no est&eacute;n en el
+  CDPA. <strong>Si el CDPA dejara de estar vigente o de ser aplicable a la cuenta, o si el proveedor o el servicio
+  cambiaran, este Anexo se actualiza</strong>: en ese caso se declaran el proveedor, el v&iacute;nculo contractual, los
+  datos, los pa&iacute;ses, los subencargados y las cl&aacute;usulas de devoluci&oacute;n, supresi&oacute;n y
+  auditor&iacute;a que correspondan, y el papel de cada proveedor se reeval&uacute;a antes de que ese canal se use.</p>
 ```
+
+> **Corrección del rango (13-nov-2026).** El rango de este bloque era **488-496** y dejaba fuera las
+> líneas 497 a 507 del texto base. El resultado era un **párrafo roto con un fragmento duplicado** en la v1.4
+> candidata («… que no están en el CDPA.» aparecía dos veces seguidas), porque el texto propuesto termina en
+> «… que no están en el CDPA.» y el texto base continuaba con «<strong>Lo que el CDPA sí establece</strong>…».
+> El rango passa a ser **488-507**, que es el párrafo completo, y el texto propuesto de arriba **incorpora** las
+> frases del texto base que quedaban huérfanas («Lo que el CDPA sí establece…», «Queda por precisar, y lo
+> confirma el abogado…», «Si el CDPA dejara de estar vigente…»), corregidas según el escrito del abogado
+> matriculado del 13-nov-2026.
 
 ## B.3 §11 del Anexo de Nube v1.4, «Referencias normativas» (líneas 885-897) y viñeta del CDPA (líneas 903-915)
 
@@ -640,7 +686,22 @@ en los textos que se publiquen.
     <li>Decreto 1074 de 2015, art&iacute;culos 2.2.2.25.5.1 y 2.2.2.25.5.2 (transmisi&oacute;n internacional y
     contrato de transmisi&oacute;n) y numeral 8.6 del
     Acuerdo sobre el uso del mecanismo de firma electr&oacute;nica.</li>
+    <li>Circular &Uacute;nica de la SIC, T&iacute;tulo V, numeral 3.2 (pa&iacute;ses con nivel adecuado de protecci&oacute;n,
+    con Estados Unidos incluido) y sus par&aacute;grafos primero (responsabilidad demostrada), tercero (el simple
+    tr&aacute;nsito transfronterizo no comporta una transferencia) y cuarto (la transmisi&oacute;n a pa&iacute;ses con
+    nivel adecuado, en los t&eacute;rminos de la transferencia). <strong>Se cita como marco sectorial de referencia y
+    no como fundamento de la calificaci&oacute;n que este Anexo hace: el contenido de este numeral y de la lista de
+    pa&iacute;ses con nivel adecuado de protecci&oacute;n no fue verificado por el abogado matriculado el 13 de
+    noviembre de 2026</strong>.</li>
+  </ul>
 ```
+
+> **Por qué vuelve la viñeta del Título V (13-nov-2026).** El texto propuesto de este bloque sustitu&iacute;a las
+> l&iacute;neas 885-897 del texto base, entre las cuales estaba la viñeta del num&eacute;ral 3.2 del T&iacute;tulo V, y
+> esa viñeta **qued&oacute; fuera** de la lista de referencias de la v1.4 mientras el cuerpo del Anexo la citaba como
+> marco de referencia: una contradicci&oacute;n interna. Con el escrito del abogado matriculado del 13-nov-2026, que
+> **no verific&oacute;** ese numeral, la correcci&oacute;n no es callar la norma sino **citarla con su salvedad**: queda
+> en la lista de referencias y marcada como marco sectorial de referencia, no como fundamento.
 
 **Texto literal ACTUAL** (viñeta del CDPA, líneas 903-915, fragmento a corregir):
 
@@ -861,7 +922,7 @@ fondo) y «la auditoría» → «las certificaciones y revisiones» (corrección
 | Línea | Texto literal ACTUAL (fragmento) | Texto literal PROPUESTO |
 |---|---|---|
 | 297 | `... contenida en este Anexo de Encargo de Tratamiento de Datos Personales del servicio de firma electr&oacute;nica K+AIR, versi&oacute;n 2026-11-11, fechada el 11 de noviembre de 2026, y en el Acuerdo de uso ...` | `... contenida en este Anexo de Encargo de Tratamiento de Datos Personales del servicio de firma electr&oacute;nica K+AIR, versi&oacute;n 2026-11-12, fechada el 12 de noviembre de 2026, y en el Acuerdo de uso ...` |
-| 535 | `... y (ix) la suscripci&oacute;n de esta versi&oacute;n 2026-11-11 del Anexo de Encargo por la Empresa y su contrafirma por el Encargado, a cargo de la Empresa y de Gesstiar S.A.S.` | `... y (ix) la suscripci&oacute;n de esta versi&oacute;n 2026-11-12 del Anexo de Encargo por la Empresa y su contrafirma por el Encargado, a cargo de la Empresa y de Gesstiar S.A.S.` |
+| 535 | `... y (ix) la suscripci&oacute;n de esta versi&oacute;n 2026-11-11 del Anexo de Encargo por la Empresa y su contrafirma por el Encargado, a cargo de la Empresa y de Gesstiar S.A.S.` | **Ya resuelto por el literal de B.8.5 (13-nov-2026):** la l&iacute;nea 535 est&aacute; dentro del p&aacute;rrafo «Lo que queda pendiente», que B.8.5 sustituye entero, y el literal nuevo ya dice `2026-11-12`. El motor **no** lleva este fragmento: aplicarlo sobre el literal nuevo lo dejar&iacute;a distinto del texto del dictamen y romper&iacute;a la identidad byte a byte entre el dictamen y el candidato. |
 | 574 | `... este Anexo de Encargo en su versi&oacute;n 2026-11-11, cada uno con su suscripci&oacute;n, su contrafirma, su acta y su huella.` | **NO SE CAMBIA.** Es una afirmación histórica: nombra la versión que fue suscrita y contrafirmada el 12-nov-2026. Cambiarla a 2026-11-12 sería una inexactitud. |
 
 ### B.6.5 Las remisiones del Anexo de Nube v1.4 que nombran la versión del Encargo
@@ -987,3 +1048,199 @@ art. 3 num. 4 y 5 del Decreto 1377), siete actos del owner, texto literal HTML l
 pegar, y lista completa de pasajes incoherentes con ubicación, texto actual y texto propuesto. Dos puntos quedan
 marcados `⚠️ No verificado` (fecha de versión del CDPA y entidad contractual por perfil de pago) y ninguno bloquea
 el cierre.
+
+---
+
+## B.8 Ajustes de la v1.4 que impone el escrito del abogado matriculado del 13-nov-2026
+
+> **Qué es esta sección.** El 13 de noviembre de 2026 un abogado matriculado respondió por escrito a las
+> solicitudes S-01, S-02, S-03, S-04 y S-23. Su escrito **no cierra ninguna de esas filas** (no lleva nombre,
+> fecha de suscripción ni huella de un documento firmado), pero **confirma el núcleo normativo** de L1 y L4 y
+> obliga a **cambiar cinco cosas** en el texto de la v1.4. Esta sección contiene los literales HTML que
+> sustituyen a los que quedan afectados.
+>
+> **Las cinco cosas que cambian:**
+>
+> 1. **El numeral 3.2 del Título V de la Circular Única y la lista de países con nivel adecuado no fueron
+>    verificados.** El abogado los leyó como marco, pero no los confirmó. Pasan a citarse **como marco sectorial
+>    de referencia, nunca como fundamento** de la calificación que hacen los Anexos.
+> 2. **La condición de que el país sea uno de esos países NO es una exigencia legal.** El art. 24 num. 2 y el
+>    art. 25 del Decreto 1377 **no condicionan el país** del encargado. La región US del bucket de Backblaze, y
+>    la mención de Estados Unidos en la ficha de Google, quedan como **decisión conservadora de K+AIR**.
+> 3. **La transferencia del software a la Empresa sí cae en el supuesto (ii) de la Circular Externa 002 de 2025.**
+>    El canal de correo sigue **fuera** de su ámbito literal. El texto anterior solo decía la primera mitad.
+> 4. **Los hechos contractuales del CDPA no verificados** (el perfil de pago que fija la entidad contractual, la
+>    huella y la efectividad del CDPA, el §7.5.2(a) condicionado a la Ley Europea, el carácter de Estados Unidos
+>    como uno de los países posibles y el plazo de 48 horas) quedan **declarados como pendientes de confirmación
+>    contra el contrato**.
+> 5. **La Circular 002 leída en su literal** es la que está en la base normativa del escrito: sus dos supuestos
+>    (i) y (ii), y sus instrucciones 1 a 4.
+
+### B.8.0 Párrafo de revisión del abogado (se inserta después de la línea de opinión, al final del §4)
+
+```html
+  <p><strong>Revisi&oacute;n de un abogado matriculado del 13 de noviembre de 2026.</strong> El texto de esta secci&oacute;n
+  se revis&oacute; a la luz del escrito de un abogado matriculado, de fecha 13 de noviembre de 2026, que verific&oacute;
+  la base normativa en fuente oficial (Ley 1581 de 2012; Decretos 1377 de 2013, 1072 y 1074 de 2015; Circular Externa
+  002 de 2025 de la SIC) y confirm&oacute; el n&uacute;cleo de esta determinaci&oacute;n: el doble papel de Google
+  (Responsable y Encargado), la transmisi&oacute;n y no la transferencia, y la no activaci&oacute;n del art&iacute;culo
+  26 de la Ley 1581 de 2012. <strong>Esa revisi&oacute;n no es una validaci&oacute;n formal</strong>: el escrito no lleva nombre,
+  fecha de suscripci&oacute;n ni huella de un documento firmado, y por eso este Anexo no se presenta como ratificado
+  por un tercero. <strong>Cuatro puntos de ese escrito cambian la redacci&oacute;n de este Anexo</strong>: (i) el
+  numeral 3.2 del T&iacute;tulo V de la Circular &Uacute;nica y la lista de pa&iacute;ses con nivel adecuado de
+  protecci&oacute;n <strong>no fueron verificados</strong> y quedan como marco sectorial de referencia, no como
+  fundamento; (ii) la condici&oacute;n de que el pa&iacute;s del encargado sea uno de esos pa&iacute;ses
+  <strong>no es una exigencia legal</strong> del art&iacute;culo 24, numeral 2, ni del art&iacute;culo 25 del Decreto
+  1377 de 2013, sino una decisi&oacute;n conservadora de K+AIR; (iii) la <strong>transferencia del software a la
+  Empresa s&iacute; cae en el supuesto (ii)</strong> de la Circular Externa 002 de 2025, mientras el canal de correo
+  queda fuera de su &aacute;mbito literal; y (iv) los hechos contractuales que ese escrito no pudo verificar
+  <strong>quedan declarados como pendientes de confirmaci&oacute;n contra el contrato</strong> y este Anexo no los
+  presenta como verificados. El plazo de cuarenta y ocho horas que este Anexo asume es, adem&aacute;s, compromiso
+  propio del Encargado y no un plazo fijado por el CDPA.</p>
+```
+
+### B.8.1 §5 del Anexo de Nube v1.4, párrafo «Circular 002 de 2025 de la SIC» (líneas 401-417)
+
+```html
+  <p><strong>Circular 002 de 2025 de la SIC.</strong> La Circular Externa No. 002 del 7 de octubre de 2025 (la
+  &laquo;Circular 2 de 2025&raquo; en las referencias de este Anexo), publicada en el Diario Oficial No. 53.268 del
+  9 de octubre de 2025, da instrucciones aplicables a los <strong>procesos de transferencia de
+  tecnolog&iacute;a</strong> en los que se transfieran datos personales o en los que se transfieran tecnolog&iacute;as
+  que permitan o tengan por objeto el tratamiento de datos personales. <strong>Este Anexo documenta la
+  operaci&oacute;n</strong>: el uso de la cuenta empresarial de Google Workspace del Encargado, con los
+  datos, la finalidad, el destinatario y el pa&iacute;s que quedan declarados en esta secci&oacute;n y en el &sect;2 de
+  este Anexo. <strong>Este Anexo no implementa ni declara ninguna comunicaci&oacute;n previa a la Delegatura para la
+  Protecci&oacute;n de Datos Personales de la SIC por el hecho de usar Gmail</strong>, y tampoco afirma que dicha
+  comunicaci&oacute;n sea necesaria. <strong>Conclusi&oacute;n jur&iacute;dica sobre el canal de correo: el canal queda
+  fuera del alcance literal de la Circular</strong>, porque el &aacute;mbito de la Circular son los procesos de
+  transferencia de tecnolog&iacute;a y el uso de una cuenta de correo para enviar un c&oacute;digo OTP no es una
+  transferencia de tecnolog&iacute;a: lo gobiernan el art&iacute;culo 24, numeral 2, y el art&iacute;culo 25 del
+  Decreto 1377 de 2013. <strong>Conclusi&oacute;n jur&iacute;dica sobre el servicio: la transferencia del software a la
+  Empresa s&iacute; cae en el supuesto (ii) de la Circular</strong>, porque K+AIR permite y tiene por objeto el
+  tratamiento de datos personales; en consecuencia, las instrucciones de la Circular se aplican a esa transferencia
+  de tecnolog&iacute;a y no al canal de correo. <strong>Queda pendiente, y es un acto del owner, el documento que
+  re&uacute;na las caracterizaciones que la Circular exige para la transferencia de tecnolog&iacute;a</strong> (los
+  datos que se transfieren, la finalidad, la tecnolog&iacute;a y las medidas de seguridad): el &sect;2 (datos y
+  finalidad), el &sect;4 (proveedores externos y subencargados) y el &sect;5 (seguridad) de este Anexo, junto con
+  el &sect;4 y el &sect;9 del Anexo de Encargo, cubren buena parte de eso, pero no lo sustituyen. <strong>El texto de la
+  Circular fue le&iacute;do y verificado por un abogado matriculado el 13 de noviembre de 2026</strong>, en la fuente
+  oficial de la SIC.</p>
+```
+
+### B.8.2 §4 del Anexo de Nube v1.4, «Las tres preguntas del abogado» (líneas 508-528)
+
+```html
+  <p><strong>Las tres preguntas del abogado y las respuestas que este Anexo incorpora.</strong> Las tres preguntas
+  planteadas sobre este canal (si el papel del destinatario debe determinarse desde los t&eacute;rminos del proveedor
+  o desde la operaci&oacute;n concreta; si la Circular 002 de 2025 exige comunicaci&oacute;n previa a la Delegatura o
+  basta la declaraci&oacute;n en el RNBD; y qu&eacute; redacci&oacute;n deja la base de la declaraci&oacute;n de la
+  transmisi&oacute;n de forma que pueda considerarse suficiente) quedan respondidas en este Anexo con los textos
+  siguientes, <strong>revisados por un abogado matriculado el 13 de noviembre de 2026</strong>; esa revisi&oacute;n
+  <strong>no sustituye la validaci&oacute;n formal</strong>, que sigue pendiente:</p>
+  <ul>
+    <li><strong>Pregunta 1.</strong> &laquo;Por la operaci&oacute;n concreta, contrastada con los t&eacute;rminos
+    aplicables y con el v&iacute;nculo contractual: con la cuenta empresarial de Google Workspace y el CDPA vigente
+    y aplicable a la cuenta, Google trata los datos del cliente como procesado y queda contractualmente obligado a
+    hacerlo; la redacci&oacute;n refleja las dos cosas.&raquo;</li>
+    <li><strong>Pregunta 2.</strong> &laquo;El canal de correo queda <strong>fuera</strong> del &aacute;mbito literal de
+    la Circular Externa 002 de 2025, porque su &aacute;mbito son los procesos de transferencia de tecnolog&iacute;a y el
+    uso de una cuenta de correo no lo es; pero <strong>la transferencia del software a la Empresa s&iacute; cae en su
+    supuesto (ii)</strong>, porque K+AIR permite y tiene por objeto el tratamiento de datos personales, y a esa
+    transferencia se aplican sus instrucciones.&raquo;</li>
+    <li><strong>Pregunta 3.</strong> &laquo;Identificaci&oacute;n de la operaci&oacute;n, datos, finalidad,
+    destinatario, pa&iacute;s, fundamento aplicable y obligaciones de informaci&oacute;n y
+    autorizaci&oacute;n.&raquo;</li>
+  </ul>
+  <p>La respuesta 3 se materializa as&iacute;: la operaci&oacute;n, los datos y la finalidad en esta secci&oacute;n y
+  en el &sect;2 de este Anexo; el destinatario, en la secci&oacute;n 4; el pa&iacute;s de destino, en esta secci&oacute;n
+  y en el &sect;3; el fundamento aplicable, en el &sect;11 y en el estado declarado de la secci&oacute;n inicial; y las obligaciones de
+  informaci&oacute;n y autorizaci&oacute;n, en el &sect;2, en el &sect;7 y en el &sect;8 de este Anexo.</p>
+```
+
+### B.8.3 §8 del Anexo de Nube v1.4, párrafo de auditoría y de incidentes (líneas 788-800)
+
+```html
+  <p>El Encargado permite auditor&iacute;a o entrega, en cuanto Cloudflare los ponga a disposici&oacute;n y sin que su
+  disponibilidad altere las obligaciones de este Anexo, los informes SOC 2 Tipo II, ISO/IEC 27001 e ISO/IEC 27701
+  de Cloudflare, y la documentaci&oacute;n t&eacute;cnica del servicio. <strong>El proveedor del canal de correo
+  tambi&eacute;n est&aacute; sujeto a un deber de auditor&iacute;a contractual, mientras el Cloud Data Processing
+  Addendum (CDPA) est&eacute; vigente y aplicable a la cuenta del Encargado:</strong> el &sect;7.4 (Compliance
+  Certifications and SOC Reports) oblig&oacute; a Google a facilitar sus certificaciones de cumplimiento y sus informes
+  SOC, el &sect;7.5 (Reviews and Audits of Compliance) regula las revisiones y auditor&iacute;as del cumplimiento, y el
+  &sect;7.5.2(c) permite revisar la <em>Security Documentation</em>. <strong>El derecho de auditor&iacute;a del Cliente
+  del &sect;7.5.2(a), con auditor independiente nombrado por el Cliente, est&aacute; condicionado a que se aplique la
+  Ley Europea</strong>, de modo que para esta cuenta, que no est&aacute; sujeta al Reglamento (UE) 2016/679, ese
+  derecho no se activa por s&iacute; solo: lo que el Encargado exige y mantiene a disposici&oacute;n del Responsable son
+  las certificaciones, los informes SOC y la documentaci&oacute;n de seguridad. El Encargado responde por el
+  cumplimiento del subencargado en los mismos t&eacute;rminos en que responde por s&iacute; mismo y pone a
+  disposici&oacute;n de la Empresa la documentaci&oacute;n que reciba del proveedor. <strong>Notifica incidentes sin
+  demora injustificada y a m&aacute;s tardar en cuarenta y ocho (48) horas: ese plazo es un compromiso propio del
+  Encargado y no un plazo fijado por el CDPA</strong>, cuyo &sect;7.2.1 exige &laquo;promptly and without undue
+  delay&raquo; sin fijar un plazo de 24 ni de 48 horas. El Encargado colabora con la SIC e informa conforme al
+  art&iacute;culo 18(k) de la Ley 1581; la notificaci&oacute;n de incidentes que involucren datos del cliente
+  transmitidos por el canal se alinea con el r&eacute;gimen del &sect;7.2 del CDPA.</p>
+```
+
+### B.8.4 §11 del Anexo de Nube v1.4, viñeta de la Circular 002 (líneas 898-902)
+
+```html
+    <li>Circular Externa No. 002 del 7 de octubre de 2025 (la &laquo;Circular 2 de 2025&raquo; en las referencias de
+    este Anexo) de la SIC, Diario Oficial No. 53.268 del 9 de octubre de 2025: instrucciones aplicables a los
+    procesos de transferencia de tecnolog&iacute;a en los que se transfieran datos personales o en los que se
+    transfieran tecnolog&iacute;as que permitan o tengan por objeto el tratamiento de datos personales;
+    <strong>el canal de correo queda fuera de su &aacute;mbito literal y la transferencia del software a la Empresa
+    s&iacute; cae en su supuesto (ii)</strong> (v&eacute;ase el &sect;4 de este Anexo).</li>
+```
+
+### B.8.5 §5 del Anexo de Encargo 2026-11-12, párrafo «Lo que queda pendiente» (líneas 524-537)
+
+```html
+  <p><strong>Lo que queda pendiente.</strong> La migraci&oacute;n del canal transaccional a una cuenta empresarial de
+  Google Workspace vinculada por el CDPA qued&oacute; ejecutada; de los pasos que ese proceso exige, los que siguen
+  pendientes son estos, y ninguno de ellos se declara cumplido en este anexo: (i) el documento que demuestra las
+  medidas de seguridad del canal de correo, que es la responsabilidad demostrada del Responsable; el par&aacute;grafo
+  primero del numeral 3.2 del T&iacute;tulo V de la Circular &Uacute;nica se cita como marco sectorial de referencia y
+  <strong>su contenido no fue verificado</strong> por el abogado matriculado el 13 de noviembre de 2026; (ii) la
+  evidencia de lo que el r&eacute;gimen de transferencias internacionales exija a la Empresa como Responsable; el
+  canal de correo queda <strong>fuera</strong> del alcance literal de la Circular Externa 002 de 2025, porque su
+  &aacute;mbito son los procesos de transferencia de tecnolog&iacute;a (seg&uacute;n la conclusi&oacute;n de este
+  Anexo), pero <strong>la transferencia del software a la Empresa s&iacute; cae en el supuesto (ii)</strong> de esa
+  Circular, de modo que a esa transferencia se aplican sus instrucciones y queda pendiente, a cargo del owner, el
+  documento que re&uacute;na las caracterizaciones que la Circular exige; (iii) la declaraci&oacute;n de la
+  transferencia en el Registro Nacional de Bases de Datos, a cargo de cada Empresa como Responsable &mdash; la
+  obligaci&oacute;n de inscripci&oacute;n se mide por los activos totales de cada Responsable, y los 19,09 UVT que el
+  expediente declara para el Encargado son una declaraci&oacute;n del owner y no un certificado &mdash;, previa
+  confirmaci&oacute;n de que est&aacute; inscrita; y (iv) la pol&iacute;tica de tratamiento de la Empresa que informa al
+  Titular de la transferencia. Del v&iacute;nculo con el proveedor solo quedan dos pasos pendientes: (vii) la
+  creaci&oacute;n y verificaci&oacute;n de los alias de privacidad, soporte e incidentes del dominio, a cargo de
+  Gesstiar S.A.S.; y (ix) la suscripci&oacute;n de esta versi&oacute;n 2026-11-12 del Anexo de Encargo por la Empresa y su
+  contrafirma por el Encargado, a cargo de la Empresa y de Gesstiar S.A.S. <strong>Este Anexo declara lo que est&aacute;
+  hecho y deja lo que falta con nombre y responsable: no afirma que estos pasos ya est&eacute;n cumplidos.</strong></p>
+```
+
+### B.8.6 §12 del Anexo de Encargo 2026-11-12, viñetas del Título V y de la Circular 002 (líneas 964-969)
+
+```html
+    <li>Circular &Uacute;nica de la SIC, T&iacute;tulo V, numeral 3.2 (pa&iacute;ses con nivel adecuado de protecci&oacute;n,
+    con Estados Unidos incluido) y sus par&aacute;grafos primero (responsabilidad demostrada), tercero (el simple
+    tr&aacute;nsito transfronterizo no comporta una transferencia) y cuarto (la transmisi&oacute;n a pa&iacute;ses con
+    nivel adecuado, en los t&eacute;rminos de la transferencia); actualizada por la Circular 001 del 9 de enero de
+    2026, Diario Oficial 53.362. <strong>Se cita como marco sectorial de referencia y no como fundamento de la
+    calificaci&oacute;n que este Anexo hace: su contenido y la lista de pa&iacute;ses con nivel adecuado de
+    protecci&oacute;n no fueron verificados por el abogado matriculado el 13 de noviembre de 2026, y la
+    calificaci&oacute;n de transmisi&oacute;n internacional que este Anexo declara no depende de &eacute;ste</strong>
+    (art&iacute;culo 24, numeral 2, y art&iacute;culo 25 del Decreto 1377 de 2013, que no condicionan el pa&iacute;s del
+    encargado).</li>
+    <li>Circular 2 de 2025 de la SIC (instrucciones para los procesos de transferencia de tecnolog&iacute;a):
+    <strong>el canal de correo queda fuera de su &aacute;mbito literal y la transferencia del software a la Empresa
+    s&iacute; cae en su supuesto (ii)</strong> (v&eacute;ase el &sect;5 de este Anexo).</li>
+```
+
+> **Nota sobre el rango 524-537 (corregida el 13-nov-2026).** El texto literal nuevo dice **2026-11-12**, que
+> es la versi&oacute;n que este Anexo de Encargo suscripci&oacute;n: la l&iacute;nea 535 del texto base est&aacute; **dentro**
+> del p&aacute;rrafo que este rango sustituye, as&iacute; que la sustituci&oacute;n de `2026-11-11` por `2026-11-12` la trae
+> **el propio literal** y el motor **no** lleva el fragmento `B6.4-535`. Antes el motor lo llevaba, y eso ten&iacute;a
+> dos efectos: el candidato sal&iacute;a con una fecha que el dictamen no dec&iacute;a, y el **guard de identidad byte a byte**
+> (el texto del candidato tiene que ser byte a byte el de la determinaci&oacute;n) fallaba sin que el generador se
+> quejara. Un texto que se firma no puede salir de una fuente que dice otra fecha. La fila 535 de **B.6.4**
+> queda **resuelta por este literal**.

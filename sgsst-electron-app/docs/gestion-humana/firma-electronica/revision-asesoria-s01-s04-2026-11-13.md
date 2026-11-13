@@ -5,8 +5,11 @@
 > **punto a favor**. Queda registrada aquí con su huella porque cambia lo que se le manda al abogado.
 >
 > **Qué NO es.** **No es la respuesta del abogado matriculado.** El propio escrito lo dice: «No sustituye la
-> decisión del abogado matriculado ni del representante legal». Por eso **S-01 a S-04 siguen `EMITIDA` y 0
-> `RESPONDIDA`**: lo que se corrigió fue **lo que se envía**, no lo que el abogado respondió.
+> decisión del abogado matriculado ni del representante legal». Por eso esta revisión **dejó las cuatro
+> `EMITIDA` y 0 `RESPONDIDA`**: lo que se corrigió fue **lo que se envía**, no lo que el abogado respondió.
+> (Más tarde ese mismo día, S-01, S-03 y S-04 se cerraron **por resolución del owner** —«resuelto por
+> decisión del owner, sin ratificación externa», no por respuesta— y S-02 sigue `EMITIDA`: ver
+> `tabla-de-solicitudes-2026-11-13.md`.)
 >
 > **Estado del envío.** El owner's écrit del 13-nov-2026 registra las cuatro como «emitida hoy, pendiente tu
 > envío». Esta revisión se produjo **antes** de ese envío y quedó incorporada al escrito; el envío físico sigue
@@ -59,6 +62,16 @@ guarda.
 **Huellas nuevas de los candidatos** (mismo tamaño, huella distinta):
 Anexo de Nube v1.4 — **103 390 B**, `fae2b26b87867d24d558c948e7f90f886f76d6cf6b3eb39eb19deda4dbd8b416`;
 Anexo de Encargo 2026-11-12 — **97 962 B**, `7576b1a1dd7f7ded71ac6be7ff556a7041e04538266f199372e4f9c7082d9f3c`.
+
+> **Anotación del 13-nov-2026 (tarde): estas huellas ya no son las vigentes.** Eran las de la mañana,
+> después de corregir la cita del Decreto 1377. Ese mismo día, con la autorización expresa del owner,
+> se aplicó al texto el **escrito informal** del abogado matriculado (archivado en
+> `respuesta-del-abogado-2026-11-13.md`; **no es formal**: sin nombre, sin fecha de suscripción y sin
+> huella), y los candidatos se regeneraron. **Las huellas vigentes** son: Anexo de Nube v1.4 —
+> **111 462 B**, `ba664e6f1ad130c968b6224ab71ed66a52017e96ac578b8b0e740fd55f9e3b47`; Anexo de Encargo
+> 2026-11-12 — **100 153 B**, `d4df187a4070a847a1259e2bacffdead3251579c3fea38ec294f07f82a4e2967`.
+> Las de arriba **no se reescriben** (este registro tiene fecha) pero **tampoco se pueden mandar**: el
+> pedido al abogado (`solicitudes-al-abogado-2026-11-13.md`) trae la tabla de huellas vigentes al final.
 
 ## 3. Los dos avisos
 

@@ -13,6 +13,25 @@
 >
 > **Estado de cada cosa.** La determinación es del equipo y **espera la ratificación del abogado
 > externo**. El texto literal es una propuesta, no un texto publicado.
+>
+> **Anotación del 13-nov-2026 (escrito de un abogado matriculado).** Este documento **no se reescribe**: se
+> anota. El escrito del abogado matriculado del 13-nov-2026 **verificó la norma** (art. 3 num. 4 y 5, art. 24
+> num. 2 y art. 25 del Decreto 1377 de 2013) y **confirmó la calificación de transmisión** de la copia
+> cifrada de Encargado a Encargado, con las tres obligaciones mínimas del art. 25 verificadas. Pero dejó
+> **sin verificar** el numeral 3.2 del Título V de la Circular Única y la lista de países con nivel
+> adecuado, y contestó de forma expresa la pregunta de la **S-04**: **la condición de región United States
+> NO es una exigencia legal** del art. 24 num. 2 ni del art. 25 — esos artículos **no condicionan el país**
+> del encargado—, de modo que **es una decisión conservadora de K+AIR**. Dos consecuencias:
+>
+> - **El texto literal de (i-a) que se va al Anexo de Nube v1.4 está corregido** (celda «Ubicación» y celda
+>   de auditoría): la región US se declara como decisión propia y no como consecuencia jurídica, y el
+>   Título V se cita como marco sectorial de referencia y no como fundamento.
+> - **Los pasajes analíticos de este documento que siguen diciendo lo contrario quedan superados por esta
+>   anotación**, sin reescribirse: el punto 2 del §1.1 («los Estados Unidos de América figuran en el numeral
+>   3.2 del Título V […] que reconoce nivel adecuado de protección») y la condición 1 del §2 («la región del
+>   bucket es condición de esta declaración»). La **decisión operativa no cambia**: el bucket se sigue creando
+>   en la región United States y se sigue documentando nombre, región, endpoint y fecha; lo que cambia es el
+>   **motivo**, que ahora es una decisión conservadora declarada, no una exigencia legal verificada.
 
 ---
 
@@ -189,12 +208,18 @@ su contenido mínimo, con la razón de cada una.
         subencargado en los mismos t&eacute;rminos en que responde por s&iacute; mismo</td>
         <td>Backblaze, Inc., con sede en San Francisco, California, Estados Unidos. El bucket se crea en la
         <strong>regi&oacute;n United States</strong> y los archivos del cliente se almacenan en centros de datos de
-        Estados Unidos (regi&oacute;n US-West). <strong>La regi&oacute;n del bucket es condici&oacute;n de esta
-        declaraci&oacute;n</strong>: el numeral 3.2 del T&iacute;tulo V de la Circular &Uacute;nica de la SIC
-        reconoce nivel adecuado de protecci&oacute;n a los Estados Unidos de Am&eacute;rica, y los archivos del
-        cliente de Backblaze se almacenan en las regiones CA-East (Canad&aacute;) y EU-Central (Pa&iacute;ses Bajos)
-        cuando la cuenta se crea en ellas. La regi&oacute;n efectiva del bucket queda declarada en el manifiesto del
-        servicio</td>
+        Estados Unidos (regi&oacute;n US-West). <strong>La regi&oacute;n del bucket es una decisi&oacute;n
+        conservadora de K+AIR y no una exigencia legal</strong>: el art&iacute;culo 24, numeral 2, y el art&iacute;culo
+        25 del Decreto 1377 de 2013, que son los que rigen esta operaci&oacute;n por ser una transmisi&oacute;n a un
+        Encargado, <strong>no condicionan el pa&iacute;s</strong> del encargado, de modo que la operaci&oacute;n no
+        depende de que el pa&iacute;s figure en ninguna lista. <strong>El numeral 3.2 del T&iacute;tulo V de la
+        Circular &Uacute;nica, que reconocer&iacute;a nivel adecuado de protecci&oacute;n a los Estados Unidos de
+        Am&eacute;rica, se cita solo como marco sectorial de referencia y no fue verificado por el abogado
+        matriculado el 13 de noviembre de 2026</strong>; por eso este Anexo declara la regi&oacute;n como decisi&oacute;n
+        propia y no como consecuencia jur&iacute;dica. Los archivos del cliente de Backblaze se almacenan en las
+        regiones CA-East (Canad&aacute;) y EU-Central (Pa&iacute;ses Bajos) cuando la cuenta se crea en ellas, y por
+        eso la regi&oacute;n se decide antes de crear el bucket. La regi&oacute;n efectiva del bucket queda declarada
+        en el manifiesto del servicio</td>
         <td>Data Processing Addendum de Backblaze (M&oacute;dulo 2, tratamiento de los archivos del cliente por el
         Encargado del Encargado) y <strong>Anexo de tratamiento de datos de car&aacute;cter colombiano</strong> con
         el contenido m&iacute;nimo del art&iacute;culo 25 del Decreto 1377 de 2013 (alcances, actividades y las tres
@@ -209,8 +234,9 @@ su contenido mínimo, con la razón de cada una.
         la eliminaci&oacute;n a Backblaze y responde frente a la Empresa por el resultado</td>
         <td>Si: informes de auditor&iacute;a y certificaciones del proveedor (SOC 2 y equivalentes), que el
         Encargado exige y mantiene a disposici&oacute;n del Responsable, y que son la evidencia de las medidas
-        apropiadas y efectivas del par&aacute;grafo primero del numeral 3.2 del T&iacute;tulo V de la Circular
-        &Uacute;nica</td>
+        apropiadas y efectivas que el Responsable debe poder demostrar; <strong>el par&aacute;grafo primero del numeral
+        3.2 del T&iacute;tulo V de la Circular &Uacute;nica se cita como marco sectorial de referencia y su contenido
+        no fue verificado por el abogado matriculado el 13 de noviembre de 2026</strong></td>
       </tr>
 ```
 

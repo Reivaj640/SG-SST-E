@@ -61,7 +61,7 @@ const SALIDA = path.join(RAIZ, 'docs', 'gestion-humana', 'firma-electronica', 'c
 const NUBE = [
   {
     id: 'C1',
-    donde: '§1, primer bullet (lineas 90-93)',
+    donde: 'Seccion 1, primer bullet (lineas 90-93)',
     antes:
       '<strong>Esta declaraci&oacute;n es\n'
       + '      condicional</strong>: no afirma que el CDPA haya sido aceptado por el administrador de la cuenta, ni que la\n'
@@ -77,7 +77,7 @@ const NUBE = [
   },
   {
     id: 'C2',
-    donde: '§1, bullet del cifrado (lineas 113-114)',
+    donde: 'Seccion 1, bullet del cifrado (lineas 113-114)',
     antes:
       'del respaldo fuera del servidor y la purga peri&oacute;dica de los respaldos se ejecutan con los scripts del\n'
       + '      despliegue, con la frase de paso que el owner conserva en una copia fuera del servidor, y quedan declarados en',
@@ -89,7 +89,7 @@ const NUBE = [
   },
   {
     id: 'C3',
-    donde: '§1, parrafo de la cuenta (lineas 163-165)',
+    donde: 'Seccion 1, parrafo de la cuenta (lineas 163-165)',
     antes:
       'cerraron el 10 de noviembre de 2026 (pendientes P2 y P5): la cuenta est&aacute; activa, con verificaci&oacute;n en',
     despues:
@@ -98,7 +98,7 @@ const NUBE = [
   },
   {
     id: 'C4',
-    donde: '§5, ficha "Contrasena de aplicacion": el metodo (lineas 617-621)',
+    donde: 'Seccion 5, ficha "Contrasena de aplicacion": el metodo (lineas 617-621)',
     antes:
       '<strong>El m&eacute;todo de autenticaci&oacute;n est&aacute; pendiente de decisi&oacute;n y de\n'
       + '        verificaci&oacute;n por el owner (P2):</strong> si la consola de Workspace tiene habilitadas las app\n'
@@ -113,7 +113,7 @@ const NUBE = [
   },
   {
     id: 'C5',
-    donde: '§5, ficha "Contrasena de aplicacion": la fecha (lineas 623-625)',
+    donde: 'Seccion 5, ficha "Contrasena de aplicacion": la fecha (lineas 623-625)',
     antes:
       '<strong>La fecha de generaci&oacute;n de la credencial vigente no consta</strong> y no se inventa:\n'
       + '        el proveedor de correo no expone la fecha de creaci&oacute;n de una app password y el expediente no la\n'
@@ -124,7 +124,7 @@ const NUBE = [
   },
   {
     id: 'C6',
-    donde: '§5, ficha "Plantilla vigente": el envio con remitente nuevo (lineas 661-662)',
+    donde: 'Seccion 5, ficha "Plantilla vigente": el envio con remitente nuevo (lineas 661-662)',
     antes:
       '<strong>El env&iacute;o con el remitente nuevo\n'
       + '        (<code>kair@gesstiar.com</code>) sigue pendiente de ejecutar (P5).</strong>',
@@ -145,7 +145,7 @@ const ENCARGO = [
   },
   {
     id: 'C7.2',
-    donde: '§1, remision y estado de los actos (lineas 570-574)',
+    donde: 'Seccion 1, remision y estado de los actos (lineas 570-574)',
     antes:
       '<strong>La versi&oacute;n 1.3 del Anexo de Nube\n'
       + '  es el texto que se publicar&aacute; y remite a esta versi&oacute;n 2026-11-11 de este Anexo de Encargo sin\n'
@@ -163,7 +163,7 @@ const ENCARGO = [
   },
   {
     id: 'C7.3',
-    donde: '§2, remision al Anexo de Nube (lineas 72)',
+    donde: 'Seccion 2, remision al Anexo de Nube (lineas 72)',
     antes:
       '<a href="anexo-nube-v1.3.html">Anexo de Nube</a>.</td>',
     despues:
@@ -171,7 +171,7 @@ const ENCARGO = [
   },
   {
     id: 'C7.4',
-    donde: '§5, proveedores externos (linea 431)',
+    donde: 'Seccion 5, proveedores externos (linea 431)',
     antes:
       'est&aacute;n en el <a href="anexo-nube-v1.3.html">Anexo de Nube</a>, versi&oacute;n 1.3, que forma parte',
     despues:
@@ -179,7 +179,7 @@ const ENCARGO = [
   },
   {
     id: 'C7.5',
-    donde: '§9, servicio en la nube (linea 834)',
+    donde: 'Seccion 9, servicio en la nube (linea 834)',
     antes:
       '<a href="anexo-nube-v1.3.html">Anexo de Nube</a>. La Empresa no recibe copias de la base de datos ni del',
     despues:

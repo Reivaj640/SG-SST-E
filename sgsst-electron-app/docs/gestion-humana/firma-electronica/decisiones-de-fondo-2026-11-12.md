@@ -41,8 +41,12 @@ decir «cerrado» porque el equipo haya escrito la pregunta.
 pedido está emitido y medido** —con su destinatario, su fecha y su verificación—, y los actos de un tercero
 (firma, credencial, ventana, respuesta) **no** cierran un bloque: se siguen en
 `tabla-de-solicitudes-2026-11-13.md`, con su estado y su fecha. Con la regla nueva el mapa quedó en **31
-cerrados / 0 pendientes**, con **24 solicitudes: 23 `EMITIDA` y 1 `CERRADA`** (la S-22, respondida por el
-owner el 13-nov-2026 y aplicada al procedimiento del canal de `fecha_terminacion`), y **sin afirmar que el
+cerrados / 0 pendientes**, con **24 solicitudes: 18 `EMITIDA`, 1 `RESPONDIDA` y 5 `CERRADA`** (la S-02,
+respondida el 13-nov-2026 por el abogado matriculado con un escrito **no formal** —sin nombre, sin fecha
+de suscripcion y sin huella—, que por eso **no cierra** la fila; la S-22, respondida por el
+owner el 13-nov-2026 y aplicada al procedimiento del canal de `fecha_terminacion`; y S-01, S-03, S-04 y
+S-23, cerradas por resolucion ese mismo dia: «resuelto por decision del owner, sin ratificacion externa»),
+y **sin afirmar que el
 servicio
 pueda abrirse a empresas reales**. La regla de arriba es la que rigió el 12-nov-2026.
 
@@ -233,8 +237,8 @@ diff. Y la **firma es del owner**.
 
 | Documento | Bytes | SHA-256 |
 |---|---|---|
-| Candidato Anexo de Nube v1.4 | 85 494 | `895d0d0b163ae7b207a96b775727146038285b7c1e76d9f65012369959d3fe39` |
-| Candidato Anexo de Encargo 12-nov-2026 | 95 118 | `2afb0e6877f8983604f4ac6fa9f4685ec69d5fd98f7d92e30dc26ba4f117af1c` |
+| Candidato Anexo de Nube v1.4 | 111 462 | `ba664e6f1ad130c968b6224ab71ed66a52017e96ac578b8b0e740fd55f9e3b47` |
+| Candidato Anexo de Encargo 12-nov-2026 | 100 153 | `d4df187a4070a847a1259e2bacffdead3251579c3fea38ec294f07f82a4e2967` |
 | Texto vigente Nube v1.3 (**intacto**) | 85 143 | `fdd10551c2106e186d62a2b70922530ff9494a8538fc67816f6f5ad5ca2b585d` |
 | Texto vigente Encargo 2026-11-11 (**intacto**) | 94 923 | `6308b1f7a51007cb1e973de0210d1e5659d3b3ceb8e3e3b7a3ee52a7275b8948` |
 

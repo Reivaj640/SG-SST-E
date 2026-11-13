@@ -8,8 +8,8 @@
 
 | Archivo | Bytes | SHA-256 | Que es |
 |---|---|---|---|
-| `anexo-nube-v1.4.html` | 103 390 | `fae2b26b87867d24d558c948e7f90f886f76d6cf6b3eb39eb19deda4dbd8b416` | Candidato del Anexo de Nube v1.4 (6 anclas de C1 a C7 + 35 determinaciones de L1, L4 y L5) |
-| `anexo-encargo-2026-11-12.html` | 97 962 | `7576b1a1dd7f7ded71ac6be7ff556a7041e04538266f199372e4f9c7082d9f3c` | Candidato del Anexo de Encargo del 12-nov-2026 (5 anclas de C1 a C7 + 10 determinaciones de L1, L4 y L5) |
+| `anexo-nube-v1.4.html` | 111 462 | `ba664e6f1ad130c968b6224ab71ed66a52017e96ac578b8b0e740fd55f9e3b47` | Candidato del Anexo de Nube v1.4 (6 anclas de C1 a C7 + 39 determinaciones de L1, L4 y L5) |
+| `anexo-encargo-2026-11-12.html` | 100 153 | `d4df187a4070a847a1259e2bacffdead3251579c3fea38ec294f07f82a4e2967` | Candidato del Anexo de Encargo del 12-nov-2026 (5 anclas de C1 a C7 + 11 determinaciones de L1, L4 y L5) |
 
 ## Que NO se toco
 
@@ -31,10 +31,10 @@ En **dos fases**, con `firma-service/scripts/generar-candidatos-v1.4.js`:
    documentos de determinacion** (`../dictamen-legal-l1-2026-11-12.md` para L1 y
    `../pedido-6-backblaze-v1-4-2026-11-12.md` para L4 y L5), con el motor de
    `firma-service/scripts/determinaciones-v1.4.js`. **El texto no se transcribe**: lo que esta escrito en la
-   determinacion es lo que queda en el candidato, byte a byte. Son 35 cambios en el Nube y 10 en el Encargo.
+   determinacion es lo que queda en el candidato, byte a byte. Son 39 cambios en el Nube y 11 en el Encargo.
 
 El script **se niega a escribir** si una ancla no casa **exactamente una vez**: con las 11 de la fase 1 y las
-45 de la fase 2 bien, la salida es reproducible.
+50 de la fase 2 bien, la salida es reproducible.
 
 ```powershell
 node firma-service/scripts/generar-candidatos-v1.4.js --estado   # solo mide: imprime hashes
@@ -68,6 +68,19 @@ Ademas, el agente general aplico **por la misma regla de version** nueve identif
 enumeraba (el titulo, la meta, el §1, el pie y cuatro remisiones que decian «esta version 1.3» cuando el
 documento **es** la 1.4). Van marcadas como `ext` en `determinaciones-v1.4.js` y se reportan al abogado: si
 alguna no le parece bien, se quita y se vuelve a armar.
+
+**Lo que cambio el 13-nov-2026 (escrito del abogado matriculado).** La seccion **B.8** del dictamen de L1
+aplico al texto lo que el abogado escribio (que es **no formal**: sin nombre, sin fecha de suscripcion y sin
+huella): el Titulo V y la lista de paises con nivel adecuado **dejan de ser fundamento** (son marco sectorial
+de referencia y **no verificados**), la **region US del bucket es decision conservadora de K+AIR** y no una
+exigencia legal, la **transferencia del software a la Empresa si cae en el supuesto (ii)** de la Circular
+002 de 2025, y los **hechos contractuales del CDPA** quedan **pendientes de confirmacion contra el
+contrato**. La redaccion final la hizo K+AIR con la autorizacion del owner.
+
+**El invariante que el motor sostiene.** El candidato tiene que ser **byte a byte** el literal de la
+determinacion: si el motor reescribiera el literal por su cuenta, el texto que se firma no seria el texto
+que se aprobo. Hay dos guards que lo vigilan (`generar-candidatos-v1.4.test.js`): el de identidad byte a
+byte y el que prohibe que un fragmento toque el literal de una determinacion.
 
 ## Que falta para que exista una v1.4 de verdad
 
