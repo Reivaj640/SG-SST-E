@@ -2,7 +2,7 @@
 
 > **Qué es este documento.** La pregunta que lo motivó fue «¿está lista para producción?». La
 > respuesta corta es: **lista para operar, no abierta**. Lo que separa una cosa de la otra son
-> treinta puntos concretos, y este documento los lista **con su estado, su evidencia y quién lo
+> treinta y un puntos concretos, y este documento los lista **con su estado, su evidencia y quién lo
 > tiene**.
 >
 > **Cómo se lee.** Cada bloque dice una cosa, con la evidencia que lo sostiene. El estado va en la
@@ -16,15 +16,16 @@
 > emitido y medido»**, no «el acto esta cumplido». Los actos de un tercero —una firma, una credencial,
 > una ventana de mantenimiento, una respuesta— **no** cierran un bloque: lo que lo cierra es que el
 > pedido salio, con su destinatario, su fecha y su verificacion. Esos actos se siguen en
-> **`tabla-de-solicitudes-2026-11-13.md`**, que es la tabla de las 21 solicitudes: hoy estan las 21
-> `EMITIDA` y **0 respondidas**. **Este mapa no afirma que el servicio pueda abrirse a empresas
+> **`tabla-de-solicitudes-2026-11-13.md`**, que es la tabla de las 24 solicitudes: hoy estan **23
+> `EMITIDA`, 1 `CERRADA`** (la S-22, que el owner respondio el 13-nov-2026) y **0 `RESPONDIDA`**.
+> **Este mapa no afirma que el servicio pueda abrirse a empresas
 > reales**: los hechos de cada bloque (que no hay empresa real suscrita, que la compuerta sigue
 > apagada, que los permisos siguen en 777, que no hay respaldo fuera del servidor) siguen siendo
 > ciertos, y eso es lo que dice cada bloque con su evidencia.
 >
 > **Medido el 2026-11-12**, contra el servicio desplegado, no contra una copia.
 >
-> **Alcance.** Estos treinta puntos son los que separan «el servicio funciona» de «una empresa real
+> **Alcance.** Estos treinta y un puntos son los que separan «el servicio funciona» de «una empresa real
 > puede firmar». Los que están fuera de este mapa (los 96 requisitos del cuadro de cierre del 30-oct)
 > se verificaron aparte y se dejaron en
 > `docs/gestion-humana/firma-electronica/verificacion-cierre/`.
@@ -1392,6 +1393,86 @@ cambio es que **la apertura ahora exige la validacion escrita en el archivo**, n
 
 **Quien lo tiene.** —
 
+### M.31 - El procedimiento del canal de `fecha_terminacion` ya tiene las cinco decisiones del owner: falta la validacion del abogado, la firma del owner y la primera operacion real: el codigo existe y el Anexo lo exige — CERRADO. Solicitudes S-22 (respondida y cerrada), S-23 (emitida) y S-24 (emitida) el 13-nov-2026
+
+**Origen.** El §6 del Anexo de Encargo y el §8.6(b) del Acuerdo (J9), y
+`docs/gestion-humana/firma-electronica/procedimiento-canal-fecha-terminacion-2026-10-31.md`.
+
+**Que se verifico.** El canal por el que la Empresa comunica al Encargado la fecha de terminacion de la
+relacion laboral **existe en el codigo**: `src/services/fechaTerminacion.js`, las migraciones 052 y 053
+(la bitacora de solo agregar), las rutas de administracion interna y su prueba
+(`tests/fecha-terminacion-canal.test.js`). La correspondencia del §8.6(b) lo declara **Implementado**.
+Lo que **no** existia era el papel: el procedimiento, redactado el 31-oct-2026, seguia con el estado
+«redactado, **pendiente de firma y de que el owner lo valide**», y su §9 pedia **cinco decisiones del
+owner** que no estaban escritas. Este bloque no estaba en el mapa: se agrego el 13-nov-2026, con la
+decision del owner de registrarlo.
+
+**Las cinco decisiones del owner, escritas el 13-nov-2026.** El owner las respondio y quedaron
+**escritas en el procedimiento**, cada una en su seccion, con su *por que* y su *consecuencia*:
+1. **Quien es el operador** (§3.1): una **persona administradora de K+AIR**, identificada de forma
+   individual en `X-Admin-Actor`, que opera **por cuenta de la Empresa y sobre su instruccion y
+   evidencia**. No es el sistema de la Empresa: hoy no hay autoservicio y las credenciales de
+   administracion solo existen en el servidor.
+2. **El origen de la llamada** (§3.2): la **novedad es originada en la Empresa**, y la **ejecucion es
+   de K+AIR**. La declaracion escrita es «novedad originada en la Empresa, ejecutada y registrada por
+   K+AIR, con la evidencia de la Empresa como soporte».
+3. **Que evidencia se acepta** (§4): un texto de hasta 1 000 caracteres con **cuatro datos minimos**
+   (quien comunica, fecha de la comunicacion, soporte identificable y fecha de cese coherente con el
+   soporte). La **guia de aceptacion** va como **Anexo A** del procedimiento, con un ejemplo que se
+   acepta y uno que no.
+4. **El plazo maximo de espera** (§5a): **30 dias calendario** desde la fecha de cese (o desde el
+   primer aviso, para las filas anteriores). No es el plazo de conservacion y su incumplimiento
+   **no acorta ni pierde** el plazo legal de 20 anos (Decreto 1072 de 2015, art. 2.2.4.6.13): solo
+   mantiene la fila retenida.
+5. **La frecuencia de la revision periodica** (§5b): **mensual**, el primer dia habil, a cargo de
+   K+AIR, con aviso a la Empresa a los 30 dias y reporte al representante legal a los 90.
+
+Ademas, el **abogado matriculado** tiene que validar el procedimiento como evidencia del canal: eso no
+es del owner, y por eso **no** se pide en S-22. Es lo unico que queda del §9 del procedimiento que depende
+de un tercero, y **hasta el 13-nov-2026 no se le habia pedido por escrito**: por eso se emitio la **S-23**,
+en su propio documento (`solicitud-al-abogado-validacion-procedimiento-2026-11-13.md`), porque no pide
+una determinacion sino una **validacion** sobre un documento que ya existe.
+
+**Por que importa para abrir.** Con esas cinco decisiones, la Empresa y K+AIR ya saben **como** se
+comunica una fecha de terminacion y **que evidencia** queda archivada, y el §6 del Anexo de Encargo
+tiene el procedimiento que lo sostiene. Lo que sigue sin dueño propio es la **validacion del
+abogado** sobre ese procedimiento.
+
+**Que falta.** La **validacion del abogado matriculado** sobre el procedimiento (§9.2 del
+procedimiento), que es de otro dueño y que **el 13-nov-2026 se pidio por escrito** con la solicitud
+**S-23** (vence el **2026-11-27**); la **firma del owner** sobre el procedimiento, que el
+13-nov-2026 quedo registrada como la solicitud **S-24** (vence el **2026-11-20**); y la **primera
+operacion real** del canal con una empresa real.
+El 13-nov-2026 el owner respondio la solicitud **S-22** con las cinco decisiones, se aplicaron al
+procedimiento y se verificaron: **S-22 quedo CERRADA**, y es la **unica fila cerrada** de la tabla de
+solicitudes. **El codigo no se toca**: la decision era de procedimiento y de escritura.
+
+**Medido en produccion el 13-nov-2026 (SSH, solo lectura).** Las dos tablas del canal existen
+(`gh_firma_fecha_terminacion` y `gh_firma_fecha_terminacion_eventos`, migraciones 052 y 053) y **la ruta
+si esta desplegada** (11 coincidencias de `fecha-terminacion` en
+`/opt/kair-firma/app/src/routes/admin-empresas.js`, archivo del 12-nov). Pero **el canal nunca se ha
+usado**: **0 comunicaciones**, **0 eventos** y **0 filas** con el hold `fecha_cese_pendiente`. Es decir:
+la logica esta desplegada y probada, y **no hay ninguna operacion en produccion**. Eso confirma el
+tercer punto del §9 del procedimiento, y es un **acto de ejecucion con una empresa real**, no una
+decision del owner.
+
+**Quien lo tiene.** El abogado matriculado (la validacion del procedimiento) y el owner (la primera
+operacion real del canal).
+
+**Solicitud.** Tres, y las tres con su destinatario, su verificacion y su fecha limite, en
+`tabla-de-solicitudes-2026-11-13.md`:
+
+- **S-22**, emitida el 13-nov-2026 y **respondida y cerrada el mismo dia**; la respuesta esta
+  registrada en su §2.1.
+- **S-23**, emitida el 13-nov-2026 al **abogado matriculado**: validar el procedimiento como
+  evidencia del canal del §6 del Anexo de Encargo (el punto 1.3 de su plan de cierre). Va en su
+  propio documento, `solicitud-al-abogado-validacion-procedimiento-2026-11-13.md`, y vence el
+  **2026-11-27**.
+- **S-24**, emitida el 13-nov-2026 al **owner**: **firmar el procedimiento**. El documento quedo con
+  el estado «pendiente de firma del owner» (16 872 B, sha256 `5a817b38…e04e`), y ese estado es un
+  pendiente con dueño: sin la fila, la firma que falta seria un hueco invisible. Vence el
+  **2026-11-20**.
+
 ---
 
 ## La tabla
@@ -1400,13 +1481,13 @@ cambio es que **la apertura ahora exige la validacion escrita en el archivo**, n
 |---|---|---|---|---|
 | 1. Bloqueos duros | 10 | 0 | 0 | 10 |
 | 2. Condiciones de apertura | 8 | 0 | 0 | 8 |
-| 3. Deuda y riesgo | 12 | 0 | 0 | 12 |
-| **TOTAL** | **30** | **0** | **0** | **30** |
+| 3. Deuda y riesgo | 13 | 0 | 0 | 13 |
+| **TOTAL** | **31** | **0** | **0** | **31** |
 
-Los 0 pendientes concilian: ninguno = 0. Las 21 solicitudes de la tabla
-(`tabla-de-solicitudes-2026-11-13.md`): 21 EMITIDA. Cerrado en este mapa significa que
-el pedido esta emitido y medido, no que el acto este cumplido: cada acto de un tercero
-se sigue en esa tabla, con su estado, su destinatario y su fecha.
+Los 0 pendientes concilian: ninguno = 0. Las 24 solicitudes de la tabla
+(`tabla-de-solicitudes-2026-11-13.md`): 23 EMITIDA, 1 CERRADA. Cerrado en este mapa
+significa que el pedido esta emitido y medido, no que el acto este cumplido: cada acto
+de un tercero se sigue en esa tabla, con su estado, su destinatario y su fecha.
 
 ---
 
@@ -1420,14 +1501,18 @@ Esto se midio el 12-nov-2026 y **no** es un bloqueante:
 - El **Acuerdo v1.6 esta publicado**, y el Anexo de Nube v1.3 y el Anexo de Encargo 2026-11-11
   estan **suscritos y contrafirmados**, con sus actas.
 - El sitio publico sirve **exactamente** las huellas suscribidas (6 URLs comprobadas).
-- La **suite** del servicio: **2 689 tests, 2 687 pass, 0 fail, 2 skipped** (corrida final del 13-nov
-  por la tarde, segunda parte, 180 archivos de prueba, `exit 0`), y **vinculada a un commit**: el 12-nov por la
+- La **suite** del servicio: **2 693 tests, 2 691 pass, 0 fail, 2 skipped** (corrida final del 13-nov
+  por la tarde, sexta parte, 180 archivos de prueba, `exit 0`), y **vinculada a un commit**: el 12-nov por la
   manana se corrio tambien desde un clon limpio del commit `e4dd5f31` y dio el mismo resultado que
   la corrida de esa manana (2 665 / 2 663 / 0 / 2, mismo conjunto de nombres de prueba, clon byte a
   byte igual al arbol del owner). Los **+2** de la tarde del 12-nov son las dos pruebas de regresion
-  del manifiesto, posteriores a ese commit, y los **+5** de esta ronda son las del enlace entre cada
-  bloque del mapa y su fila en `tabla-de-solicitudes-2026-11-13.md` y la del guard que falla si la
-  cita errada del Decreto 1377 reaparece en los dos candidatos de la v1.4.
+  del manifiesto, posteriores a ese commit, y los **+9** de esta ronda son las del enlace entre cada
+  bloque del mapa y su fila en `tabla-de-solicitudes-2026-11-13.md`, la del guard que falla si la
+  cita errada del Decreto 1377 reaparece en los dos candidatos de la v1.4 y las que exigen que las
+  cinco decisiones del owner sobre el canal de `fecha_terminacion` esten escritas en el
+  procedimiento, que la S-22 este cerrada en la tabla, que la S-23 exista con la huella real
+  del procedimiento que se envia, que la S-24 exista como la firma del owner y que el CONTEXT
+  publique la cifra vigente en su linea viva.
 - El `npm audit` del repo: **0 vulnerabilidades**. Las dos altas de M.13 se corrigieron en el repo
   (`nodemailer` 6.10.1 -> 10.5.0 y `zod` 3.25.76 -> 4.6.7); **en produccion siguen vivas** hasta
   que se despliegue el 📦1051.

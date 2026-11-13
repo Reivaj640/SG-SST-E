@@ -1579,7 +1579,7 @@ byte** igual al arbol del owner: **4 810 archivos identicos, 0 diferentes, 0 aus
 
 **Ojo con las dos cifras:** la del clon es la del commit `e4dd5f31`, **anterior** a las dos pruebas
 de regresion del manifiesto que se agregaron el 12-nov por la tarde; el arbol de hoy da
-**2 689 / 2 687 / 0 / 2**.
+**2 693 / 2 691 / 0 / 2**.
 
 **Un hallazgo que hay que dejar escrito.** El primer clon se hizo con la configuracion del sistema
 (`core.autocrlf = true`) y **no reproducia el arbol del owner**: materializo 2 697 de los 4 781
@@ -1594,8 +1594,8 @@ de `npm audit` resueltas) y los tests nuevos de esta ronda, la suite completa se
 sobre el arbol de trabajo del owner:
 
 ```
-tests 2689 | pass 2687 | fail 0 | cancelled 0 | skipped 2 | todo 0
-duration_ms 325319
+tests 2693 | pass 2691 | fail 0 | cancelled 0 | skipped 2 | todo 0
+duration_ms 318180
 ```
 
 180 archivos de prueba, `exit 0`, sin bloques `not ok`. **Esta es la cifra que publica ahora la

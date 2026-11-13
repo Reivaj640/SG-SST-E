@@ -1176,12 +1176,26 @@ La medicion vigente es la del **2026-11-13** (corrida en solitario sobre el arbo
 ronda, con el arbol de dependencias nuevo y los tests de la ronda de cierre):
 
 ```
-tests 2689 | pass 2687 | fail 0 | skipped 2
+tests 2693 | pass 2691 | fail 0 | skipped 2
 ```
 
 Medido con **Node 22.23.4** (ABI 127) en el PC de trabajo, con `better-sqlite3` 11.10.0
 recompilado para ese ABI: 325 s. Los 2 `skipped` son los que ya estaban asi el 11-nov.
-**Actualizada el 13-nov-2026 (tarde, segunda parte):** la corrida dio **2 689 / 2 687 / 0 / 2**
+**Actualizada el 13-nov-2026 (tarde, sexta parte):** la corrida dio **2 693 / 2 691 / 0 / 2**
+(318 s, 180 archivos, `exit 0`). El **+2** sobre la corrida anterior son
+las dos pruebas nuevas: la que exige que la **S-24 exista, sea `EMITIDA` y sea del bloque M.31**
+(la firma del owner sobre el procedimiento del canal) y la que exige que el **CONTEXT publique la
+cifra vigente en su linea viva** y no la de una ronda anterior.
+**La anterior, del 13-nov-2026 (tarde, quinta parte):** la corrida dio **2 691 / 2 689 / 0 / 2**
+(357 s, 180 archivos, `exit 0`). El **+1** sobre la corrida de la tarde es
+la prueba nueva que exige que la **S-23 exista, sea `EMITIDA`, sea del bloque M.31 y declare la
+huella real del procedimiento que se le envia** al abogado.
+**La anterior, del 13-nov-2026 (tarde, cuarta parte):** la corrida dio **2 690 / 2 688 / 0 / 2**
+(338 s, 180 archivos, `exit 0`). El **+1** sobre la corrida de la tarde es
+la prueba nueva que exige que **las cinco decisiones del owner sobre el canal de
+`fecha_terminacion` esten escritas** en el procedimiento y que la **S-22 este `CERRADA`** en la
+tabla de solicitudes.
+**La anterior, del 13-nov-2026 (tarde, segunda parte):** la corrida dio **2 689 / 2 687 / 0 / 2**
 (325 s, 180 archivos, `exit 0`). Los **+5** sobre la corrida de la noche del 12-nov son las cuatro
 pruebas nuevas del enlace entre cada bloque del mapa y su fila en la tabla de solicitudes
 (`tabla-de-solicitudes-2026-11-13.md`) y la del guard que **falla si la cita errada del Decreto
@@ -1196,7 +1210,7 @@ ni BOM, ni CRLF).
 La medicion anterior (12-nov-2026, antes del cambio de dependencias) fue
 `tests 2606 | pass 2604 | fail 0 | skipped 2`, en 415 s; la de antes (11-nov-2026) fue
 `tests 2574 | pass 2572 | fail 0 | skipped 2`, en 220 s. **La diferencia son 83 pruebas nuevas**
-(2 689 - 2 606), todas en verde; el numero de la seccion 7 se queda
+(2 693 - 2 606), todas en verde; el numero de la seccion 7 se queda
 atrasado si no se actualiza, y una cifra vencida leida como vigente es un verde falso.
 
 > La reproduccion desde **clon limpio** esta medida y registrada en
@@ -1207,7 +1221,7 @@ atrasado si no se actualiza, y una cifra vencida leida como vigente es un verde 
 > los 2 665 nombres de prueba identico** al de la corrida de ese momento. El clon quedo **byte a byte**
 > igual al arbol del owner (4 810 archivos, 0 diferentes). El 6.11 del cuadro canonico quedo
 > **CERRADO** por esto. **Ojo con las dos cifras:** la del clon es la de `e4dd5f31`, que es
-> **anterior** a las dos pruebas de regresion del manifiesto; el arbol de hoy da **2 689 / 2 687**.
+> **anterior** a las dos pruebas de regresion del manifiesto; el arbol de hoy da **2 693 / 2 691**.
 > Compararlas como si fueran la misma corrida seria un error de lectura.
 
 > **El EOL de este archivo esta fijado por su test.** Si lo abres en un editor que normalice a

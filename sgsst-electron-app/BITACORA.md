@@ -10234,6 +10234,43 @@ real del archivo**, o la tabla de insumos es una tabla de deseos.
    de estar `EMITIDA`; (e) el aviso de la Circular 002 como no verificada desaparece del escrito. Los cinco
    **salen en rojo** y el archivo queda restaurado.
 
+## 2026-11-13 (tarde, tercera parte) — la decisión que no estaba en ningún registro, y el 0 pendientes que era cierto y estaba incompleto
+
+**Cómo se hizo visible.** El owner preguntó «¿hay algo pendiente por decisión?». La pregunta se apoyó en el
+expediente —el mapa, la tabla de solicitudes, el CONTEXT— y el expediente **no tenía la respuesta**. Buscando
+decisiones abiertas aparecieron **cinco que el owner tenía pendientes desde el 31-oct-2026** y que no estaban
+en ningún documento de cierre: las del §9 de `procedimiento-canal-fecha-terminacion-2026-10-31.md`, un
+procedimiento con el estado «redactado, **pendiente de firma y de que el owner lo valide**».
+
+**Lo que había.** El canal por el que la Empresa comunica al Encargado la fecha de terminación de la relación
+laboral **está implementado**: `src/services/fechaTerminacion.js`, las migraciones 052 y 053 (la bitácora de solo
+agregar), las rutas de administración interna y `tests/fecha-terminacion-canal.test.js`. La tabla de
+correspondencia del §8.6(b) lo dice: **Implementado**. Lo que no había eran las **cinco decisiones** que
+el propio procedimiento pedía: quién es el operador, si el llamante es la Empresa o K+AIR, qué evidencia se
+acepta, el plazo máximo de espera y la frecuencia de la revisión periódica.
+
+**La regla que sale de ahí.**
+1. **Un requisito tiene dos caras, y son dos requisitos.** «Implementado» en la tabla de correspondencia
+   describe **el código**. El §6 del Anexo de Encargo no dice «implementado»: dice «por el canal que el
+   Encargado habilite». Si el papel no existe, el requisito **no está cumplido**, por mucho que el test pase y
+   que el código esté bien escrito.
+2. **Una decisión que no está escrita, no está tomada.** Cinco decisiones pendientes el 31-oct siguen siendo
+   cinco decisiones el 13-nov. El hecho de que nadie las reclamara no las decidía: las escondía.
+3. **El mapa que solo cuenta lo que ya se escriba deja los huecos fuera del conteo.** El mapa decía «30 bloques,
+   31 cerrados, 0 pendientes», y el **0 pendientes era cierto y estaba incompleto**: un requisito sin registro
+   no está pendiente, está **invisible**. Invisible no es cerrado, y un 0 que no cubre el universo es un verde
+   falso con otro nombre.
+4. **El conteo se mueve con el registro, y el registro es lo que se mueve.** La corrección no fue cambiar el
+   número: fue **escribir el hueco** (S-22 y el bloque M.31), y el script regeneró el número desde el conteo
+   real. Al revés —cambiar el número para que cuadre— es escribir la cifra a mano.
+
+**Medido.** El mapa quedó en **31 bloques · 31 cerrados · 0 pendientes**, con **22 solicitudes (22 `EMITIDA`,
+0 respondidas)**; el script del conteo (`contar-estados-meta-apertura.js`) declara los IDs que exige y su test
+pasó a **22 filas**; la regeneración con `--escribir` es **idempotente** (la segunda corrida no cambió nada); las
+cifras de las rondas 16 y 17 **no se reescribieron** (son registros con su fecha) y los documentos que publican
+la cifra como vigente sí se actualizaron; suite completa **2 689 tests, 2 687 pass, 0 fail, 2 skipped**;
+barrido de los archivos de la ronda **0 problemas**.
+
 **Medido.** La corrección quedó en la fuente (con la fila **0.13** trazada) y llegó a los dos candidatos por
 regeneración: **103 390 B / `fae2b26b…d8b416`** y **97 962 B / `7576b1a1…d9f3c`**, huellas que **no cambiaron**
 porque el ajuste de «doce» a «trece correcciones» no entra en los literales que el generador lee. El barrido de
@@ -10245,3 +10282,68 @@ reaparece** en cualquiera de los dos textos firmables. Las huellas del dictamen 
 **manifiesto de sumas del paquete** se regeneró: **14 de 14**. La suite completa dio **2 689 tests,
 2 687 pass, 0 fail, 2 skipped** (180 archivos de prueba, `exit 0`, 325 s, corrida en solitario): **+1**
 sobre la ronda 16, que es la prueba del guard nuevo de la cita.
+
+## 2026-11-13 (tarde, cuarta parte) — las cinco decisiones del canal escritas, y por qué el código no cambió
+
+**El defecto que se cerró.** El canal por el que la Empresa comunica la fecha de terminación de la relación laboral
+estaba **implementado y probado** (`src/services/fechaTerminacion.js`, migraciones 052 y 053,
+`tests/fecha-terminacion-canal.test.js`) y su procedimiento estaba redactado, pero el procedimiento **no tenía las
+cinco decisiones del owner** y su §9 lo decía: «pendiente de firma y de que el owner lo valide». El requisito del §6
+del Anexo de Encargo —«por el canal que el Encargado habilite»— no estaba cumplido: había código y no había
+papel. Eso quedó registrado como **S-22** (ronda 18) y como el bloque **M.31** del mapa, con las cinco decisiones
+enumeradas una por una.
+
+**Lo que cambió en el código. Prácticamente nada, y a propósito.** Las cinco decisiones son de procedimiento: el
+código ya exigía `evidencia` y `canal` como campos obligatorios, y la regla que se escribió —«sí la evidencia no
+cumple los cuatro datos mínimos, el operador no registra la comunicación y la fila sigue retenida»— es exactamente
+el comportamiento que el texto ya determinaba. Lo que sí cambió en el código fue **el guard**:
+`tests/scripts/contar-estados-meta-apertura.test.js` pasó de **11 a 12 pruebas**, y la nueva comprueba que **las cinco
+decisiones están escritas** en el procedimiento (cinco marcas de decisión con fecha), que el **Anexo A** existe con sus
+cuatro datos mínimos, que el procedimiento **ya no dice que una decisión operativa sigue pendiente**, y que la **S-22
+está `CERRADA`**. Sin ese guard, volver a borrar una decisión del procedimiento no rompía nada: el expediente
+volvería a decir «31 cerrados / 0 pendientes» con el hueco invisible, que es la misma trampa de la ronda 18 al revés.
+
+**El estado se cuenta por su palabra clave, no por su posición.** La tabla pasó de **22 `EMITIDA`** a **21 `EMITIDA` y 1 `CERRADA`**:
+S-22 se cerró porque la respuesta **se aplicó y se verificó**, que es lo que dice el ciclo `PREPARADA → EMITIDA →
+RESPONDIDA → CERRADA` de la propia tabla. La frase de conciliación la regenera `contar-estados-meta-apertura.js` (es
+idempotente) y ahora dice «21 EMITIDA, 1 CERRADA». **El bloque M.31 no cambió de estado**: un bloque cerrado por solicitud
+significa «el pedido está emitido y medido», y que la respuesta llegara y se aplicara **no** lo convierte en un bloque
+«cumplido»; lo que cambia es el «qué falta» del bloque, que ahora nombra al abogado y la primera operación real.
+
+**Medido.** Suite completa **2 690 tests, 2 688 pass, 0 fail, 2 skipped** (180 archivos de prueba, `exit 0`, 338 s,
+corrida en solitario): **+1** sobre la ronda 18, que es el guard nuevo. Test del script del conteo **12/12**. Mapa **31 bloques
+· 31 cerrados · 0 pendientes**, **22 solicitudes (21 `EMITIDA`, 1 `CERRADA`)**. Barrido de los archivos de la ronda
+**0 problemas**. Verificación de cierre: **sin inconsistencias**.
+
+## 2026-11-13 (tarde, quinta parte) — un documento que dice «me falta X» genera un pendiente, y un guard que busca la cifra en todo el archivo se satisface con la entrada vieja
+
+**El pendiente que nació de un estado, no de una tarea.** El owner volvió a escribir las cinco decisiones del canal de
+`fecha_terminacion` y pidió aplicarlas. Al cotejar su texto con el procedimiento, **el contenido era el mismo** que ya
+estaba escrito desde la ronda anterior: la **S-22 no se reabre** (sus criterios ya estaban cumplidos y verificados).
+Lo que sí cambió fue el **encabezado** del procedimiento, que quedó con el estado «**pendiente de firma del owner** y de
+la validación del abogado». Ese estado es un pendiente **con dueño**, así que se registró como la **S-24**: una fila
+más, con destinatario, qué se pide, cómo se verifica y fecha. Sin esa fila, la firma que faltaba era un hueco invisible
+—la misma trampa de la ronda 18 al revés— y el conteo no la cubría.
+
+**El defecto que nadie vio: la línea viva del CONTEXT publicaba la cifra de la ronda anterior.** El CONTEXT describe la
+META en su línea viva (la que se lee antes de tocar nada) y publicaba allí **22 solicitudes** con **21 `EMITIDA` y
+1 `CERRADA`**, mientras la tabla ya iba en **23: 22 `EMITIDA` y 1 `CERRADA`**. El check de la ronda 20 no lo vio: buscaba
+`/22\s+EMITIDA…1\s+CERRADA/` en **todo** el CONTEXT, y lo satisfacía la **entrada histórica** de la ronda 20 (que sí
+decía 22 `EMITIDA` y 1 `CERRADA`). Un guard que busca en todo el documento se cumple con la coincidencia más antigua:
+el registro con fecha convive con la línea viva y la tapa. La deriva llevaba una ronda entera publicada.
+
+**El guard nuevo.** `tests/scripts/contar-estados-meta-apertura.test.js` pasó de 13 a **15 pruebas**. Las dos nuevas: una
+exige que la **S-24 exista, sea `EMITIDA` y sea del bloque M.31**, y que el procedimiento declare «pendiente de firma del
+owner»; la otra **deriva la cifra de la tabla** (la fuente de la verdad) y comprueba que la **línea viva** del CONTEXT la
+publique, y que ya no diga la cifra de la ronda anterior. El mutante que devuelve la línea viva a la cifra vieja pone el
+test **en rojo** —un guard que no se ha visto fallar no es un guard—.
+
+**Nota de continuidad.** Esta entrada es la quinta. La **cuarta** (arriba) es la de la ronda 19 —las cinco decisiones
+escritas y la S-22 cerrada—; la ronda 20 (la **S-23** y el guard de la huella real) **no llegó a la BITACORA**: quedó
+registrada en el `Historial.md` y el `CONTEXT.md`, pero no aquí.
+
+**Medido.** Suite completa **2 693 tests, 2 691 pass, 0 fail, 2 skipped** (180 archivos de prueba, `exit 0`, 318 s,
+corrida en solitario): **+2** sobre la corrida anterior, que son las dos pruebas nuevas. Test del script del conteo
+**15/15**. Mapa **31 bloques · 31 cerrados · 0 pendientes**, **24 solicitudes (23 `EMITIDA`, 1 `CERRADA`)**. Paquete al
+abogado: **14 de 14** sumas coinciden. Barrido de los archivos de la ronda: **0 problemas**. Verificación de cierre:
+**sin inconsistencias**.

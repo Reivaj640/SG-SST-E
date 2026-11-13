@@ -311,11 +311,13 @@ gate antes y después, y el `.env` con la bandera.
 Para que nadie lo busque dos veces, esto **ya está hecho y medido** (los detalles y la evidencia están
 en el mapa y en `verificacion-cierre/`):
 
-- El **mapa de la meta** con sus 30 puntos, su tabla regenerada por script y su verificador
+- El **mapa de la meta** con sus 31 puntos, su tabla regenerada por script y su verificador
   (**4 cerrados / 23 pendientes** al cierre de la 12.ª ronda; **9 cerrados / 21 pendientes** el 12-nov;
-  **hoy 30 cerrados / 0 pendientes**). Desde el **13-nov-2026** un bloque cierra cuando **el pedido esta
-  emitido y medido**, no cuando el acto esta cumplido: las **21 solicitudes** de
-  `tabla-de-solicitudes-2026-11-13.md` estan **EMITIDA** y **0 respondidas**, y **esto no dice que el
+  **hoy 31 cerrados / 0 pendientes**). Desde el **13-nov-2026** un bloque cierra cuando **el pedido esta
+  emitido y medido**, no cuando el acto esta cumplido: las **24 solicitudes** de
+  `tabla-de-solicitudes-2026-11-13.md` son **23 `EMITIDA` y 1 `CERRADA`** (la S-22, que el owner
+  respondio el 13-nov-2026 y que se aplico al procedimiento del canal de `fecha_terminacion`), y **esto no
+  dice que el
   servicio pueda abrirse a empresas reales**. Los actos de terceros se siguen en esa tabla.
 - La **reconciliación del cuadro canónico** (34 requisitos medidos; de 62 a **76 cerrados**).
 - La **medición de las 39 casillas** del §7 del `SECURITY.md`.

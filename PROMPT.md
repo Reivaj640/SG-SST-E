@@ -1295,6 +1295,109 @@ un punto a favor. Alguien podía leer eso como «ya está, el abogado respondió
    cita.** Si el insumo cambia, el documento que lo cita se vuelve a medir: bytes y SHA-256 con
    `execFileSync`, nunca con un pipe de shell.
 
+### 5.41 🔴 Un requisito con código y con papel son dos requisitos, y el que no está escrito no está contado
+
+**El caso real (13-nov-2026), la ronda 18.** El owner preguntó «¿hay algo pendiente por decisión?». La pregunta
+se apoyó en el expediente y el expediente **no tenía la respuesta**: había **cinco decisiones del owner**
+pendientes desde el 31-oct-2026 (las del §9 de `procedimiento-canal-fecha-terminacion-2026-10-31.md`), y
+**ningún documento de cierre las mencionaba**. El mapa decía «30 bloques, 30 cerrados, 0 pendientes», y el
+**0 pendientes era cierto y estaba incompleto**: el requisito no estaba registrado, así que no estaba
+*pendiente* —estaba **invisible**.
+
+**Reglas:**
+
+1. **«Implementado» describe el código, no el requisito.** El §6 del Anexo de Encargo no dice «implementado»:
+   dice «por el canal que el Encargado habilite». Un requisito que tiene una cara de código y otra de papel
+   **no está cumplido** mientras falte el papel, por mucho que la prueba pase y el programa esté bien escrito.
+2. **Una decisión que no está escrita, no está tomada.** Cinco decisiones pendientes el 31-oct siguen siendo
+   cinco decisiones el 13-nov. Que nadie las reclamara no las decidía: las escondía.
+3. **Un hueco que no está registrado no es un hueco cerrado: es un hueco invisible.** El mapa y la tabla de
+   solicitudes cuentan lo que está escrito. Si un requisito no aparece en ninguno, **no está cerrado**,
+   porque el conteo no lo cubre. Un `0 pendientes` que no cubre el universo es un verde falso con otro nombre.
+4. **El hueco se escribe primero; el número sale después.** La corrección no es cambiar el número para que
+   cuadre: es **registrar el hueco** (su bloque, su solicitud, su dueño y su fecha), y dejar que el script
+   regenere el conteo desde el conteo real.
+5. **La pregunta «¿qué falta?» se responde con el expediente, no de memoria.** Y si el expediente no alcanza
+   para responderla, **eso es un hallazgo**: un requisito que el expediente no conoce es un requisito que
+   nadie está midiendo.
+
+### 5.42 🔴 Una decisión del owner se escribe en el documento que la pide, y su solicitud se cierra cuando la respuesta se aplica y se verifica
+
+**El caso real (13-nov-2026), la ronda 19.** La ronda 18 dejó registrada la **S-22** con las cinco
+decisiones del owner sobre el canal de `fecha_terminacion`, y el bloque **M.31** en el mapa, con las
+cinco **pendientes**. El owner las respondió ese mismo día. La respuesta tenía que quedar **escrita en el
+documento que las pedía** —`procedimiento-canal-fecha-terminacion-2026-10-31.md`, en sus §3, §4 y §5— y
+no en un chat, en un correo ni en una nota del `Historial.md`.
+
+**Reglas:**
+
+1. **La decisión se escribe donde se va a aplicar, con su fecha y su responsable.** En el procedimiento,
+   en la sección que la pide; cada una con su *por qué* y su *consecuencia*, para que dentro de un año se
+   sepa si fue una decisión o un descuido.
+2. **Cerrar una solicitud es un acto de tres pasos**: la respuesta **se aplica** al documento destino,
+   **se verifica** (con un guard que falle si la decisión no está) y **se registra** con su fecha. Una
+   solicitud respondida y no aplicada sigue abierta, aunque el mensaje esté en el correo.
+3. **La solicitud se cierra; el bloque del mapa no cambia de estado.** Un bloque cerrado por solicitud
+   significa «el pedido está emitido y medido»: que la respuesta llegó y se aplicó **no** lo convierte en
+   un bloque «cumplido». Lo que cambia es el **cuerpo** del bloque: su «qué falta» deja de listar la
+   decisión y empieza a listar lo que sí falta (el abogado, la primera operación real).
+4. **El estado de la solicitud se cuenta por su palabra** (`PREPARADA`, `EMITIDA`, `RESPONDIDA`,
+   `CERRADA`), y **la cifra sale del script**. El mapa, el guion de cierre, la §8, el acta y el CONTEXT
+   publican el conteo; el que no se reescribe es el registro con fecha de una ronda anterior.
+5. **Un guard que no se ha visto fallar no es un guard.** El test nuevo comprueba que las cinco decisiones
+   **están escritas** en el procedimiento y que la S-22 está `CERRADA`; si alguien borra el Anexo A o
+   devuelve la decisión a «pendiente», el test **falla**.
+
+### 5.43 🔴 Medir y mutar no pueden ocurrir a la vez: la huella que sale es la del mutante, no la del archivo
+
+**El caso real (13-nov-2026), la ronda 20.** Al publicar la huella del procedimiento del canal
+(`procedimiento-canal-fecha-terminacion-2026-10-31.md`) se corrieron en paralelo los **mutantes** —el
+arnés que mete un defecto, corre el verificador y restaura el archivo— y la **medición**. El arnés tenía
+el archivo en estado mutado en ese instante: la medición devolvió **16 495 B / `5220559b…`**, que era la
+huella **del mutante**, no la del archivo. La huella real era **16 513 B / `6f792eae…`** (la de ese
+momento: el procedimiento volvió a cambiar el 13-nov-2026, en la ronda 21), y el escrito que se iba
+a enviar declaraba la huella equivocada. Se detectó porque el test que compara la huella declarada
+con la real **falló**: ese check es el que atrapó el error.
+
+**Reglas:**
+
+1. **Nunca se mide un archivo mientras un mutante lo tiene modificado.** El arnés de mutantes escribe,
+   corre el verificador y restaura: entre la escritura y la restauración el archivo es **otro archivo**.
+   Medir en esa ventana da la huella del defecto.
+2. **La misma regla de la suite**: nunca dos corridas simultáneas en el mismo árbol. Un mutante es una
+   corrida que escribe.
+3. **La huella que se publica se mide DESPUÉS**, con el árbol quieto, y **se vuelve a medir al final**,
+   después de todos los cambios.
+4. **El guard que compara la huella declarada con la real es el que salva**: sin ese check, la huella
+   del mutante habría viaja al escrito que se envía, y el abogado habría recibido un número que no
+   corresponde con el archivo del repositorio.
+
+### 5.44 🔴 Un documento que declara lo que le falta genera un pendiente: ese pendiente es una fila, y repetir no es corregir
+
+**El caso real (13-nov-2026), la ronda 21.** El owner volvió a escribir las cinco decisiones del
+canal de `fecha_terminacion` y pidió aplicarlas. Al cotejar su texto con el procedimiento,
+**el contenido era el mismo**: las cinco decisiones ya estaban escritas desde la ronda anterior,
+cada una en su sección, con su *por qué* y su *consecuencia*. Lo que sí cambió fue el **encabezado**
+del procedimiento, que quedó con el estado «**pendiente de firma del owner** y de la validación del
+abogado». Ese estado es un **pendiente con dueño**, así que se registró como la **S-24**: una fila
+más, con destinatario, qué se pide, cómo se verifica y fecha.
+
+**Reglas:**
+
+1. **Un documento que dice «me falta X» tiene que tener X en la tabla de solicitudes.** Si el
+   encabezado, el §9 o el cuerpo de un documento declara un estado pendiente, ese pendiente se
+   registra como fila. Sin fila es un **hueco invisible** (trampa 162): el conteo no lo cubre y el
+   mapa no lo nombra.
+2. **La firma es un acto, y los actos tienen fila.** «Firmar el documento» no es un detalle de la
+   decisión: es un acto del owner, con su verificación (el acta de la firma, con la huella del texto
+   que se firma).
+3. **Repetir no es corregir.** Cuando el owner reescribe lo que ya está escrito, se coteja el
+   texto: si el contenido es el mismo, la solicitud **no se reabre** (sus criterios ya estaban
+   cumplidos y verificados) y lo que se registra es **lo que cambió de verdad**; si el contenido
+   difiere, la solicitud se reabre y se vuelve a aplicar, y la fila dice por qué.
+4. **El estado del documento y el estado de la fila son el mismo hecho.** Si el encabezado dice
+   «firmado» y la fila dice `EMITIDA`, una de las dos está mintiendo. El guard compara los dos.
+
 ### 6.1 Backend — bridges
 
 Sufijo **`-bridge.js`** (no `bridge-*.js`). Hay 30 en `main/`.
@@ -2086,6 +2189,14 @@ Caso real (31-oct-2026): al corregir el único rojo de la suite del `firma-servi
 | 160 | 🔴 **Un verificador que compara un bloque de varias líneas por su primera línea acepta una reescritura que pierde líneas: el documento queda mal formado y el guard en verde** | `sgsst-electron-app/firma-service/scripts/contar-estados-meta-apertura.js` (la frase de conciliación), `sgsst-electron-app/docs/gestion-humana/firma-electronica/meta-para-abrir-a-empresas-reales-2026-11-12.md` | Caso real (13-nov-2026), la ronda 16: el script que reescribe la frase de conciliación del mapa **comparaba el bloque por su primera línea** y lo reescribía entero. Cuando la frase pasó a ocupar **dos líneas** (para nombrar las 21 solicitudes y aclarar que *cerrado no es acto cumplido*), la reescritura **perdió la línea en blanco** que separaba la frase del `---` de abajo: el documento quedó con la frase pegada al separador, y el script **no se quejaba**, porque comparaba una línea con una línea y las dos coincidían. Reglas: (1) **un bloque se compara completo**: si lo que se reescribe ocupa más de una línea, el comparador compara el bloque entero y el reescritor escribe el bloque entero —uno por líneas y el otro por bloques se contradicen—; (2) **un verificador que reescribe tiene que ser idempotente**: correrlo dos veces tiene que dejar el mismo archivo, y el **mutante** (una copia a la que se le quita la línea en blanco) tiene que salir en rojo; (3) **un reescritor se prueba sobre una copia y el diff se mira a ojo**: un `git diff` que muestra una línea en blanco desaparecida es el defecto entero; (4) **cuando el texto comparado crece a más de una línea, el comparador y el reescritor se cambian juntos** |
 
 | 161 | 🔴 **La huella que un documento declara es la del contenido: si el insumo cambia, la huella queda vieja y el documento que se envía pasa a mentir** | `sgsst-electron-app/docs/gestion-humana/firma-electronica/solicitudes-al-abogado-2026-11-13.md` (las tablas de insumos), `sgsst-electron-app/firma-service/scripts/generar-candidatos-v1.4.js` | Caso real (13-nov-2026), la ronda 17: al corregir **en la fuente** la cita del Decreto 1377, cambiaron el dictamen de L1 y el pedido 6, y el escrito al abogado **seguía declarando sus huellas viejas** (89 527 B / `901b2ed9…` y `d5a44080…`): el abogado recibía dos números que ya no correspondían a los archivos del repositorio. Reglas: (1) **la huella que se declara es la del archivo en ese momento**, medida con `execFileSync`; (2) **si el insumo cambia, el documento que lo cita se vuelve a medir y se vuelve a escribir**; (3) **el verificador compara la huella declarada con la real del archivo y falla si no coinciden** —una tabla de insumos sin ese check es una tabla de deseos—; (4) **la huella del texto generado no se mueve porque haya cambiado el texto fuente**: si la corrección no está en la región que el generador lee, el candidato sale idéntico, y eso **no** significa que la corrección no llegó (medido: el dictamen pasó de 90 850 B a 90 936 B y los dos candidatos conservaron `fae2b26b…` y `7576b1a1…`) |
+
+| 162 | 🔴 **Un requisito con código y con papel son dos requisitos: el código implementado no cierra el requisito, y un hueco que no está registrado no es un hueco cerrado, es un hueco invisible** | `sgsst-electron-app/docs/gestion-humana/firma-electronica/procedimiento-canal-fecha-terminacion-2026-10-31.md` (§9), `sgsst-electron-app/docs/gestion-humana/firma-electronica/meta-para-abrir-a-empresas-reales-2026-11-12.md` (bloque M.31), `sgsst-electron-app/docs/gestion-humana/firma-electronica/tabla-de-solicitudes-2026-11-13.md` (S-22) | Caso real (13-nov-2026), la ronda 18: el canal de `fecha_terminacion` estaba **implementado y probado** (`src/services/fechaTerminacion.js`, migraciones 052/053, `tests/fecha-terminacion-canal.test.js`, y la correspondencia del §8.6(b) diciendo «Implementado»), y aun así el requisito **no estaba cumplido**: faltaban las **cinco decisiones del owner** que el propio procedimiento pedía, y **ningún documento de cierre las registraba**. El mapa publicaba «30 bloques, 30 cerrados, 0 pendientes»: el 0 era cierto y estaba incompleto. Reglas: (1) **«Implementado» describe el código, no el requisito**: el §6 del Anexo dice «por el canal que el Encargado habilite», y sin papel no hay canal habilitado; (2) **una decisión que no está escrita no está tomada**: cinco decisiones del 31-oct siguen vivas el 13-nov; (3) **un hueco sin registro no es un hueco cerrado, es un hueco invisible**: el conteo solo cubre lo que está escrito, y un `0 pendientes` que no cubre el universo es un verde falso con otro nombre; (4) **el hueco se escribe primero y el número sale después**: registrar el bloque y la solicitud, y dejar que el script regenere el conteo real —cambiar el número para que cuadre es escribir la cifra a mano; (5) **el mapa tiene que poder responder «¿qué falta?»**: si el expediente no alcanza, eso es un hallazgo, no un vacío |
+
+| 163 | 🔴 **Una respuesta que no se escribe en el documento que la pide no está aplicada: la solicitud queda cerrada en el papel y abierta en la realidad** | `sgsst-electron-app/docs/gestion-humana/firma-electronica/procedimiento-canal-fecha-terminacion-2026-10-31.md` (§3.1, §3.2, §4, §5a, §5b, Anexo A), `sgsst-electron-app/docs/gestion-humana/firma-electronica/tabla-de-solicitudes-2026-11-13.md` (S-22 y su §2.1), `sgsst-electron-app/firma-service/tests/scripts/contar-estados-meta-apertura.test.js` | Caso real (13-nov-2026), la ronda 19: el owner respondió las **cinco decisiones** del canal de `fecha_terminacion` que la S-22 pedía. La respuesta existía —en el mensaje del owner— pero **no estaba escrita en el procedimiento**, así que el requisito seguía sin cumplir: era la misma trampa de la ronda 18 en su forma inversa (ahora el hueco no es invisible, es **aparentemente** visible). Reglas: (1) **la decisión se escribe donde se va a aplicar**, con su fecha y su responsable, y no en un chat, un correo o el `Historial.md`; (2) **cerrar una solicitud es un acto de tres pasos**: aplicar, verificar y registrar —responder no es cerrar—; (3) **la respuesta se registra con su contenido**: la tabla tiene su §2.1 con las cinco decisiones, dónde quedaron escritas y quién respondió; (4) **la solicitud se cierra y el bloque del mapa no cambia de estado**: un bloque cerrado por solicitud significa «el pedido está emitido y medido», y lo que cambia es el «qué falta» del bloque; (5) **el guard tiene que fallar cuando la decisión no está escrita**: el test comprueba las cinco marcas de decisión, el Anexo A y el estado `CERRADA` de la S-22, y si alguien borra el Anexo A o devuelve una decisión a «pendiente», el test **falla** |
+
+| 164 | 🔴 **Medir un archivo mientras un mutante lo tiene modificado devuelve la huella del mutante, no la del archivo: y esa huella se va al escrito que se envía** | `%TEMP%\kair-p8\mutantes-v19.js`, `%TEMP%\kair-p8\huellas-r19.js`, `sgsst-electron-app/docs/gestion-humana/firma-electronica/solicitud-al-abogado-validacion-procedimiento-2026-11-13.md` (la tabla de insumos), `sgsst-electron-app/firma-service/tests/scripts/contar-estados-meta-apertura.test.js` (el check de la huella real) | Caso real (13-nov-2026), la ronda 20: al publicar la huella del procedimiento del canal se launcharon en paralelo el **arnés de mutantes** (que escribe un defecto, corre el verificador y restaura) y la **medición**. La medición cayó en la ventana en que el arnés tenía el archivo mutado, y devolvió **16 495 B / `5220559b…`**, que era la huella **del mutante**: la real era **16 513 B / `6f792eae…`** (la de ese momento: el procedimiento volvió a cambiar el 13-nov-2026, en la ronda 21). El error se detectó porque el test que compara la huella declarada con la real **falló**; sin ese check, la huella del mutante habría viajado al escrito que se le manda al abogado. Reglas: (1) **nunca se mide un archivo mientras un mutante lo tiene modificado** — entre la escritura y la restauración el archivo es otro archivo—; (2) **la misma regla de la suite**: nunca dos corridas simultáneas en el mismo árbol, y un mutante es una corrida que escribe; (3) **la huella que se publica se mide con el árbol quieto y se vuelve a medir al final**, después de todos los cambios; (4) **el guard que compara la huella declarada con la real es el que salva**: es el que hace que una huella vieja o ajena no llegue al documento enviable |
+
+| 165 | 🔴 **Un guard que busca la cifra en todo el documento se satisface con una entrada histórica: la línea viva puede quedar vieja y nadie lo ve** | `sgsst-electron-app/CONTEXT.md` (la línea que describe la META), `sgsst-electron-app/firma-service/tests/scripts/contar-estados-meta-apertura.test.js` (el guard de la línea viva) | Caso real (13-nov-2026), la ronda 21: el CONTEXT publicaba en su **línea viva** —la que describe la META, la que se lee antes de tocar nada— la cifra de la ronda anterior (**22 solicitudes** con **21 `EMITIDA` y 1 `CERRADA`**), mientras la tabla ya iba en **23: 22 `EMITIDA` y 1 `CERRADA`**. El check de la ronda 20 buscaba `/22\s+EMITIDA…1\s+CERRADA/` en **todo** el CONTEXT: lo satisfacía la **entrada histórica** de la ronda 20 (que sí decía 22 `EMITIDA` y 1 `CERRADA`), así que la deriva no la vio nadie — llevaba una ronda entera publicada. Reglas: (1) **la cifra se propaga a la línea viva y se verifica en esa línea**: un guard que busca en todo el documento se cumple con la coincidencia más antigua; (2) **un registro con fecha es un registro**: la entrada de una ronda anterior se anota, no se reescribe, y por eso convive con la línea viva y la puede tapar; (3) **el guard deriva el número de la fuente** —la tabla de solicitudes— y no de una constante escrita a mano, para que no se pueda quedar viejo sin que nadie lo note; (4) **un guard que no se ha visto fallar no es un guard**: el mutante de la ronda 21 devuelve la línea viva a la cifra de la ronda anterior y el test tiene que ponerse en rojo; (5) **la deriva se busca, no se supone**: en cada ronda se comparan una por una las publicaciones de la cifra contra la fuente, porque un script de propagación que dice «OK» no prueba que la línea viva haya quedado actualizada |
 
 **Formato de commit real** (verificá con `git log` antes de cada uno, la convención migró varias veces):
 

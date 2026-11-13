@@ -30,6 +30,10 @@
  *   solicitud que no existe hace fallar la verificacion, y una solicitud que
  *   no invoca ningun bloque tambien (es un pedido que nadie pidio).
  *
+ * - Que las CINCO decisiones del owner estan ESCRITAS en el procedimiento del
+ *   canal de `fecha_terminacion`, y que la S-22 este CERRADA. Una decision
+ *   que no esta escrita no esta tomada (PROMPT.md 5.41).
+ *
  * NADA DE ESTO TOCA EL DOCUMENTO REAL: todas las pruebas trabajan sobre una
  * COPIA en un directorio temporal.
  */
@@ -57,6 +61,40 @@ const MAPA_REAL = path.resolve(
 
 /** La tabla de solicitudes real. */
 const RUTA_SOLICITUDES_REAL = RUTA_SOLICITUDES;
+
+/**
+ * El procedimiento del canal de `fecha_terminacion`, relativo a este test.
+ *
+ * Es el documento donde el owner escribio las cinco decisiones que la S-22
+ * pedia. Si el procedimiento vuelve a quedar sin ellas, la solicitud esta
+ * cerrada y la decision no: eso es un verde falso.
+ */
+const RUTA_PROCEDIMIENTO = path.resolve(
+  __dirname, '..', '..', '..', 'docs', 'gestion-humana', 'firma-electronica',
+  'procedimiento-canal-fecha-terminacion-2026-10-31.md'
+);
+
+/**
+ * El documento de la S-23: el pedido al abogado para que valide el
+ * procedimiento del canal. Va aparte del escrito de S-01 a S-04 porque no
+ * pide una determinacion sino una validacion.
+ */
+const RUTA_SOLICITUD23 = path.resolve(
+  __dirname, '..', '..', '..', 'docs', 'gestion-humana', 'firma-electronica',
+  'solicitud-al-abogado-validacion-procedimiento-2026-11-13.md'
+);
+
+/**
+ * El CONTEXT, relativo a este test.
+ *
+ * Es el documento que se lee antes de tocar nada, y publica la cifra vigente
+ * de solicitudes en su linea viva (la que describe la META). Un guard que
+ * busca la cifra en TODO el documento se satisface con una entrada
+ * historica: asi es como la linea viva pudo quedar vieja sin que nadie lo
+ * viera. Por eso el guard de esta ronda busca la LINEA, no cualquier
+ * coincidencia.
+ */
+const RUTA_CONTEXT = path.resolve(__dirname, '..', '..', '..', 'CONTEXT.md');
 
 /**
  * Copia el mapa a un directorio temporal para poder romperlo sin tocar el
@@ -210,15 +248,17 @@ test('todos los bloques declaran su origen', () => {
 
 // ---------------------------------------------------------------- solicitudes
 
-test('la tabla de solicitudes declara 21 filas, todas EMITIDA, y el mapa las nombra todas', () => {
+test('la tabla de solicitudes declara 24 filas: 23 EMITIDA y 1 CERRADA, y el mapa las nombra todas', () => {
   const texto = fs.readFileSync(RUTA_SOLICITUDES_REAL, 'utf8');
   const ps = _parsearSolicitudes(texto);
   assert.equal(ps.errores.length, 0, 'la tabla de solicitudes no tiene errores: ' + ps.errores.join('; '));
-  assert.equal(ps.solicitudes.length, 21, 'hay 21 solicitudes');
+  assert.equal(ps.solicitudes.length, 24, 'hay 24 solicitudes');
   const estados = {};
   for (const s of ps.solicitudes) estados[s.estado] = (estados[s.estado] || 0) + 1;
-  assert.equal(estados.EMITIDA, 21, 'las 21 estan EMITIDA');
-  assert.equal(estados.RESPONDIDA || 0, 0, 'ninguna esta respondida todavia');
+  assert.equal(estados.EMITIDA, 23, 'las 23 que nadie ha respondido estan EMITIDA');
+  assert.equal(estados.CERRADA, 1, 'la S-22, respondida y aplicada, esta CERRADA');
+  assert.equal(estados.RESPONDIDA || 0, 0, 'ninguna quedo en RESPONDIDA: la que se respondio se aplico y se verifico');
+  assert.equal(estados.PREPARADA || 0, 0, 'ninguna quedo PREPARADA: las 24 salieron');
 
   // Cada bloque que dice "CERRADO. Solicitud S-XX" tiene que invocar una
   // solicitud que exista.
@@ -232,7 +272,28 @@ test('la tabla de solicitudes declara 21 filas, todas EMITIDA, y el mapa las nom
     }
     if (b.solicitudes.length) conSolicitud++;
   }
-  assert.equal(conSolicitud, 21, 'los 21 bloques cerrados por solicitud invocan su fila');
+  assert.equal(conSolicitud, 22, 'los 22 bloques cerrados por solicitud invocan su fila');
+});
+
+test('la S-23 pide al abogado la validacion del procedimiento, y el documento de ese pedido existe', () => {
+  const texto = fs.readFileSync(RUTA_SOLICITUDES_REAL, 'utf8');
+  const ps = _parsearSolicitudes(texto);
+  const s23 = ps.solicitudes.filter((s) => s.id === 'S-23')[0];
+  assert.ok(s23, 'la tabla tiene la fila S-23');
+  assert.equal(s23.estado, 'EMITIDA', 'la S-23 esta EMITIDA: el escrito todavia no sale');
+  assert.equal(s23.bloque, 'M.31', 'la S-23 es del bloque M.31');
+
+  // El pedido de la S-23 tiene su propio documento, y ese documento declara el
+  // insumo con su huella REAL: si el procedimiento cambia, el escrito que se
+  // envia declara una huella vieja y hay que volver a medirlo.
+  assert.ok(fs.existsSync(RUTA_SOLICITUD23), 'existe el documento de la S-23');
+  const doc = fs.readFileSync(RUTA_SOLICITUD23, 'utf8');
+  assert.ok(doc.indexOf('5a817b38b504aa1f14cb63e41ff87607d8873587a45235704d318e529131e04e') >= 0,
+    'el documento de la S-23 declara la huella del procedimiento que se envia');
+  const proc = fs.readFileSync(RUTA_PROCEDIMIENTO);
+  const real = require('crypto').createHash('sha256').update(proc).digest('hex');
+  assert.equal(real, '5a817b38b504aa1f14cb63e41ff87607d8873587a45235704d318e529131e04e',
+    'la huella declarada del procedimiento es la real: si el procedimiento cambia, el escrito se vuelve a medir');
 });
 
 test('detecta un bloque que invoca una solicitud que no existe', () => {
@@ -266,9 +327,91 @@ test('detecta una solicitud huerfana (en la tabla, pero en ningun bloque)', () =
 
 test('la frase de conciliacion nombra las solicitudes y dice que cerrado no es acto cumplido', () => {
   const texto = fs.readFileSync(MAPA_REAL, 'utf8');
-  assert.ok(texto.indexOf('Las 21 solicitudes de la tabla') >= 0,
+  assert.ok(texto.indexOf('Las 24 solicitudes de la tabla') >= 0,
     'la frase nombra las solicitudes');
   assert.ok(texto.indexOf('no que el acto este cumplido') >= 0,
     'la frase aclara que cerrado no significa acto cumplido');
-  assert.ok(texto.indexOf('21 EMITIDA') >= 0, 'la frase dice cuantas hay emitidas');
+  assert.ok(texto.indexOf('23 EMITIDA') >= 0, 'la frase dice cuantas hay emitidas');
+  assert.ok(texto.indexOf('1 CERRADA') >= 0, 'la frase dice cuantas hay cerradas');
+});
+
+test('las cinco decisiones del owner estan escritas en el procedimiento y la S-22 esta CERRADA', () => {
+  const proc = fs.readFileSync(RUTA_PROCEDIMIENTO, 'utf8');
+
+  // Las cinco decisiones: cada una lleva su marca de escrita y su fecha. Se
+  // cuenta el fragmento en ASCII puro para no depender de las tildes.
+  const marcas = proc.match(/del owner, escrita el 13-nov-2026/g) || [];
+  assert.ok(
+    marcas.length >= 5,
+    'el procedimiento tiene que declarar las cinco decisiones escritas: halladas ' + marcas.length
+  );
+
+  // Y ninguna puede seguir marcada como pendiente.
+  assert.ok(
+    proc.indexOf('operativa pendiente') < 0,
+    'el procedimiento ya no puede decir que una decision operativa sigue pendiente'
+  );
+
+  // Las anclas de las cinco decisiones: el operador (3.1), el origen de la
+  // llamada (3.2) y los dos plazos (5a y 5b).
+  assert.ok(proc.indexOf('### 3.1 ') >= 0, 'el procedimiento tiene la seccion 3.1 (quien es el operador)');
+  assert.ok(proc.indexOf('### 3.2 ') >= 0, 'el procedimiento tiene la seccion 3.2 (el origen de la llamada)');
+  assert.ok(proc.indexOf('X-Admin-Actor') >= 0, 'la decision del operador dice quien queda nombrado');
+  assert.ok(proc.indexOf('(a): el plazo') >= 0, 'el procedimiento tiene el plazo maximo de espera (5a)');
+  assert.ok(proc.indexOf('(b): la frecuencia') >= 0, 'el procedimiento tiene la frecuencia de revision (5b)');
+  assert.ok(proc.indexOf('Treinta (30)') >= 0, 'el plazo maximo de espera esta escrito con su numero');
+
+  // La guia de aceptacion de la evidencia va como Anexo A, con los cuatro
+  // datos minimos y un ejemplo.
+  assert.ok(proc.indexOf('## Anexo A.') >= 0, 'el procedimiento tiene el Anexo A de la guia de aceptacion');
+  assert.ok(proc.indexOf('cuatro datos') >= 0, 'la guia de aceptacion declara los cuatro datos minimos');
+
+  // Y la S-22 esta cerrada en la tabla: respuesta aplicada y verificada.
+  const tabla = fs.readFileSync(RUTA_SOLICITUDES_REAL, 'utf8');
+  const ps = _parsearSolicitudes(tabla);
+  const s22 = ps.solicitudes.filter((s) => s.id === 'S-22')[0];
+  assert.ok(s22, 'la tabla tiene la fila S-22');
+  assert.equal(s22.estado, 'CERRADA', 'la S-22 esta CERRADA: el owner respondio y se aplico');
+});
+
+test('la S-24 registra la firma del owner sobre el procedimiento, y el procedimiento la nombra', () => {
+  const tabla = fs.readFileSync(RUTA_SOLICITUDES_REAL, 'utf8');
+  const ps = _parsearSolicitudes(tabla);
+  const s24 = ps.solicitudes.filter((s) => s.id === 'S-24')[0];
+  assert.ok(s24, 'la tabla tiene la fila S-24');
+  assert.equal(s24.estado, 'EMITIDA', 'la S-24 esta EMITIDA: la firma todavia no esta');
+  assert.equal(s24.bloque, 'M.31', 'la S-24 es del bloque M.31');
+
+  // El procedimiento declara el estado que genera la fila: si el encabezado
+  // dijera que ya esta firmado, la S-24 seria una fila de papel.
+  const proc = fs.readFileSync(RUTA_PROCEDIMIENTO, 'utf8');
+  assert.ok(proc.indexOf('pendiente de firma del owner') >= 0,
+    'el procedimiento declara que falta la firma del owner');
+});
+
+test('la linea viva del CONTEXT publica la cifra vigente de solicitudes', () => {
+  // La cifra sale de la tabla, que es la fuente de la verdad: asi el guard no
+  // hay que tocarlo cada vez que el conteo se mueve.
+  const tabla = fs.readFileSync(RUTA_SOLICITUDES_REAL, 'utf8');
+  const ps = _parsearSolicitudes(tabla);
+  const estados = {};
+  for (const s of ps.solicitudes) estados[s.estado] = (estados[s.estado] || 0) + 1;
+  const total = ps.solicitudes.length;
+  const emitidas = estados.EMITIDA || 0;
+  const cerradas = estados.CERRADA || 0;
+
+  // Se busca la LINEA VIVA (la que describe la META, la que se lee antes de
+  // tocar nada), no cualquier coincidencia del documento: un guard que busca
+  // en todo el archivo se satisface con una entrada historica, y asi es como
+  // la linea viva quedo vieja (22 solicitudes: 21 EMITIDA y 1 CERRADA) sin que
+  // nadie lo viera, con la tabla ya en 23.
+  const ctx = fs.readFileSync(RUTA_CONTEXT, 'utf8');
+  const marca = ctx.indexOf('**La META (el documento que hay que leer antes de tocar nada).**');
+  assert.ok(marca >= 0, 'el CONTEXT describe la META');
+  const tramo = ctx.slice(marca, marca + 2500);
+  const vigente = '**' + total + ' solicitudes: ' + emitidas + ' `EMITIDA` y ' + cerradas + ' `CERRADA`**';
+  assert.ok(tramo.indexOf(vigente) >= 0,
+    'la linea viva de la META publica la cifra de la tabla: ' + vigente);
+  assert.ok(ctx.indexOf('**22 solicitudes: 21 `EMITIDA` y 1 `CERRADA**') < 0,
+    'el CONTEXT ya no publica la cifra de la ronda anterior');
 });

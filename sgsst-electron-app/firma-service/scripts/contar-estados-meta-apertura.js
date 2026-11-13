@@ -25,7 +25,7 @@
  *    invoca una solicitud inexistente es un verde falso, y una solicitud
  *    huerfana es un pedido que nadie pidio.
  * 8. La frase de conciliacion nombra las solicitudes y su estado, para que un
- *    mapa con 30 bloques cerrados y 21 solicitudes sin responder no se lea
+ *    mapa con 31 bloques cerrados y 22 solicitudes sin responder no se lea
  *    como "listo para abrir".
  *
  * INTERFAZ
@@ -117,12 +117,19 @@ const ANCHO = 88;
 const SECCIONES = [
   { n: 1, etiqueta: '1. Bloqueos duros', requisitos: 10 },
   { n: 2, etiqueta: '2. Condiciones de apertura', requisitos: 8 },
-  // La seccion 3 tiene 12 bloques: el M.28 (la transferencia internacional que
+  // La seccion 3 tiene 13 bloques: el M.28 (la transferencia internacional que
   // abrio la decision de M.7) y los dos que destapo la determinacion legal del
   // 12-nov-2026 (M.29, la poda del destino que no miraba el hold legal, y
   // M.30, la compuerta de conservacion que se abria con la bandera sola) se
-  // sumaron ese dia.
-  { n: 3, etiqueta: '3. Deuda y riesgo', requisitos: 12 },
+  // sumaron ese dia. El 13-nov-2026 se sumo el M.31 (el procedimiento del
+  // canal de `fecha_terminacion`, que estaba redactado pero sin las cinco
+  // decisiones del owner). Ese mismo dia el owner escribio las cinco: la S-22
+  // paso a CERRADA y el bloque no cambio de estado, porque un cierre por
+  // solicitud sigue siendo un cierre por solicitud; lo que falta (la
+  // validacion del abogado) se dice en el cuerpo del bloque. Ese mismo dia se
+  // emitio la S-23: el pedido al abogado para que valide el procedimiento,
+  // que hasta entonces nunca se le habia hecho por escrito.
+  { n: 3, etiqueta: '3. Deuda y riesgo', requisitos: 13 },
 ];
 
 /** El encabezado de cada bloque: "### M.n - texto - ESTADO." */
@@ -393,7 +400,7 @@ function _armarTabla(conteo) {
  *
  * La frase dice las DOS cosas: cuantos pendientes quedan, y cuantos bloques
  * "cerrados" lo estan porque su pedido salio. Sin la segunda parte, un mapa
- * con 30 cerrados y 21 solicitudes sin responder es un verde falso.
+ * con 31 cerrados y 22 solicitudes sin responder es un verde falso.
  *
  * @param {Array} conteo
  * @param {Array} solicitudes
