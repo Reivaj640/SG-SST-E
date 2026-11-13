@@ -9997,3 +9997,92 @@ Reglas:
    marcados como **no publicados y no firmables**: la **redacción final es del abogado** y la **firma es
    del owner**. *Abrir a un cliente con un contrato que afirma un estado que el servicio ya superó es
    abrir en falso.*
+
+
+## 2026-11-12 (noche) — la revisión legal encontró dos defectos más de fondo, y los dos quedaron corregidos y medidos
+
+El agente legal del repositorio (skill `asesoria-legal-sg-sst`, **solo consulta**) revisó los cuatro
+puntos que quedaban de la mesa del abogado (L2 Circular 002/2025 y RNBD, L3 tabla supletoria de
+conservación, L6 la v1.1 del Anexo de Nube, L7 la variable inerte) y el punto nuevo que abrió la
+decisión de M.7 (L5, la transferencia internacional del respaldo, y L4, las tres adiciones a la v1.4).
+Su entregable está en `docs/gestion-humana/firma-electronica/dictamen-legal-2026-11-12-tandas-2-y-3.md`
+y en `pedido-6-backblaze-v1-4-2026-11-12.md`.
+
+**El resultado: dos defectos reales de fondo, corregidos y medidos.** La suite oficial quedo en
+**2 670 tests · 2 668 pass · 0 fail · 0 cancelled · 2 skipped** (179 archivos, `exit 0`, 360 s): los **+3**
+sobre la corrida de la tarde son las tres pruebas de la compuerta de conservacion (M.30).
+
+1. **La poda del destino no miraba el deber legal de conservación.** `deploy/backup-offsite.sh` borraba
+   por edad (`rclone delete --min-age`) sin consultar `hold_legal`, mientras que la poda **local**
+   (`backup-firma.sh`) sí lo respeta: si hay una firma con `hold_legal = 1`, no borra ninguna copia. El
+   11-nov el log de producción decía «PODA RETENIDA: hay 5 firma(s)»: retenidas **en local** y a punto
+   de borrarse **del bucket** a los 30 días. Como el bucket guarda la base **completa**, un solo hold
+   vigente basta para que ninguna copia se pueda borrar. Y el §3 del Anexo de Nube v1.3 le promete al
+   Titular que un hold «obliga a conservar sus respaldos»: el texto y el bucket decían dos cosas
+   distintas. **Corregido** con `hay_hold_legal()` y con la poda que pregunta antes de borrar; además
+   la poda dejó de tragarse su propio fallo (antes un `rclone delete` fallido se silenciaba y el log
+   decía que la poda se había hecho). **Medido en el servidor**, con el script real y un `rclone`
+   simulado que solo deja escrito qué habría borrado: **4 de 4 casos** (con hold no borra; sin hold
+   borra; sin base legible no borra; con base sin la tabla de firmas no borra). Bloque **M.29**.
+2. **La compuerta de conservación se abría con la bandera sola.** `validado_por` y `validado_at` —los
+   dos campos que guardan **quién** validó los plazos y **cuándo**— **no los leía ningún código**:
+   cambiar `aplicacion.activada` a `true` aplicaba los plazos de diez y cinco años sin que nada
+   exigiera la validación que el propio archivo dice que los precede. La compuerta era un acto de
+   disciplina humana, no un acto que la máquina pudiera auditar. **Corregido**: `_tablaActivada()` exige
+   ahora los dos campos, con **tres pruebas nuevas** (sin validación no se abre, con la validación a
+   medias tampoco, con la validación completa sí). Bloque **M.30**.
+
+**Las seis afirmaciones que el propio expediente escribió y quedaron corregidas.**
+
+- La tabla supletoria tiene **ocho** categorías, no cinco (las cinco son los registros del §8.6(b)).
+- La regla `CUSTODIA_20_ANOS` **sigue en el código**: lo que se retiró fue su aplicación automática
+  como plazo por defecto.
+- El §8.6 **no** tiene un «compromiso contractual de 20 años»: los 20 años son el **piso legal** desde
+  el cese.
+- «La Circular 002/2025 no aplica» era demasiado amplia: no aplica al canal de correo (transmisión) y
+  **sí** al segundo supuesto, la transferencia del software a la Empresa.
+- «Bajo la v1.1 no se trató dato alguno» **no se sostiene**: hubo una firma electrónica completada el
+  06-nov, dentro de la ventana en que la v1.1 era la única versión suscribida. Lo que corresponde es
+  **declarar** ese tratamiento, no negarlo.
+- La ficha publicada **ya** declara el control incondicional; los tres documentos internos que lo
+  trataban como interruptor son el manifiesto, la migración 031 y un comentario obsoleto de
+  `publicFlow.js` (este último ya corregido; los otros dos, por decisión, quedan explicados).
+
+**Y el punto que abrió la decisión de M.7 quedó encuadrado.** La copia del respaldo a Backblaze B2 es
+**transmisión internacional** (Encargado a Encargado), no transferencia: la prohibición del art. 26 no
+se activa porque los Estados Unidos figuran en el numeral 3.2 del Título V de la Circular Única, y el
+art. 24.2 del Decreto 1377 exonera de informar y de consentir al Titular porque existe contrato en los
+términos del art. 25. **Ninguna de las cuatro vías** que se evaluaron era la vía. Y la **región del
+bucket es condición de esa declaración**: Backblaze también guarda los archivos del cliente en Canadá y
+en Países Bajos, que **no** están en la lista de nivel adecuado, así que el bucket debe crearse en la
+región United States.
+
+**Las ocho reglas de esta ronda.**
+
+1. **Una revisión legal se aplica, no se archiva.** Un dictamen que encuentra dos defectos de código
+   y seis afirmaciones falsas en el expediente no sirve si no corrige el código y los documentos. Los
+   dos defectos quedaron corregidos **y medidos**; las seis afirmaciones, corregidas en los documentos
+   vivos.
+2. **La revisión legal mira el código, no solo los textos.** Los dos defectos encontrados —la poda y la
+   compuerta— estaban en código que nadie había mirado con esa pregunta. *El texto decía una cosa y el
+   código otra: eso es un falso verde con forma de línea de código.*
+3. **Un script que sobrescribe lo que no debe, no se puede usar para «regenerar» nada.**
+   `scripts/armar-paquete-abogado.js` se usó en esta ronda para regenerar el manifiesto de sumas del
+   paquete del abogado y **copió cuatro adjuntos desde su origen encima de los adjuntos ya
+   sincronizados**: el paquete dejó de ser el que se le envió al abogado. Se restauraron los cuatro con
+   `git checkout` y el manifiesto de sumas se regeneró **a mano**, con el mismo formato, cambiando solo la
+   línea del archivo editado. *Un script que reconstruye el paquete tiene que avisar antes de escribir.*
+4. **El EOL de un archivo no se toca ni de paso.** `CONTEXT.md` es MIXTO (2 343 CRLF y 2 768 CR): todos
+   los parches de esta ronda se hicieron **por bytes**, nunca con la herramienta de edición, y el perfil
+   se comprobó al final: idéntico.
+5. **Una decisión que abre un punto nuevo se anota como bloque propio, no escondida.** La transferencia
+   internacional es el bloque **M.28**, con lo que ya está medido y lo que falta (que es del abogado).
+6. **Las cifras de un mapa se propagan a mano y se comprueban con el script.** El mapa pasó a **30
+   bloques: 9 cerrados y 21 pendientes**, y la cifra se propagó a `CONTEXT.md`, al guion de cierre y al
+   documento de decisiones de fondo, distinguiendo siempre la foto histórica de la cifra vigente.
+7. **Lo que un tercero tiene que hacer se escribe como de tercero, y lo que el equipo puede hacer se
+   hace.** La redacción de la cláusula del proveedor (16 cláusulas) la puede escribir el equipo; la
+   determinación y la firma, no.
+8. **Un texto literal para pegar se entrega literal, con su aviso de estilo.** El texto de las tres
+   adiciones a la v1.4 va en `pedido-6-backblaze-v1-4-2026-11-12.md`, con entidades con nombre y sin
+   tocar los textos suscritos: la v1.4 son copias nuevas.

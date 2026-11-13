@@ -9297,3 +9297,82 @@ encendió ninguna compuerta. No se firmó nada: la T8, el A4 y la v1.4 los firma
 depende antes de la redacción del abogado. No se tocó `legal/` ni `sitio/`: los textos publicados siguen
 siendo los mismos, y los candidatos viven fuera del paquete. No se tocaron los textos ya suscritos. Y no
 se borró nada del servidor.
+
+## Ronda 14 — 12-nov-2026 (noche): el agente legal resolvió los puntos que quedaban, y su respuesta
+destapó dos defectos más de fondo que quedaron corregidos y medidos
+
+### 1. Qué se pidió
+
+El owner chargeó dos encargos en la misma jornada: «quiero que soluciones los 7 puntos de decisiones de
+fondo, tomas las decisiones tu que mejor queden para cerrarlas» y, después, «utiliza al agente legal para
+que lo resuelva», con el informe del agente legal en modo asesoría (puntos L1 a L7) como insumo. La
+ronda 13 cerró las siete decisiones; esta ronda es la que **usa al agente legal** para lo que quedaba.
+
+### 2. Qué hizo el agente legal
+
+Dos workers con la skill `asesoria-legal-sg-sst` del repositorio (**solo consulta**: no edita archivos ni
+ejecuta comandos sobre el repo), que trabajaron en paralelo y con la base normativa verificada en
+fuente oficial el 12-nov-2026:
+
+- **L5 + L4** (transferencia internacional del respaldo y las tres adiciones a la v1.4).
+- **L2 + L3 + L6 + L7** (Circular 002/2025 y RNBD, tabla supletoria de conservación, la v1.1 del Anexo de
+  Nube y la variable inerte).
+
+Los dos entregables quedaron en el repositorio:
+`docs/gestion-humana/firma-electronica/dictamen-legal-2026-11-12-tandas-2-y-3.md` y
+`docs/gestion-humana/firma-electronica/pedido-6-backblaze-v1-4-2026-11-12.md` (este ultimo con el texto
+**literal** de las tres adiciones para la v1.4 y el esquema de 16 clausulas para el contrato con el
+proveedor).
+
+### 3. Los dos defectos de fondo que su respuesta destapo, y que quedaron corregidos
+
+**M.29 — La poda del destino no miraba el deber legal de conservacion.** `deploy/backup-offsite.sh`
+borraba por edad sin consultar `hold_legal`, mientras que la poda local si lo respeta: el destino
+conservaba **menos** que la copia local, y el §3 del Anexo de Nube v1.3 le promete al Titular que un
+hold «obliga a conservar sus respaldos». Corregido con `hay_hold_legal()` y con la poda que pregunta
+antes de borrar (ademas, la poda dejo de tragarse su propio fallo). **Medido en el servidor** con el
+script real y un `rclone` simulado: **4 de 4 casos**.
+
+**M.30 — La compuerta de conservacion se abria con la bandera sola.** `validado_por` y `validado_at` no
+los leia ningun codigo, de modo que abrirla no exigia la validacion que el propio archivo dice que la
+precede. Corregido: `_tablaActivada()` exige los dos campos, con **tres pruebas nuevas**.
+
+### 4. Las seis afirmaciones del expediente que su respuesta corrigio
+
+Ocho categorias (no cinco) en la tabla supletoria; la regla `CUSTODIA_20_ANOS` sigue en el codigo (lo que
+se retiro fue su aplicacion automatica); el §8.6 no tiene un «compromiso contractual de 20 anos» (son
+el piso legal desde el cese); «la Circular 002/2025 no aplica» era demasiado amplia (no aplica al canal
+de correo y si al segundo supuesto); «bajo la v1.1 no se trato dato alguno» no se sostiene (hubo una firma
+electronica completada el 06-nov); y la ficha publicada ya declaraba el control incondicional, de modo
+que los tres documentos internos que lo trataban como interruptor son los que había que corregir.
+
+### 5. Lo que quedo pedido al abogado
+
+La nota al abogado paso de **cinco** a **seis** puntos. El punto 6 es el nuevo: la determinacion del
+respaldo en Backblaze B2. Y la determinacion **cambio de forma**: el encuadre es **transmision
+internacional** (Encargado a Encargado), no transferencia, porque los Estados Unidos figuran en el numeral
+3.2 del Titulo V de la Circular Unica (nivel adecuado de proteccion) y el art. 24.2 del Decreto 1377
+exonera de informar y de consentir al Titular. **Ninguna de las cuatro vias** que se evaluaron era la via.
+Una condicion operativa nueva: el bucket debe crearse en la **region United States**, porque Backblaze
+tambien guarda los archivos del cliente en Canada y en Paises Bajos, que no estan en esa lista.
+
+### 6. Estado al cierre de la ronda
+
+- **Mapa de la meta: 30 bloques, 9 cerrados / 21 pendientes** (tabla regenerada por script, idempotente).
+  Los dos bloques nuevos (M.29 y M.30) los **cerró el equipo** en la misma ronda.
+- **Cuadro canonico: 77 cerrados / 19 pendientes** de 96 (sin cambios).
+- **Paquete del abogado: 14 de 14 sumas** verificadas; el manifiesto se regenero a mano, cambiando solo
+  la linea del archivo editado. El `nota-al-abogado-2026-10-30.md` esta **fuera** del manifiesto por
+  diseno.
+- **Manifiesto**: el del repositorio `d9b59699…c9097b`, el de produccion `191c08b8…a4013f`, con la
+  diferencia de **dos notas** declarada en el expediente. **No se toco** el manifiesto legal.
+- **Suite oficial: 2 670 tests · 2 668 pass · 0 fail · 0 cancelled · 2 skipped** (179 archivos de
+  prueba, `exit 0`, 360 s, Node 22). Los **+3** sobre la corrida de la tarde son las **tres pruebas nuevas
+  de la compuerta de conservacion** (M.30).
+
+### 7. Lo que NO se hizo en esta ronda
+
+No se commiteo ni se pusheo nada mas alla del commit de la ronda. No se desplego: no hay `sudo`. No se
+encendio ninguna compuerta. No se firmo nada. No se toco `legal/` ni `sitio/`: los textos publicados
+siguen siendo los mismos, y el texto para la v1.4 se entrega como **copia nueva** en el pedido 6. No se
+tocaron los textos ya suscritos. Y no se borro nada del servidor.

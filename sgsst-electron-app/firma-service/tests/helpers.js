@@ -1001,13 +1001,27 @@ async function capturarLogs(fn) {
  * con la compuerta abierta. Este helper la arma a partir de la real, sin
  * tocar el archivo: el archivo es la fuente legal y los tests no lo modifican.
  *
+ * LA VALIDACION TAMBIEN SE INYECTA (12-nov-2026)
+ * ---------------------------------------------
+ * La compuerta no se abre solo con `activada: true`: desde el 12-nov-2026 el
+ * codigo exige ademas `validado_por` y `validado_at`, que son la constancia de
+ * que un abogado matriulado valido los plazos. Si este helper solo abriera la
+ * bandera, la compuerta seguiria cerrada y los tests del mecanismo probarian
+ * nada. Por eso inyecta tambien una validacion FICTICIA, propia de los tests:
+ * lo que se prueba aqui es el mecanismo de la tabla, no la validacion de
+ * sus plazos (que es un acto del abogado, no del codigo).
+ *
  * @returns {object} la tabla con `aplicacion.activada` en true
  */
 function tablaConservacionActivada() {
   const retencion = require('../src/services/retencion');
   const base = retencion.tablaConservacion();
   return Object.assign({}, base, {
-    aplicacion: Object.assign({}, base.aplicacion, { activada: true }),
+    aplicacion: Object.assign({}, base.aplicacion, {
+      activada: true,
+      validado_por: 'PRUEBA automatica: validacion ficticia para verificar el mecanismo de la tabla',
+      validado_at: '2026-11-12T00:00:00.000Z',
+    }),
   });
 }
 

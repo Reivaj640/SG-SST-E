@@ -1111,12 +1111,12 @@ La medicion vigente es la del **2026-11-12** (corrida final sobre el arbol de tr
 ronda, ya con el arbol de dependencias nuevo y los 41 tests nuevos que trajo):
 
 ```
-tests 2667 | pass 2665 | fail 0 | skipped 2
+tests 2670 | pass 2668 | fail 0 | skipped 2
 ```
 
 Medido con **Node 22.23.4** (ABI 127) en el PC de trabajo, con `better-sqlite3` 11.10.0
 recompilado para ese ABI: 317 s. Los 2 `skipped` son los que ya estaban asi el 11-nov.
-**Actualizada el 12-nov-2026 (tarde):** la corrida dio **2 667 / 2 665 / 0 / 2** (362 s, 179
+**Actualizada el 12-nov-2026 (tarde):** la corrida dio **2 670 / 2 668 / 0 / 2** (360 s, 179
 archivos, `exit 0`). Los **+2** son las dos pruebas de regresion del manifiesto que se
 agregaron con la correccion del defecto que empujaba la firma del texto vigente a
 `versiones_firmadas` (ver §7.1).
@@ -1124,7 +1124,7 @@ agregaron con la correccion del defecto que empujaba la firma del texto vigente 
 La medicion anterior (12-nov-2026, antes del cambio de dependencias) fue
 `tests 2606 | pass 2604 | fail 0 | skipped 2`, en 415 s; la de antes (11-nov-2026) fue
 `tests 2574 | pass 2572 | fail 0 | skipped 2`, en 220 s. **La diferencia son 61 pruebas nuevas**
-(2 667 - 2 606), todas en verde; el numero de la seccion 7 se queda
+(2 670 - 2 606), todas en verde; el numero de la seccion 7 se queda
 atrasado si no se actualiza, y una cifra vencida leida como vigente es un verde falso.
 
 > La reproduccion desde **clon limpio** esta medida y registrada en
@@ -1135,7 +1135,7 @@ atrasado si no se actualiza, y una cifra vencida leida como vigente es un verde 
 > los 2 665 nombres de prueba identico** al de la corrida de ese momento. El clon quedo **byte a byte**
 > igual al arbol del owner (4 810 archivos, 0 diferentes). El 6.11 del cuadro canonico quedo
 > **CERRADO** por esto. **Ojo con las dos cifras:** la del clon es la de `e4dd5f31`, que es
-> **anterior** a las dos pruebas de regresion del manifiesto; el arbol de hoy da **2 667 / 2 665**.
+> **anterior** a las dos pruebas de regresion del manifiesto; el arbol de hoy da **2 670 / 2 668**.
 > Compararlas como si fueran la misma corrida seria un error de lectura.
 
 > **El EOL de este archivo esta fijado por su test.** Si lo abres en un editor que normalice a

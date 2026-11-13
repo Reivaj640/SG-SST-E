@@ -26,7 +26,7 @@ El paquete tiene **catorce (14) adjuntos**. El primero es su propia revisión; l
 | 06 | **Auditoría del Capítulo V** — los dos hallazgos T1 y T2 | `06-auditoria-capitulo-v-t1-t2.md` | `sgsst-electron-app/docs/gestion-humana/firma-electronica/auditoria-capitulo-v-acuerdo-uso-2026-10-19.md` | 16 675 | `0b407184917b4da1bcd9f07e6b94e2afd27f4d037d1a426f37476a5f4361e654` |
 | 07 | **Evaluación del canal de correo** — antecedente del 27-oct, superado | `07-evaluacion-canal-correo.md` | `sgsst-electron-app/docs/gestion-humana/firma-electronica/evaluacion-canal-correo-2026-10-27.md` | 17 165 | `9aa3cad83fe48abceb003488aa62ccbea82c43d7c299058bdc8b5a4e8153041b` |
 | 08 | **Su especificación del 30-oct-2026**, tal como se recibió | `08-especificacion-abogado-2026-10-30.md` | `sgsst-electron-app/docs/gestion-humana/firma-electronica/especificacion-abogado-2026-10-30.md` | 10 947 | `6e6d3f4a3aba229ab3b38d9e8a96f3ab6ae733b3dea518899d07fcd47ab0d47e` |
-| 09 | **Respuesta a su checklist de cierre** — los 96 requisitos con su evidencia | `09-respuesta-al-checklist-de-cierre.md` | `sgsst-electron-app/docs/gestion-humana/firma-electronica/respuesta-checklist-cierre-2026-10-30.md` | 192 150 | `19fb933540c74ef5f83a904ade2392fdf79bc15e7816daaf04b3c13b419f8aef` |
+| 09 | **Respuesta a su checklist de cierre** — los 96 requisitos con su evidencia | `09-respuesta-al-checklist-de-cierre.md` | `sgsst-electron-app/docs/gestion-humana/firma-electronica/respuesta-checklist-cierre-2026-10-30.md` | 192 150 | `d6c6dfccc0b827f36dbf18c1618b73263083248ca643fb5b26a63b57654ff9d4` |
 | 10 | **Informe de correcciones para revisión jurídica** — el detalle punto por punto | `10-informe-correcciones-para-asesor-juridico.md` | `sgsst-electron-app/docs/gestion-humana/firma-electronica/paquete-abogado-2026-10-30/10-informe-correcciones-para-asesor-juridico.md` | 54 086 | `1fd392082001dee9fa2be0704aed0852aecf551714a98b8000f158e403d634f5` |
 | 11 | **Checklist definitivo de revisión jurídica y cierre** | `11-checklist-definitivo-revision-juridica-y-cierre.md` | `sgsst-electron-app/docs/gestion-humana/firma-electronica/paquete-abogado-2026-10-30/11-checklist-definitivo-revision-juridica-y-cierre.md` | 44 632 | `c3c45a46772e07568fc691dcad3561625332449a28c2fda3857e7f1be1e7f90f` |
 | 12 | **Procedimiento escrito de incidentes de datos de salud** — RNBD, 15 días hábiles | `12-procedimiento-incidentes-datos-salud.md` | `sgsst-electron-app/docs/gestion-humana/firma-electronica/procedimiento-incidentes-datos-salud-2026-10-30.md` | 29 197 | `9e5ae201cdb00944f5d902ed3c226c099559589e60f05dc7950438bfe4e8b142` |
@@ -244,12 +244,13 @@ lectura.** Lo que encontró, y que el abogado debe ver porque su checklist lo pi
 
 Lo que **no** se hizo en esa verificación: no se reinició, no se desplegó, no se migró, y el
 servidor quedó sin un solo byte modificado.
-## 3.bis Quinta vuelta (12-nov-2026): los cinco puntos concretos que se le piden ahora
+## 3.bis Quinta vuelta (12-nov-2026): los seis puntos concretos que se le piden ahora
 
 Los catorce adjuntos de este paquete son los del 30-oct-2026 y no se han rearmado: se rearman cuando
-usted devuelva su respuesta y el texto que de ahí salga tenga su versión y su huella. Pero **cinco cosas
+usted devuelva su respuesta y el texto que de ahí salga tenga su versión y su huella. Pero **seis cosas
 cambiaron después** y no pueden esperar a esa vuelta, porque son las que tienen plazo de terceros. Van
-primero, con el insumo ya medido para que usted no tenga que medir.
+primero, con el insumo ya medido para que usted no tenga que medir. **El punto 6 es nuevo** y nació de una
+decisión técnica del 12-nov-2026: la del destino del respaldo fuera del servidor.
 
 **1. Ratificar J6 — el papel de Google en el canal de correo.** El dictamen del 11-nov-2026 (apartados 2.3
 y 5) ya determinó que Google es **Responsable** respecto de los datos de la cuenta del administrador y de
@@ -307,11 +308,106 @@ instrumento bilateral más reciente.
 histórico**: **no se contrafirma retroactivamente**, porque contrafirmar un acto que no ocurrió sería
 fabricarlo, y porque la v1.1 no describe el texto vigente (la v1.3 es el vigente, suscrito y contrafirmado).
 La v1.1 **no se borra ni se reescribe**: sigue en el manifiesto, en `versiones_firmadas`, con su huella y su
-evidencia. Se le pide **su confirmación** de esa decisión.
+evidencia. Se le pide **su confirmacion** de esa decision.
+> **Un dato que corrige una premisa del encargo (12-nov-2026):** la afirmacion «bajo la v1.1 no se trato dato
+> alguno» **no se sostiene**. La base de produccion registra `SIGN-2026-738564` (06-nov, **SIGNED**) y
+> `SIGN-2026-016820` (06-nov, CANCELLED), y la v1.1 era en esas fechas la unica version del Anexo de Nube
+> suscrita por la Empresa (la v1.3 no se publico hasta el 11-nov). Lo que corresponde es **declarar** que
+> ese tratamiento se ejecuto por K+AIR **como Encargado**, conforme al Acuerdo y a la version suscrita, y no
+> **negarlo**. Queda pendiente una comprobacion de solo lectura (acto del owner, no bloquea): que version y
+> que huella del Anexo de Nube registran las cinco filas de firma de produccion.
+
+**6. Determinar la transferencia internacional del respaldo y el papel de Backblaze B2 (punto nuevo,
+nacido de la decisión de M.7).** El 12-nov-2026 el owner delegó la toma de las decisiones de fondo y el
+equipo decidió que la copia de los respaldos fuera del servidor vaya a un **bucket S3-compatible de
+Backblaze B2** (que está en EE. UU.), alcanzada con `rclone`, con **retención de 30 días**; se descartó
+Drive de Google porque es el proveedor del canal de correo. **Esa decisión abrió un punto que el
+expediente no tenía**, y por eso se le pide.
+
+**Lo que el equipo ya midió, para que usted no tenga que medirlo:** lo que sale del servidor son
+archivos `.enc` **cifrados con GPG simétrico AES256**; la **frase de cifrado nunca sale**
+(`backup.passphrase`, 600 root); el script **verifica por SHA-256** que la copia llegó entera y **no
+borra nunca la copia local**; el destino **no ve texto claro**; y el **nombre de los archivos no
+identifica a ninguna Empresa ni a ningún Titular** (`firma-AAAAmmdd-HHMMSS.sqlite.enc`). Y lo que
+**no** está resuelto: la cuenta y el bucket **todavía no existen** (es un acto del owner), y el Anexo
+vigente afirma que «el cifrado en reposo del disco no está implementado», que es una cosa distinta del
+respaldo que sale cifrado, pero **no puede quedar así, en el mismo expediente, con dos verdades**.
+
+**La lectura del equipo, que le pedimos que ratifique o corrija** (dictamen del 12-nov-2026, con la
+base normativa verificada en fuente oficial ese día):
+
+1. **Sí es una salida de datos personales al exterior, y debe declararse como tal.** Que los `.enc`
+   vayan cifrados no cambia la naturaleza del dato: sigue siendo dato personal bajo control de
+   K+AIR, y el cifrado es una **medida de seguridad** (art. 4(h) y 18(b) de la Ley 1581 de 2012), no
+   una exención. Lo que sí hace el cifrado es lo que hay que defender por escrito: **el destino no
+   puede leer los archivos**, y lo que el proveedor podría entregar, si se lo exigieran, es texto
+   cifrado.
+2. **La vía no es ninguna de las cuatro que se evaluaron, y esa es la determinación.** Los Estados
+   Unidos de América figuran en el **numeral 3.2 del Título V de la Circular Única** de la SIC, que
+   reconoce **nivel adecuado de protección**; por eso **la prohibición del art. 26 de la Ley 1581 no
+   se activa** y no hace falta ninguna de sus excepciones (ni autorización del Titular, ni la
+   excepción del art. 26(e), ni la declaración de conformidad de la SIC). Y, calificada como
+   **transmisión internacional** (Encargado → Encargado), el **art. 24.2 del Decreto 1377 de 2013**
+   exonera de informar y de consentir al Titular, porque existe contrato en los términos del
+   **art. 25** —que el Anexo de Encargo del 12-nov-2026, ya suscrito y contrafirmado, cumple.
+3. **Backblaze es subencargado** (Encargado del Encargado) y debe entrar en la **lista de proveedores
+   y subencargados**: en el texto vigente, esa lista está en el **§4 del Anexo de Nube** y en el
+   **§5 del Anexo de Encargo**. *(El §11 del Anexo de Nube es «Referencias normativas», no la lista:
+   esa referencia estaba equivocada en el encargo y ya se corrigió en el expediente.)*
+4. **Hacen falta dos contratos con papeles distintos:** el **Anexo de Encargo** (Empresa ↔ K+AIR), que
+   ya existe y ya cumple el contenido mínimo del art. 25; y el **instrumento con Backblaze**
+   (K+AIR ↔ Backblaze), que es el que la cláusula de subencargados del §4 del Anexo de Encargo exige
+   para que el subencargado sea admisible, y que debe replicar ese contenido mínimo.
+
+**Las cuatro preguntas que quedan, entonces, son estas** (las del encargo cambiaron de forma cuando
+se leyó la norma):
+
+(a) ¿Califica usted la operación como **transmisión internacional** —Encargado a Encargado— o como
+**transferencia** (si Backblaze llegara a calificar como Responsable)? *La conclusión del equipo es
+que es transmisión; si usted la califica de otro modo, cambia el texto del Anexo.*
+(b) ¿Ratifica la **vía** —nivel adecuado de protección (num. 3.2) más el art. 24.2 del Decreto 1377 y
+el contrato del art. 25— y, con ello, que **no** se pide autorización del Titular ni declaración de
+conformidad de la SIC?
+(c) ¿Qué **instrumento** debe firmarse con Backblaze y con qué cláusulas? El equipo tiene un esquema
+de 16 cláusulas (partes y rol, objeto y categorías de datos, las tres obligaciones del art. 25,
+medidas de seguridad, custodia de la clave y no acceso al texto claro, ubicación y subencargados,
+subencargados, incidentes, devolución y supresión, auditoría, instrucciones documentadas,
+confidencialidad, responsabilidad, derecho aplicable, terminación, vigencia), para que usted lo
+revise y lo convierta en redacción.
+(d) ¿Cómo se concilia la frase del Anexo sobre el cifrado en reposo? La v1.4 debe nombrar los **tres
+objetos distintos**: el **disco del servidor**, sin cifrar (verificado el 31-oct-2026); los
+**archivos de respaldo**, cifrados; y la **copia que sale del servidor**, cifrada y **pendiente de
+existir** hasta que el owner abra la cuenta y se verifique la primera copia.
+
+**Dos advertencias operativas que el equipo discovered y que condicionan la redacción:**
+
+- **La región del bucket es condición de la declaración.** Backblaze almacena los archivos del
+  cliente en centros de datos de Estados Unidos, pero también en **CA-East (Canadá)** y
+  **EU-Central (Países Bajos)**. **El bucket debe crearse en la región United States**: si quedara en
+  Canadá o en Países Bajos, el destino **dejaría de estar en la lista de países con nivel adecuado de
+  protección** y toda la determinación de arriba cambiaría. Como la región es fija y el bucket se
+  crea una vez, esto hay que decidirlo antes de crearlo.
+- **El equipo ya corrigió un defecto que el dictamen encontró:** la poda del destino borraba por edad
+  sin mirar el deber legal de conservación, mientras que la poda local sí lo respeta. El 12-nov-2026
+  el equipo lo corrigió y lo probó en el servidor (4 de 4 casos). **Por eso la v1.4 ya puede afirmar
+  que el destino respeta el `hold`**; sin esa corrección, no podía.
+
+**Qué se le entrega de vuelta:** la **redacción de la cláusula del proveedor** (fila de la tabla del
+§4 del Anexo de Nube v1.4 y del §5 del Encargo nuevo, con el párrafo del §3 sobre los respaldos),
+la **entrada de Backblaze en la lista de proveedores**, y el **dictamen sobre las cuatro preguntas**.
+El texto literal de las adiciones, con las tres piezas ya redactadas en HTML y el esquema de las 16
+cláusulas, está en el documento que acompaña esta nota:
+`docs/gestion-humana/firma-electronica/pedido-6-backblaze-v1-4-2026-11-12.md`.
+
+**Y una nota de método, para que el tiempo no se pierda:** la copia off-site **no se activa** hasta
+que existan el bucket y su llave **y** quede por escrito el resultado de esta determinación. El motivo
+no es prudencia de forma: una vez que hay una copia de datos personales en el exterior, **retirarla
+después no la deshace** — el proveedor ya tuvo los bytes. Hoy que no hay copia, esta determinación sale
+**antes** de que exista el hecho.
 
 **Lo que NO se le pide.** No se le pide firmar el Anexo de Nube ni el de Encargo: esas suscripciones
 corresponden a las partes. No se le pide habilitar ninguna compuerta. No se le pide certificar hechos
-técnicos que no haya verificado. Y no se le pide nada fuera de los cinco puntos anteriores.
+técnicos que no haya verificado. Y no se le pide nada fuera de los seis puntos anteriores.
 
 ## 4. Revisión solicitada
 

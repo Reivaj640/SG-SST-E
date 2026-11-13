@@ -2,7 +2,7 @@
 
 > **Qué es este documento.** La pregunta que lo motivó fue «¿está lista para producción?». La
 > respuesta corta es: **lista para operar, no abierta**. Lo que separa una cosa de la otra son
-> veintisiete puntos concretos, y este documento los lista **con su estado, su evidencia y quién lo
+> veintiocho puntos concretos, y este documento los lista **con su estado, su evidencia y quién lo
 > tiene**.
 >
 > **Cómo se lee.** Cada bloque dice una cosa, con la evidencia que lo sostiene. El estado va en la
@@ -14,7 +14,7 @@
 >
 > **Medido el 2026-11-12**, contra el servicio desplegado, no contra una copia.
 >
-> **Alcance.** Estos veintisiete puntos son los que separan «el servicio funciona» de «una empresa real
+> **Alcance.** Estos veintiocho puntos son los que separan «el servicio funciona» de «una empresa real
 > puede firmar». Los que están fuera de este mapa (los 96 requisitos del cuadro de cierre del 30-oct)
 > se verificaron aparte y se dejaron en
 > `docs/gestion-humana/firma-electronica/verificacion-cierre/`.
@@ -200,18 +200,47 @@ la tabla y los plazos de 10 y 5 anos. El catalogo legado de 20 anos desde la fir
 con la precedencia del 8.6(a).
 
 **Decisión tomada (12-nov-2026).** La compuerta **sigue cerrada**, y esa es la decision. Al abogado se le
-entrega la tabla **ya alineada** (cinco categorias, plazos de 10 y 5 anos, y la correccion de que el
-catalogo legado de 20 anos esta retirado del codigo). Si la validacion procede, la apertura es un acto
-del owner **despues**, en el orden que el bloque ya declara: **validar, alinear, reejecutar las pruebas,
-abrir**. El paso de reejecutar las pruebas no es opcional: abrir la compuerta cambia el comportamiento del
-servicio. Detalle en `decisiones-de-fondo-2026-11-12.md`, bloque M.6.
+entrega la tabla **ya alineada** (ocho categorias, plazos de 10 y 5 anos). Si la validacion procede, la
+apertura es un acto del owner **despues**, en el orden que el bloque ya declara: **validar, alinear,
+reejecutar las pruebas, abrir**. El paso de reejecutar las pruebas no es opcional: abrir la compuerta
+cambia el comportamiento del servicio. Detalle en `decisiones-de-fondo-2026-11-12.md`, bloque M.6.
+
+**Lo que la determinacion legal del 12-nov-2026 corrigio en este bloque (M.6).** Tres cosas, todas
+verificadas contra el codigo y contra la tabla:
+
+1. **La tabla tiene OCHO categorias, no cinco.** Las cinco son los registros del SG-SST del literal (b) del
+   §8.6; la tabla supletoria tiene ocho filas con cinco plazos distintos. La validacion debe cubrir las ocho.
+2. **La regla `CUSTODIA_20_ANOS` sigue en el codigo**: lo que se retiro fue su **aplicacion automatica como
+   plazo por defecto** (el planificador ya no la usa). Por eso el fondo del punto (el catalogo no manda
+   sobre la precedencia del §8.6(a)) se sostiene, y la frase «ya esta retirado del codigo» no.
+3. **El §8.6 no contiene un «compromiso contractual de 20 anos»**: los 20 anos son el **piso legal** desde
+   el cese (art. 2.2.4.6.13 del Decreto 1072). La compatibilidad con los plazos de 10 y 5 anos es **total**,
+   porque el codigo toma siempre la fecha mas lejana y la tabla de la Empresa no puede bajar el piso.
+
+**Y cuatro condiciones que la validacion debe cubrir** (la determinacion las propone y el abogado ratifica
+o corrige): **C1**, el plazo del registro de operaciones debe seguir al del documento asociado cuando este
+tenga piso legal o hold sin termino (si no, el documento conservado queda sin el asiento que acredita
+quien lo firmo); **C2**, el computo debe ser en **anos calendario** o el texto debe corregirse (los plazos se
+calculan en dias: 3650 dias son 2 o 3 dias menos que diez anos calendario, y 1825 son 1 dia menos que
+cinco si el periodo incluye un 29 de febrero — el texto al Trabajador dice «10 anos (3650 dias)» y el piso
+legal si se calcula en anos, y no pueden quedar dos verdades en el mismo mensaje); **C3**, el piso legal no
+puede ser bajado por la tabla de la Empresa; **C4**, la fecha de cese la informa y valida la Empresa por
+escrito.
+
+**Y un defecto que la determinacion destapo y que ya quedo corregido (M.30):** `validado_por` y
+`validado_at` **no los leia ningun codigo**, de modo que la compuerta se podia abrir con la bandera sola,
+sin que nada exigiera la validacion que el propio archivo dice que la precede. Ahora `_tablaActivada()`
+exige los dos campos, con tres pruebas que fijan las tres formas (sin validacion, a medias, completa).
 
 **Evidencia.** `sgsst-electron-app/firma-service/config/tabla-conservacion.json` ->
 `aplicacion.activada = false`; `10-informe-correcciones-para-asesor-juridico.md`, fila J8 (PENDIENTE:
 el catalogo legado no esta alineado y la compuerta sigue cerrada porque depende de su validacion).
 
-**Qué falta.** La validacion juridica de la tabla y de los plazos, y despues la decision de abrirla. Abrir
-antes aplicaria plazos que nadie ha validado.
+**Qué falta.** La validacion juridica de la tabla y de los plazos **con las condiciones C1 a C4**, su
+incorporacion a la tabla (con `validado_por`, `validado_at`, `estado` y `condiciones`, y `activada` en
+`false`), la reejecucion de las pruebas y, solo despues, la decision de abrirla. Abrir antes aplicaria
+plazos que nadie ha validado. **Lo que ya no hace falta**: que la maquina separe el acto de la validacion,
+porque desde el 12-nov-2026 la compuerta **no se abre sin la validacion escrita en el archivo** (M.30).
 
 **Quién lo tiene.** El abogado (valida) y el owner (abre).
 
@@ -233,6 +262,14 @@ correo**: una cuenta comprometida se llevaria el correo y los respaldos juntos. 
 B por pareja diaria, 20,5 MB a 30 dias) y van **cifrados**: el destino no ve texto claro. Detalle en
 `decision-respaldo-offsite-2026-11-12.md` y en `decisiones-de-fondo-2026-11-12.md`, bloque M.7.
 
+**Lo que esta decision abrio.** Por decidir un destino **fuera del pais** (Backblaze B2 esta en EE. UU.)
+aparecio un punto que el mapa **no tenia**: la copia de los respaldos puede ser una **transferencia
+internacional** de datos personales (art. 26 de la Ley 1581 de 2012 y art. 24 del Decreto 1377 de 2013), y
+Backblaze puede quedar como **subencargado** que debe entrar en la lista de proveedores del **§4** del
+Anexo de Nube y del **§5** del Anexo de Encargo (el **§11** del Anexo de Nube es «Referencias normativas»:
+la referencia estaba equivocada y ya se corrigio en el expediente). Ese punto es **M.28**, en la seccion 3,
+y es **acto del abogado**: el equipo puede
+preparar el insumo medido, pero **no puede emitir esa determinacion**.
 **Defecto real corregido.** La rama `rclone` de `deploy/backup-offsite.sh` comparaba la huella del destino
 con `rclone hash`, **un comando que no existe** (medido con las dos versiones reales: la de `apt` 1.60.1 y
 la 1.76.0): el metodo `rclone` **nunca podia dar una copia por buena**. Ahora la huella del destino se
@@ -245,13 +282,39 @@ storage, **todos en el mismo disco**; `tail -1 backups/backup.log`: «Backup OK:
 firma-20261111-220001.sqlite.enc (164714 B, sha256 de14e3f4b..., integrity ok, cifrado gpg)».
 
 **Qué falta.** Que exista **una copia real verificada** en el destino: abrir la cuenta y crear el bucket con
-su llave, ejecutar la activacion con `sudo` y guardar `backup.passphrase` en otro sitio. El ensayo uso un
-remoto local y **no prueba** credenciales, permisos, region ni endpoint. Riesgo escrito: la poda del
-destino **no conoce `hold_legal`**, y las 5 firmas con deber legal se conservarian localmente pero su copia
-en el bucket se borraria a los 30 dias.
+su llave **en la region United States**, ejecutar la activacion con `sudo` y guardar `backup.passphrase` en
+otro sitio (en custodia colombiana, **fuera del servidor y fuera del bucket**). El ensayo uso un remoto local
+y **no prueba** credenciales, permisos, region ni endpoint. Y, por el destino en el exterior, **la
+determinacion legal de M.28**: la ratificacion del abogado sobre el encuadre, el papel de Backblaze y el
+instrumento que exige el art. 25 del Decreto 1377. La **activacion queda
+condicionada** a esa determinacion (decision del 12-nov-2026): una vez que hay una copia de datos
+personales en el exterior, **retirarla despues no la deshace** — el proveedor ya tuvo los bytes. Hoy que
+no hay copia, la determinacion sale **antes** de que exista el hecho.
 
-**Quién lo tiene.** El owner (el destino, las credenciales y la activacion); el equipo (la instalacion y la
-prueba, ya hechas).
+**Lo que la determinacion legal del 12-nov-2026 ya resolvio, y lo que por eso hay que hacer distinto:**
+
+- **El encuadre.** No es «transferencia» sino **transmision internacional** (Encargado a Encargado): la
+  prohibicion del art. 26 **no se activa**, porque los Estados Unidos de America figuran en el numeral 3.2
+  del Titulo V de la Circular Unica de la SIC (nivel adecuado de proteccion), y el art. 24.2 del Decreto
+  1377 exonera de informar y de consentir al Titular porque existe contrato en los terminos del art. 25 —
+  que el Anexo de Encargo del 12-nov ya cumple. **Ninguna de las cuatro vias** que se evaluaron (autorizacion
+  del Titular, art. 26(e), declaracion de conformidad, clausulas modelo) es la via: las clausulas modelo de
+  la Circular Externa 003/2025 son **facultativas** y aqui serian un plus, no un requisito.
+- **La region del bucket es condicion de esa declaracion.** Backblaze guarda los archivos del cliente tambien
+  en CA-East (Canada) y EU-Central (Paises Bajos), y **Canada y Paises Bajos no estan** en la lista del numeral
+  3.2. **El bucket debe crearse en la region United States**, y como la region es fija y el bucket se crea
+  una vez, eso se decide **antes** de crearlo.
+- **La poda del destino ya respeta el deber legal de conservacion.** Antes la borraba por edad sin mirar
+  `hold_legal`, y el destino conservaba **menos** que la copia local: el bloque **M.29** quedo corregido y
+  probado en el servidor el 12-nov-2026 (4 de 4 casos). Por eso la v1.4 ya puede afirmar que el destino
+  respeta el `hold`.
+- **Lo que queda del punto de tercero** es la ratificacion del abogado, el instrumento con Backblaze y la
+  redaccion de la clausula del proveedor: el texto literal de esa redaccion esta en
+  `pedido-6-backblaze-v1-4-2026-11-12.md`, que es el documento que acompana al **punto 6** de la nota al
+  abogado.
+
+**Quién lo tiene.** El owner (el destino, las credenciales y la activacion); el abogado (la determinacion
+de M.28); el equipo (la instalacion y la prueba, ya hechas).
 
 ### M.8 - El 📦1051 no esta desplegado: produccion corre las dependencias vulnerables — PENDIENTE
 
@@ -1027,6 +1090,110 @@ produccion**; lo que se corrige es la prosa. **El despliegue es lo que restablec
 
 **Quién lo tiene.** —
 
+### M.28 - El destino del respaldo abre una transferencia internacional que no estaba en el mapa — PENDIENTE
+
+**Origen.** La decision de M.7 (12-nov-2026): el destino del respaldo fuera del servidor.
+
+**Qué se verificó.** Al decidir el destino del respaldo se eligio **Backblaze B2**, que esta en
+**EE. UU.**, y eso **abrio un punto que el mapa no tenia**: (1) si copiar a un proveedor en el exterior
+es una **transferencia internacional** (art. 26 de la Ley 1581 de 2012 y art. 24 del Decreto 1377 de 2013)
+y por que via se encuadra (autorizacion del Titular, transferencia necesaria para un contrato con el
+Titular, declaracion de conformidad de la SIC o clausulas modelo); (2) si Backblaze es un
+**subencargado** que debe entrar en la lista de proveedores del **§4** del Anexo de Nube y del
+**§5** del Anexo de Encargo (el **§11** del Anexo de Nube es «Referencias normativas», no la lista);
+(3) que contrato exige el **art. 25**
+del Decreto 1377 y con que clausulas minimas; (4) como se concilia con que el Anexo vigente dice que
+«el cifrado en reposo del disco no esta implementado», que es una cosa distinta del respaldo que sale
+cifrado, pero no puede quedar asi, en el mismo expediente, con dos verdades.
+
+Lo que **si** esta medido: lo que sale del servidor son archivos `.enc` **cifrados con GPG simetrico
+AES256**; la **frase de cifrado nunca sale** (`backup.passphrase`, 600 root); el script **verifica por
+SHA-256** que la copia llego entera y **no borra nunca la copia local**; el destino **no ve texto claro**.
+El bucket **todavia no existe**: crear la cuenta y el bucket es un acto del owner.
+
+**Evidencia.** `decision-respaldo-offsite-2026-11-12.md` (el destino y el script, con su validacion);
+el informe del agente legal del 12-nov-2026, punto L5 de la mesa del abogado.
+
+**Qué falta.** La determinacion escrita del abogado sobre las cuatro preguntas, la redaccion de la
+clausula con el proveedor en el §4 de la v1.4 y en el §5 del Encargo nuevo, la entrada de Backblaze en la
+lista de proveedores, y el contrato con las clausulas minimas del art. 25. Y una condicion operativa que el
+dictamen del 12-nov-2026 anade: el bucket debe crearse en la **region United States** de Backblaze, porque
+si queda en CA-East (Canada) o en EU-Central (Paises Bajos), el destino deja de estar en la lista de paises con
+nivel adecuado de proteccion y toda la determinacion cambia. Es un **acto de tercero**: el equipo puede
+preparar el insumo, pero **no puede emitir esa determinacion**.
+
+**Quién lo tiene.** El abogado (la determinacion y la redaccion) y el owner (el contrato y la cuenta).
+
+### M.29 - La poda del respaldo en el destino no miraba el deber legal de conservacion — CERRADO
+
+**Origen.** La determinacion legal del 12-nov-2026 (punto L5) y la lectura de `deploy/backup-offsite.sh`.
+
+**Que se verifico.** La poda del destino borraba por edad y sin preguntar: `rclone delete --min-age
+"${RETENCION_DIAS}d"`. La poda **local** (`deploy/backup-firma.sh`) si lo hace: consulta
+`SELECT COUNT(*) FROM gh_firmas_electronicas WHERE COALESCE(hold_legal,0)=1` y, si hay alguno, no
+borra ninguna copia. El 11-nov el log de produccion decia «PODA RETENIDA: hay 5 firma(s) con deber
+legal de conservacion (hold_legal=1)»: las cinco firmas con deber legal estaban **retenidas en local**
+y se habrian borrado **del bucket** a los 30 dias.
+
+El bucket guarda la base **completa** (no una copia por Empresa), asi que un solo hold vigente basta
+para que ninguna copia se pueda borrar: todas las copias contienen ese registro. Y el Anexo de Nube
+v1.3 le promete al Titular que un deber legal de conservacion «obliga a conservar sus respaldos» (su
+§3). Con la poda como estaba, el texto y el bucket decian dos cosas distintas: exactamente el defecto
+que el §3.4(d) de la Ley 1581 (veracidad) no admite.
+
+**Defecto real corregido.** `deploy/backup-offsite.sh` ahora trae `hay_hold_legal()` y `podar_destino()`
+pregunta antes de borrar. Ademas, la poda **deja de tragarse su propio fallo**: antes, un `rclone
+delete` que fallaba (permisos, red) se silenciaba con `>/dev/null 2>&1` y el log decia que la poda se
+habia hecho; ahora el fallo se escribe y el script sale con codigo 1, sin tocar la copia local.
+
+**Como se valido.** Con el script **real** en el servidor, en un sandbox de `/tmp`, y con un `rclone`
+**simulado** que deja escrito que habria borrado (no se borro nada de verdad, porque todavia no hay
+bucket): **4 de 4 casos** correctos. (1) con `hold_legal=1` NO se invoco `rclone delete`; (2) sin
+hold SI se invoco, con la retencion de 30 dias; (3) sin base legible NO se invoco; (4) con una base sin
+la tabla de firmas NO se invoco. La duda no autoriza a borrar. Se ejecuto en el servidor, con `bash` y
+`sqlite3` reales.
+
+**Evidencia.** `deploy/backup-offsite.sh` (`hay_hold_legal`, `podar_destino`); `deploy/backup-firma.sh`
+(la poda local, que ya lo hacia); `legal/anexo-nube-v1.3.html` (el §3 que lo promete al Titular); la
+salida de la prueba, en el servidor.
+
+**Que falta.** Nada: quedo corregido, medido y con su prueba.
+
+**Quien lo tiene.** —
+
+### M.30 - La compuerta de conservacion se abria con la bandera sola: la validacion escrita no la exigia nadie — CERRADO
+
+**Origen.** La determinacion legal del 12-nov-2026 (punto L3).
+
+**Que se verifico.** La tabla supletoria declara su propia activacion (`aplicacion.activada`) y el codigo
+la leia: `_tablaActivada()` devolvia `true` con solo que `activada` valiera `true`. Pero
+`validado_por` y `validado_at` —los dos campos que guardan **quien** valido los plazos de diez (10) y
+cinco (5) anos y **cuando**— **no los leia ningun codigo**: el respaldo congelado en el propio codigo
+tambien los trae en `null`. En los hechos la compuerta era un acto de disciplina humana: cambiar
+`activada` a `true` aplicaba los plazos de la tabla **sin que nada exigiera la validacion que el
+archivo mismo dice que los precede**.
+
+**Defecto real corregido.** `src/services/retencion.js`: `_tablaActivada()` exige ahora `validado_por`
+**y** `validado_at`. Sin los dos, la compuerta **no** se abre, por mucho que la bandera diga que si. Es
+el cambio minimo que hace que la maquina sea fiel a lo que el texto promete, y evita el falso verde:
+un archivo con `activada: true` y sin validacion aplicaba los plazos de categorias que nadie habia
+validado.
+
+**Como se valido.** Con **tres pruebas nuevas** que fijan las tres formas que importan: sin validacion
+(no se abre), con la validacion a medias (no se abre) y con la validacion completa (si se abre). El
+helper de pruebas (`tests/helpers.js`) inyecta una validacion **ficticia**, porque lo que se prueba es
+el mecanismo de la tabla y no la validacion de sus plazos (que es un acto del abogado). El area de
+conservacion: **24 de 24**.
+
+**Evidencia.** `src/services/retencion.js` (`_tablaActivada`); `tests/services/conservacion-supletoria.test.js`
+(los tres casos); `tests/helpers.js` (`tablaConservacionActivada`).
+
+**Que falta.** Nada: quedo corregido y con prueba. **Lo que sigue igual** es un acto del owner y del
+abogado, y no cambia: la **validacion** de los plazos (M.6) y la apertura de la compuerta. Lo que
+cambio es que **la apertura ahora exige la validacion escrita en el archivo**, no solo la decision.
+
+**Quien lo tiene.** —
+
 ---
 
 ## La tabla
@@ -1035,10 +1202,10 @@ produccion**; lo que se corrige es la prosa. **El despliegue es lo que restablec
 |---|---|---|---|---|
 | 1. Bloqueos duros | 0 | 10 | 0 | 10 |
 | 2. Condiciones de apertura | 2 | 6 | 0 | 8 |
-| 3. Deuda y riesgo | 5 | 4 | 0 | 9 |
-| **TOTAL** | **7** | **20** | **0** | **27** |
+| 3. Deuda y riesgo | 7 | 5 | 0 | 12 |
+| **TOTAL** | **9** | **21** | **0** | **30** |
 
-Los 20 pendientes concilian: 10 del bloque 1 + 6 del bloque 2 + 4 del bloque 3 = 20.
+Los 21 pendientes concilian: 10 del bloque 1 + 6 del bloque 2 + 5 del bloque 3 = 21.
 
 ---
 
@@ -1052,7 +1219,7 @@ Esto se midio el 12-nov-2026 y **no** es un bloqueante:
 - El **Acuerdo v1.6 esta publicado**, y el Anexo de Nube v1.3 y el Anexo de Encargo 2026-11-11
   estan **suscritos y contrafirmados**, con sus actas.
 - El sitio publico sirve **exactamente** las huellas suscribidas (6 URLs comprobadas).
-- La **suite** del servicio: **2 667 tests, 2 665 pass, 0 fail, 2 skipped** (corrida final del 12-nov
+- La **suite** del servicio: **2 670 tests, 2 668 pass, 0 fail, 2 skipped** (corrida final del 12-nov
   por la tarde, 179 archivos de prueba, `exit 0`), y **vinculada a un commit**: el 12-nov por la
   manana se corrio tambien desde un clon limpio del commit `e4dd5f31` y dio el mismo resultado que
   la corrida de esa manana (2 665 / 2 663 / 0 / 2, mismo conjunto de nombres de prueba, clon byte a

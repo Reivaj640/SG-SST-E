@@ -1370,16 +1370,22 @@ function maskEmail(email) {
  *     firma.
  *   - El OTP va a un medio PERSONAL que declara el propio Trabajador.
  *
- * EL RECHAZO (D2) Y CUÁNDO SE ACTIVA
- * ---------------------------------
- * El rechazo (400 con el texto del 3.7(a) al lado) está en el código, pero
- * **APAGADO** (`FIRMA_EXIGIR_MEDIO_PERSONAL_OTP`, default false). Se enciende
- * cuando exista la 9A (la firma en papel): sin esa salida, exigir un medio
- * personal sería una barrera de acceso al empleo (el 2.2.1.1.11).
+ * EL RECHAZO (D2): SIEMPRE ACTIVO
+ * --------------------------------
+ * El rechazo del código OTP hacia un buzón que la Empresa pueda leer NO
+ * depende de ninguna variable de entorno: es incondicional desde la v1.2 del
+ * Acuerdo (27-oct-2026). `FIRMA_EXIGIR_MEDIO_PERSONAL_OTP` se conserva inerte
+ * y su valor no lo usa ninguna decisión; antes de la v1.2 ese interruptor
+ * decidía si el rechazo era un 400 o solo un `logger.warn`, y con él apagado
+ * el texto prometía un registro que no existía.
  *
- * Mientras tanto, cada caso en el que el OTP va a (o pasaría por) un buzón
- * corporativo queda en el log como WARN, que es de donde sale el número del
- * inventario.
+ * El control y su asiento (`OTP_MEDIO_CORPORATIVO` en `gh_firma_eventos`,
+ * append-only) están en `_controlarMedioCorporativo`.
+ *
+ * (Este bloque estaba obsoleto: decía que el rechazo estaba «APAGADO» y que
+ * se encendía con la 9A. Corregido el 12-nov-2026, con el dictamen legal de
+ * esa fecha: un texto que presenta como interruptor lo que no lo es induce a
+ * error sobre un estado que no existe.)
  *
  * @param {object} signRequest
  * @param {string} [medioDeclarado] - el medio que declaró el Trabajador

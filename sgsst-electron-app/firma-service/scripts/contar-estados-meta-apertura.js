@@ -81,7 +81,12 @@ const ANCHO = 88;
 const SECCIONES = [
   { n: 1, etiqueta: '1. Bloqueos duros', requisitos: 10 },
   { n: 2, etiqueta: '2. Condiciones de apertura', requisitos: 8 },
-  { n: 3, etiqueta: '3. Deuda y riesgo', requisitos: 9 },
+  // La seccion 3 tiene 12 bloques: el M.28 (la transferencia internacional que
+  // abrio la decision de M.7) y los dos que destapo la determinacion legal del
+  // 12-nov-2026 (M.29, la poda del destino que no miraba el hold legal, y
+  // M.30, la compuerta de conservacion que se abria con la bandera sola) se
+  // sumaron ese dia.
+  { n: 3, etiqueta: '3. Deuda y riesgo', requisitos: 12 },
 ];
 
 /** El encabezado de cada bloque: "### M.n - texto - ESTADO." */

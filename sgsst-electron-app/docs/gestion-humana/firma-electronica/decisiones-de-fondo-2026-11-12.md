@@ -18,13 +18,13 @@
 |---|---|---|---|---|
 | M.5 | Papel de Google y Circular 002/2025 | Se pide la determinacion escrita al abogado, con los datos ya medidos | **PARCIALMENTE** | El abogado (determinar) y el owner (gestionar) |
 | M.6 | Tabla supletoria de conservacion | La compuerta sigue cerrada; la tabla se entrega al abogado para validar | **PARCIALMENTE** | El abogado (validar) y el owner (abrir, despues) |
-| M.7 | Respaldo fuera del servidor | Destino decidido: bucket S3-compatible (Backblaze B2) con `rclone`, retencion 30 dias | **PARCIALMENTE** | El owner (cuenta, bucket y activacion) |
+| M.7 | Respaldo fuera del servidor | Destino decidido: bucket S3-compatible (Backblaze B2) con `rclone`, retencion 30 dias; la activacion queda condicionada a la determinacion legal (M.28) | **PARCIALMENTE** | El owner (cuenta, bucket y activacion) y el abogado (la determinacion) |
 | M.14 | Ventana para Node 22 | La ventana se puede hacer y esta scrita con su rollback; se da el verificador | **PARCIALMENTE** | El owner (la ventana) |
 | M.15 | La v1.1 suscrita y sin contrafirma | Queda como registro historico: **no** se contrafirma retroactivamente | **CERRADO** | Nadie (la ratificacion se pide, pero no bloquea) |
 | M.18 | Los dos anexos ya suscritos contradicen la realidad | Se reemite ahora: Anexo de Nube v1.4 + el Encargo que la remite | **PARCIALMENTE** | El abogado (redaccion) y el owner (firmas) |
 | M.20 | `FIRMA_EXIGIR_MEDIO_PERSONAL_OTP` | Se conserva **inerte**: no es un interruptor y ningun documento puede tratarla como tal | **CERRADO** | Nadie |
 
-**Resultado en el mapa:** de 27 bloques, **7 cerrados y 20 pendientes** (antes de esta ronda: 5 y 22).
+**Resultado en el mapa:** de 30 bloques, **9 cerrados y 21 pendientes** (antes de esta ronda: 5 y 23).
 
 ## 2. La regla con que se clasifica cada bloque
 
@@ -68,7 +68,7 @@ medido hoy.
 sigue en `false` y `validado_por` en `null`; abrirla antes de la validacion juridica aplicaria plazos que
 nadie ha(validado.
 
-Al abogado se le entrega la tabla **ya alineada**: cinco categorias, plazos de 10 y 5 anos, y la correccion
+Al abogado se le entrega la tabla **ya alineada**: ocho categorias, plazos de 10 y 5 anos, y la correccion
 de que el catalogo legado de 20 anos esta retirado del codigo. La apertura, si procede, es un acto del owner
 **despues** de la validacion, en el orden que el propio bloque declara: **validar, alinear, reejecutar las
 pruebas, abrir**. El paso de «reejecutar las pruebas» no es opcional: abrir la compuerta cambia el
@@ -113,6 +113,34 @@ owner tiene esas credenciales), ejecutar la activacion con `sudo`, y — esto es
 legal se conservarian localmente, pero su copia en el bucket se borraria a los 30 dias. M.7 **sigue pendiente
 hasta que exista una copia real verificada** en el destino: el ensayo uso un remoto local y no prueba
 credenciales, permisos, region ni endpoint.
+
+**Lo que la determinacion legal del 12-nov-2026 ya resolvio.** El encuadre **no es «transferencia»** sino
+**transmision internacional** (Encargado a Encargado): la prohibicion del art. 26 de la Ley 1581 **no se
+activa**, porque los Estados Unidos figuran en el numeral 3.2 del Titulo V de la Circular Unica de la SIC
+(nivel adecuado de proteccion), y el art. 24.2 del Decreto 1377 exonera de informar y de consentir al Titular
+porque existe contrato en los terminos del art. 25, que el Anexo de Encargo del 12-nov ya cumple. **Ninguna
+de las cuatro vias** que se evaluaron es la via: las clausulas modelo de la Circular Externa 003/2025 son
+facultativas y aqui serian un plus, no un requisito. Y **la poda del destino ya respeta el deber legal de
+conservacion**: antes la borraba por edad sin mirar `hold_legal` y el destino conservaba menos que la copia
+local; **corregido y probado en el servidor el 12-nov-2026** (4 de 4 casos, bloque **M.29** del mapa).
+
+**Lo que esta decision abrio (M.28).** Elegir un destino **fuera del pais** (Backblaze B2 esta en EE. UU.)
+abrio un punto que el mapa **no tenia**: la copia de los respaldos puede ser una **transferencia
+internacional** de datos personales (art. 26 de la Ley 1581 de 2012 y art. 24 del Decreto 1377 de 2013), y
+Backblaze puede quedar como **subencargado** que debe entrar en la lista de proveedores del **§11** del
+Anexo de Nube. Ese punto es **M.28**, en la seccion 3 del mapa, y es **acto del abogado**: el equipo puede
+preparar el insumo medido, pero **no puede emitir esa determinacion**. El pedido, con las cuatro
+preguntas, es el **punto 6** de la nota al abogado.
+
+**Decision sobre la activacion.** La copia off-site **no se activa** hasta que existan el bucket y su llave
+**en la region United States** (la condicion que el dictamen del 12-nov-2026 hizo depender de la determinacion:
+Backblaze tambien guarda los archivos del cliente en Canada y en Paises Bajos, y esos paises no estan en la
+lista de nivel adecuado de proteccion)
+**y** quede por escrito el resultado de esa determinacion. El motivo no es prudencia de forma: una vez que
+hay una copia de datos personales en el exterior, **retirarla despues no la deshace** — el proveedor ya
+tuvo los bytes. Hoy que no hay copia, la determinacion sale **antes** de que exista el hecho. Lo que si
+esta resuelto y medido es que la copia sale **cifrada** (GPG simetrico AES256), que la **frase de cifrado
+nunca sale** del servidor (`backup.passphrase`, 600 root) y que el destino **no ve texto claro**.
 
 Detalle completo, con los comandos literales: `decision-respaldo-offsite-2026-11-12.md`.
 

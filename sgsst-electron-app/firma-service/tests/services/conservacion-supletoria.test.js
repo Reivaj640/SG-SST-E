@@ -62,7 +62,14 @@ const TABLA_ACTIVADA = tablaConservacionActivada();
 // para el código).
 const TABLA_MODIFICADA = {
   version: 'test-modificada',
-  aplicacion: { activada: true, estado: 'PROPUESTA' },
+  aplicacion: {
+    activada: true,
+    estado: 'PROPUESTA',
+    // La compuerta exige la validacion escrita (12-nov-2026): sin estos dos
+    // campos NO se abre, por mucho que `activada` diga que si.
+    validado_por: 'PRUEBA automatica: validacion ficticia',
+    validado_at: '2026-11-12T00:00:00.000Z',
+  },
   categorias: [
     { id: 'DOCUMENTO_FIRMADO', plazo_dias: 1000, punto_inicio: 'fecha_firma', piso_legal: false, hold_siempre: false },
     { id: 'SST_ESPECIAL', plazo_dias: 7305, punto_inicio: 'fecha_cese', piso_legal: true, hold_siempre: false },
@@ -492,6 +499,80 @@ test('la tabla que se despacha viene con la compuerta CERRADA', () => {
   assert.equal(tabla.aplicacion.activada, false,
     'los plazos de diez (10) y cinco (5) años no se activan hasta que el abogado los valide');
   assert.equal(retencion.tablaActivada(), false);
+});
+
+// LA COMPUERTA NO SE ABRE CON LA BANDERA SOLA (12-nov-2026).
+//
+// El hallazgo: `validado_por` y `validado_at` estaban en el archivo de la
+// tabla y NO los leia ningun codigo. La compuerta era, en los hechos, un acto
+// de disciplina humana: cambiar `activada` a `true` aplicaba los plazos de
+// diez (10) y cinco (5) años sin que nada exigiera la validacion que el
+// propio archivo dice que los precede.
+//
+// Aqui se fija lo contrario, y con las tres formas que importan: sin
+// validacion, con la validacion a medias, y con la validacion completa.
+test('la compuerta NO se abre con `activada: true` y sin validacion escrita', () => {
+  const sinValidacion = {
+    version: 'test-sin-validacion',
+    aplicacion: { activada: true, estado: 'VALIDADA', validado_por: null, validado_at: null },
+    categorias: TABLA_MODIFICADA.categorias,
+    mapeo_codigo: TABLA_MODIFICADA.mapeo_codigo,
+  };
+  const plan = retencion.planificar({
+    categoria_retencion: 'TABLA_EMPRESA',
+    fecha_creacion: FIRMA_BASE,
+    empresa: EMPRESA_SIN_PLAZO,
+    tabla_conservacion: sinValidacion,
+  });
+  assert.equal(plan.plazo_conservacion_fuente, 'tabla_supletoria_pendiente',
+    'sin validacion escrita, la tabla no aplica sus plazos aunque la bandera diga que si');
+  assert.equal(plan.fecha_conservacion, null,
+    'y por eso el registro queda retenido, sin fecha de supresion');
+});
+
+test('la compuerta tampoco se abre con la validacion a medias', () => {
+  const mediaValidacion = {
+    version: 'test-validacion-a-medias',
+    aplicacion: {
+      activada: true,
+      estado: 'VALIDADA',
+      validado_por: 'Abogado externo (solo el nombre)',
+      validado_at: null,
+    },
+    categorias: TABLA_MODIFICADA.categorias,
+    mapeo_codigo: TABLA_MODIFICADA.mapeo_codigo,
+  };
+  const plan = retencion.planificar({
+    categoria_retencion: 'TABLA_EMPRESA',
+    fecha_creacion: FIRMA_BASE,
+    empresa: EMPRESA_SIN_PLAZO,
+    tabla_conservacion: mediaValidacion,
+  });
+  assert.equal(plan.plazo_conservacion_fuente, 'tabla_supletoria_pendiente',
+    'la validacion esta a medias: falta la fecha, y la compuerta sigue cerrada');
+});
+
+test('la compuerta SI se abre con la validacion escrita completa', () => {
+  const conValidacion = {
+    version: 'test-validacion-completa',
+    aplicacion: {
+      activada: true,
+      estado: 'VALIDADA',
+      validado_por: 'Abogado externo (ficticio, para la prueba)',
+      validado_at: '2026-11-12T00:00:00.000Z',
+    },
+    categorias: TABLA_MODIFICADA.categorias,
+    mapeo_codigo: TABLA_MODIFICADA.mapeo_codigo,
+  };
+  const plan = retencion.planificar({
+    categoria_retencion: 'TABLA_EMPRESA',
+    fecha_creacion: FIRMA_BASE,
+    empresa: EMPRESA_SIN_PLAZO,
+    tabla_conservacion: conValidacion,
+  });
+  assert.notEqual(plan.plazo_conservacion_fuente, 'tabla_supletoria_pendiente',
+    'con la validacion escrita, la tabla aplica su plazo por defecto');
+  assert.ok(plan.fecha_conservacion, 'y el registro deja de quedar retenido sin fecha');
 });
 
 test('con la compuerta cerrada, no hay plazo por defecto: la tabla sigue sin validar', () => {

@@ -1,6 +1,6 @@
 # Guion de cierre — qué falta para abrir el servicio de firma a empresas reales
 
-> **Qué es esto.** El mapa `meta-para-abrir-a-empresas-reales-2026-11-12.md` lista los 27 puntos que
+> **Qué es esto.** El mapa `meta-para-abrir-a-empresas-reales-2026-11-12.md` lista los 30 puntos que
 > separan «el servicio funciona» de «una empresa real puede firmar». Este documento es **la parte que
 > depende de una persona**: los actos que **solo el owner** puede hacer, con el comando literal, con lo
 > que cada uno cierra y con la evidencia que hay que guardar.
@@ -311,8 +311,8 @@ gate antes y después, y el `.env` con la bandera.
 Para que nadie lo busque dos veces, esto **ya está hecho y medido** (los detalles y la evidencia están
 en el mapa y en `verificacion-cierre/`):
 
-- El **mapa de la meta** con sus 27 puntos, su tabla regenerada por script y su verificador
-  (**4 cerrados / 23 pendientes** al cierre de la 12.ª ronda).
+- El **mapa de la meta** con sus 30 puntos, su tabla regenerada por script y su verificador
+  (**4 cerrados / 23 pendientes** al cierre de la 12.ª ronda; **hoy 9 cerrados / 21 pendientes**).
 - La **reconciliación del cuadro canónico** (34 requisitos medidos; de 62 a **76 cerrados**).
 - La **medición de las 39 casillas** del §7 del `SECURITY.md`.
 - El **T6**: el caso del buzón corporativo, producido contra el código desplegado, con su asiento y

@@ -94,7 +94,7 @@ manda es el estado medido.
 - SSH, 12-nov: `systemctl is-active kair-firma` → `active`; `is-enabled` → `enabled`; `GET http://127.0.0.1:3001/health` → `{"status":"ok","db":"ok","smtp":"configured","uptime_seconds":14629}`.
 - SSH, 12-nov: `sha256sum` en disco → `acuerdo-v1.6.txt` `08e1eb8b...f13e`, `legal/anexo-nube-v1.3.html` `fdd10551...b585d`, `legal/anexo-encargo.html` `6308b1f7...b8948`. Coinciden con `legal-readiness.json:7`, `:145` y `:129`.
 - SSH, 12-nov: `sha256sum /opt/kair-firma/app/legal-readiness.json` → `191c08b837b41069de4e2d25d7158fd90a7c3ce5f93b22696d2d7050f8a4013f`, byte a byte igual al del repositorio (medido tambien en el PC). `sha256sum /opt/kair-firma/legal/constancia-aprobacion-acuerdo.html` → `aaf68b4e7df5e2757d5885840056218d97a0cbb1c9fa624bf7861962c8d0b413`.
-- Suite, registrada en el expediente: `sgsst-electron-app/docs/MIGRACION-SERVIDOR-FIRMA.md` §7 (12-nov por la tarde: **2 667 pruebas, 2 665 verdes, 0 rojas, 2 omitidas**; el 12-nov por la manana, sobre el commit `e4dd5f31`, 2 665 / 2 663) y `verificacion-cierre/t1-corrida-desde-clon-limpio.md` (tres corridas desde clon limpio, 0 fallos).
+- Suite, registrada en el expediente: `sgsst-electron-app/docs/MIGRACION-SERVIDOR-FIRMA.md` §7 (12-nov por la noche: **2 670 pruebas, 2 668 verdes, 0 rojas, 2 omitidas**; el 12-nov por la manana, sobre el commit `e4dd5f31`, 2 665 / 2 663) y `verificacion-cierre/t1-corrida-desde-clon-limpio.md` (tres corridas desde clon limpio, 0 fallos).
 
 **Que falta.** Cuatro cosas, todas con dueño, y ninguna es un problema del texto publicado. **Lo que se
 resolvio el 12-nov-2026** esta al final; lo que sigue abierto, antes:
@@ -294,6 +294,80 @@ Lo que **cambio en el codigo, en el manifiesto y en los documentos**:
 - **La variable `FIRMA_EXIGIR_MEDIO_PERSONAL_OTP` quedo declarada inerte** y tres documentos que la
   trataban como interruptor se corrigieron (`API.md` dos veces y el 4.7 del cuadro canonico).
 
+## Novedad de la noche del 12-nov-2026: el agente legal resolvio los puntos que quedaban, y su respuesta
+destapo dos defectos mas de fondo, que quedaron corregidos y medidos
+
+El owner encargo al agente legal del repositorio (skill `asesoria-legal-sg-sst`, **solo consulta**) que
+resolviera los puntos que de la mesa del abogado seguian abiertos: la **Circular Externa 002/2025 y el
+RNBD** (L2), la **tabla supletoria de conservacion** (L3), la **v1.1 del Anexo de Nube** (L6) y la
+**variable inerte** (L7), mas el punto **nuevo** que abrio la decision de M.7 (L5, la transferencia
+internacional del respaldo, y L4, las tres adiciones a la v1.4). Dos workers trabajaron en paralelo, con
+la base normativa verificada en fuente oficial el 12-nov-2026.
+
+**Los dos entregables quedaron en el repositorio:** `dictamen-legal-2026-11-12-tandas-2-y-3.md` y
+`pedido-6-backblaze-v1-4-2026-11-12.md` (este ultimo con el texto **literal** de las tres adiciones para
+la v1.4 y el esquema de 16 clausulas para el contrato con el proveedor).
+
+**Lo que su respuesta destapo y que quedo CORREGIDO en el codigo (dos defectos reales de fondo):**
+
+- **M.29 - La poda del destino no miraba el deber legal de conservacion.** `deploy/backup-offsite.sh`
+  borraba por edad (`rclone delete --min-age`) sin consultar `hold_legal`, mientras que la poda **local**
+  (`backup-firma.sh`) si lo respeta: si hay una firma con `hold_legal = 1`, no borra ninguna copia. El
+  11-nov el log de produccion decia «PODA RETENIDA: hay 5 firma(s)»: retenidas **en local** y a punto de
+  borrarse **del bucket** a los 30 dias. Como el bucket guarda la base **completa**, un solo hold vigente
+  basta para que ninguna copia se pueda borrar; y el §3 del Anexo de Nube v1.3 le promete al Titular que
+  un hold «obliga a conservar sus respaldos»: el texto y el bucket decian dos cosas distintas. Corregido
+  con `hay_hold_legal()` y con la poda que pregunta antes de borrar; ademas, la poda **dejo de tragarse su
+  propio fallo** (antes un `rclone delete` fallido se silenciaba y el log decia que la poda se habia
+  hecho). **Medido en el servidor** con el script real y un `rclone` simulado que solo deja escrito que
+  habria borrado: **4 de 4 casos** (con hold no borra; sin hold borra; sin base legible no borra; con una
+  base sin la tabla de firmas no borra). La duda no autoriza a borrar.
+- **M.30 - La compuerta de conservacion se abria con la bandera sola.** `validado_por` y `validado_at` -los
+  dos campos que guardan **quien** valido los plazos y **cuando**- **no los leia ningun codigo**: cambiar
+  `aplicacion.activada` a `true` aplicaba los plazos de diez (10) y cinco (5) anos sin que nada exigiera
+  la validacion que el propio archivo dice que los precede. La compuerta era un acto de disciplina humana,
+  no un acto que la maquina pudiera auditar. Corregido: `_tablaActivada()` exige ahora los dos campos, con
+  **tres pruebas nuevas** que fijan las tres formas (sin validacion, a medias, completa).
+
+**Y las seis afirmaciones del propio expediente que su respuesta corrigio:**
+
+- La tabla supletoria tiene **ocho** categorias, no cinco (las cinco son los registros del §8.6(b)).
+- La regla `CUSTODIA_20_ANOS` **sigue en el codigo**: lo que se retiro fue su aplicacion automatica como
+  plazo por defecto.
+- El §8.6 **no** tiene un «compromiso contractual de 20 anos»: los 20 anos son el **piso legal** desde el
+  cese (art. 2.2.4.6.13 del Decreto 1072).
+- «La Circular 002/2025 no aplica» era demasiado amplia: no aplica al **canal de correo** (transmision a
+  un Encargado) y **si** al segundo supuesto, la transferencia del software a la Empresa.
+- «Bajo la v1.1 no se trato dato alguno» **no se sostiene**: hubo una firma electronica completada el
+  06-nov, dentro de la ventana en que la v1.1 era la unica version suscrita. Lo que corresponde es
+  **declarar** ese tratamiento, no negarlo.
+- La ficha publicada **ya** declaraba el control incondicional: los tres documentos internos que lo
+  trataban como interruptor son los que habia que corregir (el manifiesto y la migracion 031 quedan
+  documentados, sin reescribir la migracion ya aplicada; el comentario obsoleto de `publicFlow.js` ya
+  quedo corregido).
+
+**Y el punto que abrio la decision de M.7 quedo encuadrado.** La copia del respaldo a Backblaze B2 es
+**transmision internacional** (Encargado a Encargado), no transferencia: la prohibicion del art. 26 de la
+Ley 1581 **no se activa**, porque los Estados Unidos figuran en el numeral 3.2 del Titulo V de la Circular
+Unica de la SIC (nivel adecuado de proteccion), y el art. 24.2 del Decreto 1377 exonera de informar y de
+consentir al Titular porque existe contrato en los terminos del art. 25, que el Anexo de Encargo del
+12-nov ya cumple. **Ninguna de las cuatro vias** que se evaluaron (autorizacion del Titular, art. 26(e),
+declaracion de conformidad, clausulas modelo) era la via: las clausulas modelo de la Circular Externa
+003/2025 son facultativas y aqui serian un plus, no un requisito. **Una condicion operativa nueva:** el
+bucket **debe crearse en la region United States**, porque Backblaze tambien guarda los archivos del
+cliente en CA-East (Canada) y EU-Central (Paises Bajos), y Canada y Paises Bajos **no** estan en la lista
+de paises con nivel adecuado de proteccion.
+
+**Lo que quedo pedido al abogado:** la nota paso de **cinco** a **seis** puntos. El punto 6 es el nuevo (el
+respaldo en Backblaze B2), con las cuatro preguntas ya reformuladas a la luz de la determinacion, el
+texto literal de las tres adiciones para la v1.4 y el esquema de las 16 clausulas. **Lo que sigue siendo
+acto del tercero:** la ratificacion, la redaccion final de la v1.4 y la firma.
+
+**Lo que NO cambio en esta ronda:** el manifiesto legal (`d9b59699…c9097b` en el repositorio,
+`191c08b8…a4013f` en produccion, con la diferencia de **dos notas** ya declarada), `legal/` y `sitio/` (los
+textos publicados siguen siendo los mismos), el cuadro canonico (77 cerrados / 19 pendientes de 96) y los
+textos ya suscritos. El mapa paso a **30 bloques: 9 cerrados y 21 pendientes**, y los dos bloques nuevos
+los **cerro el equipo** en la misma ronda.
 **Pendiente de limpieza, sin efecto sobre el servicio.** Por la politica de borrado de esta sesion no
 se pudieron eliminar los archivos temporales de la medicion: en el servidor quedan
 `/tmp/kair-gate-verify` (copia de la base de produccion, con permisos `700` puestos) y los scripts

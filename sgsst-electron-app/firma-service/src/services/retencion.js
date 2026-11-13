@@ -588,12 +588,31 @@ function tablaActivada(opts = {}) {
  * que decide cuándo se aplica un plazo es el documento que la administra, y
  * ese documento se versiona y se puede auditar.
  *
+ * LO QUE SE EXIGE ADEMAS DE `activada` (12-nov-2026)
+ * ---------------------------------------------------
+ * Antes, cambiar `activada` a `true` bastaba para aplicar los plazos de diez
+ * (10) y cinco (5) años: el archivo declara su propia activacion y el codigo
+ * la leia, sin preguntar quien la habia validado. Eso dejaba la compuerta
+ * como un acto de disciplina humana, y no como un acto que la maquina pueda
+ * auditar: `validado_por` y `validado_at` estaban en el archivo y NO los leia
+ * ningun codigo.
+ *
+ * La tabla dice que abrirla es un acto del owner *con la validacion escrita
+ * del abogado*. Ahora el codigo es fiel a esa frase: sin `validado_por` y
+ * `validado_at` la compuerta NO se abre, por mucho que `activada` diga que si.
+ * Es una linea, y evita el falso verde: un archivo con `activada: true` y sin
+ * validacion aplica el retencion por defecto de categorias que nadie ha
+ * validado.
+ *
  * @param {object|null} tabla - la tabla supletoria
  * @returns {boolean}
  */
 function _tablaActivada(tabla) {
   const aplicacion = tabla && typeof tabla.aplicacion === 'object' ? tabla.aplicacion : null;
-  return Boolean(aplicacion && aplicacion.activada === true);
+  if (!aplicacion || aplicacion.activada !== true) return false;
+  const validadoPor = typeof aplicacion.validado_por === 'string' ? aplicacion.validado_por.trim() : '';
+  const validadoAt = typeof aplicacion.validado_at === 'string' ? aplicacion.validado_at.trim() : '';
+  return validadoPor !== '' && validadoAt !== '';
 }
 
 /**

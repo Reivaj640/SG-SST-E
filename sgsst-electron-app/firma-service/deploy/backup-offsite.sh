@@ -32,6 +32,10 @@
 #    lo deja escrito en el log. La decision del destino es del owner.
 # 4. **La poda del destino solo ocurre DESPUES de una copia verificada**, y
 #    nunca borra mas copias de las que la retencion local permite.
+#    Y desde el 12-nov-2026 **respeta el hold legal**: si hay una firma con
+#    `hold_legal = 1`, no se borra ninguna copia del destino, igual que en el
+#    script local. Sin eso, el destino conservaba menos que la copia local y
+#    el Anexo de Nube le prometa al Titular al reves.
 # 5. No se escribe nada en claro: solo viajan los `.enc`.
 #
 # CONFIGURACION
@@ -224,21 +228,89 @@ copiar_y_verificar() {
 }
 
 # ---------------------------------------------------------------------------
+# EL HOLD (deber legal de conservacion) EN EL DESTINO
+# ---------------------------------------------------------------------------
+# Si una fila tiene hold_legal = 1, NO se suprime: el deber legal de
+# conservacion impide la supresion y, por lo tanto, la presencia del dato en
+# los respaldos es OBLIGATORIA, no una violacion.
+#
+# POR QUE ESTA FUNCION (12-nov-2026)
+# ----------------------------------
+# El hallazgo: la poda LOCAL (`backup-firma.sh`) respeta el hold y esta poda
+# NO. `backup-firma.sh` pregunta quantas firmas tienen `hold_legal = 1` y, si
+# hay alguna, no borra ninguna copia. Aqui se borraba por edad, sin preguntar.
+#
+# El efecto era que el destino conservaba MENOS que la copia local: con la
+# retencion de 30 dias, una copia de respaldo de un registro bajo hold se
+# borraba del bucket a los 30 dias aunque el respaldo local se conservara y
+# aunque el Anexo de Nube le prometa al Titular que un hold "obliga a
+# conservar sus respaldos". Con eso, el texto y el bucket decian dos cosas
+# distintas.
+#
+# Como el destino guarda la base COMPLETA (no una copia por Empresa), un solo
+# hold vigente basta para que NINGUNA copia se pueda borrar: todas las copias
+# contienen ese registro. Es la decision conservadora (acumular copias antes
+# que borrar una copia con un deber legal), y es la misma del script local.
+#
+# Codigos de salida: 0 = hay hold (NO podar), 1 = no hay hold (puede podar),
+# 2 = no se pudo saber (NO podar: la duda no autoriza a borrar).
+# En stdout va el conteo de holds (vacio si no se pudo saber).
+hay_hold_legal() {
+  local db="$APP/data/firma.sqlite"
+  local n
+  if [ ! -f "$db" ]; then
+    return 2
+  fi
+  n="$(sqlite3 "$db" "SELECT COUNT(*) FROM gh_firmas_electronicas WHERE COALESCE(hold_legal,0)=1;" 2>/dev/null)" || return 2
+  case "$n" in
+    ''|*[!0-9]*) return 2 ;;
+  esac
+  printf '%s' "$n"
+  if [ "$n" -gt 0 ]; then
+    return 0
+  fi
+  return 1
+}
+
+# ---------------------------------------------------------------------------
 # PODA DEL DESTINO: solo DESPUES de una copia verificada, y nunca mas de lo
 # que la retencion local permite.
 # ---------------------------------------------------------------------------
 podar_destino() {
-  case "$METODO" in
-    rclone)
-      rclone delete --min-age "${RETENCION_DIAS}d" "$REMOTO" >/dev/null 2>&1
+  local holds rc
+  holds="$(hay_hold_legal)"
+  rc=$?
+  case "$rc" in
+    0)
+      log "  PODA RETENIDA: hay $holds firma(s) con deber legal de conservacion (hold_legal=1)."
+      log "  PODA RETENIDA: no se borra ninguna copia del destino; esos datos se deben conservar."
+      return 0
       ;;
-    *)
-      ssh "${REMOTO%%:*}" \
-        "find '$REMOTO' -maxdepth 1 -name 'firma-*.sqlite.enc' -mtime +${RETENCION_DIAS} -delete; find '$REMOTO' -maxdepth 1 -name 'storage-*.tar.gz.enc' -mtime +${RETENCION_DIAS} -delete" \
-        >/dev/null 2>&1
+    2)
+      log "  PODA RETENIDA: no se pudo leer el conteo de hold; no se borra ninguna copia del destino."
+      return 0
       ;;
   esac
-  log "  Poda del destino: copias con mas de ${RETENCION_DIAS} dias (lo que la retencion local permite)."
+  case "$METODO" in
+    rclone)
+      if ! rclone delete --min-age "${RETENCION_DIAS}d" "$REMOTO" >/dev/null 2>&1; then
+        log "  AVISO: la poda del destino FALLO (rclone delete no salio con codigo 0)."
+        log "  Las copias viejas siguen en el destino; la copia local NO se toca."
+        return 1
+      fi
+      ;;
+    *)
+      if ! ssh "${REMOTO%%:*}" \
+        "find '$REMOTO' -maxdepth 1 -name 'firma-*.sqlite.enc' -mtime +${RETENCION_DIAS} -delete; find '$REMOTO' -maxdepth 1 -name 'storage-*.tar.gz.enc' -mtime +${RETENCION_DIAS} -delete" \
+        >/dev/null 2>&1; then
+        log "  AVISO: la poda del destino FALLO (el remoto no respondio)."
+        log "  Las copias viejas siguen en el destino; la copia local NO se toca."
+        return 1
+      fi
+      ;;
+  esac
+  log "  Poda del destino: copias con mas de ${RETENCION_DIAS} dias (lo que la retencion local permite, y no hay hold vigente)."
+  return 0
 }
 
 # ---------------------------------------------------------------------------
@@ -341,7 +413,10 @@ modo_copia() {
     log "COPIA OFFSITE: $copiados copiados, $fallidos con problemas. NO se poda el destino."
     return 1
   fi
-  podar_destino
+  if ! podar_destino; then
+    log "COPIA OFFSITE: $copiados archivo(s) copiados y verificados; la PODA del destino quedo pendiente o fallo."
+    return 1
+  fi
   log "COPIA OFFSITE: $copiados archivo(s) copiados y verificados."
   return 0
 }
