@@ -10113,7 +10113,7 @@ escribiendo, y los fallos que aparecen son de la **concurrencia**, no del códig
 
 **Cómo se salió de esta.** Se **detuvo** el worker, se comprobó que el `stash` seguía **intacto** (el `stash list`
 lo dijo), se restauró con `git stash pop`, se comprobó que el árbol tenía **exactamente** los diez archivos
-modificados esperados, y se corrió la suite **en solitario**: **2 683 tests, 2 681 pass, 0 fail, 2 skipped**,
+modificados esperados, y se corrió la suite **en solitario**: **2 684 tests, 2 682 pass, 0 fail, 2 skipped**,
 `exit 0`. La cifra que se publica es la de la corrida limpia; las otras dos no se cuentan, y no se corrigen en silencio.
 
 **El segundo defecto, que es de fondo.** La tabla de conservación lleva los campos `validado_por` y

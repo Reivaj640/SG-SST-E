@@ -1176,20 +1176,22 @@ La medicion vigente es la del **2026-11-12** (corrida final sobre el arbol de tr
 ronda, ya con el arbol de dependencias nuevo y los 41 tests nuevos que trajo):
 
 ```
-tests 2683 | pass 2681 | fail 0 | skipped 2
+tests 2684 | pass 2682 | fail 0 | skipped 2
 ```
 
 Medido con **Node 22.23.4** (ABI 127) en el PC de trabajo, con `better-sqlite3` 11.10.0
 recompilado para ese ABI: 317 s. Los 2 `skipped` son los que ya estaban asi el 11-nov.
-**Actualizada el 12-nov-2026 (noche):** la corrida dio **2 683 / 2 681 / 0 / 2** (310 s, 180
-archivos, `exit 0`). Los **+13** sobre la corrida de la tarde son las pruebas de la
-compuerta de conservacion con las condiciones C1 a C4, las del marcador de pendiente y las
-del generador de los candidatos de la v1.4 (que hasta ahora no tenia test).
+**Actualizada el 12-nov-2026 (noche):** la corrida dio **2 684 / 2 682 / 0 / 2** (299 s, 180
+archivos, `exit 0`). Los **+14** sobre la corrida de la tarde son las pruebas de la
+compuerta de conservacion con las condiciones C1 a C4, las del marcador de pendiente, las
+del generador de los candidatos de la v1.4 (que hasta ahora no tenia test) y el guard de
+ASCII puro (que exige que los dos programas de la v1.4 no tengan ni un byte sobre 127,
+ni BOM, ni CRLF).
 
 La medicion anterior (12-nov-2026, antes del cambio de dependencias) fue
 `tests 2606 | pass 2604 | fail 0 | skipped 2`, en 415 s; la de antes (11-nov-2026) fue
 `tests 2574 | pass 2572 | fail 0 | skipped 2`, en 220 s. **La diferencia son 61 pruebas nuevas**
-(2 683 - 2 606), todas en verde; el numero de la seccion 7 se queda
+(2 684 - 2 606), todas en verde; el numero de la seccion 7 se queda
 atrasado si no se actualiza, y una cifra vencida leida como vigente es un verde falso.
 
 > La reproduccion desde **clon limpio** esta medida y registrada en
@@ -1200,7 +1202,7 @@ atrasado si no se actualiza, y una cifra vencida leida como vigente es un verde 
 > los 2 665 nombres de prueba identico** al de la corrida de ese momento. El clon quedo **byte a byte**
 > igual al arbol del owner (4 810 archivos, 0 diferentes). El 6.11 del cuadro canonico quedo
 > **CERRADO** por esto. **Ojo con las dos cifras:** la del clon es la de `e4dd5f31`, que es
-> **anterior** a las dos pruebas de regresion del manifiesto; el arbol de hoy da **2 683 / 2 681**.
+> **anterior** a las dos pruebas de regresion del manifiesto; el arbol de hoy da **2 684 / 2 682**.
 > Compararlas como si fueran la misma corrida seria un error de lectura.
 
 > **El EOL de este archivo esta fijado por su test.** Si lo abres en un editor que normalice a

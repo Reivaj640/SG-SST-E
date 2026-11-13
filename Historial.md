@@ -190,6 +190,30 @@
 >
 > **La cola, en orden.** (1) **P8 real con ASEPLUS**: los cuatro actos, con el runbook de arriba. (2) El **commit 📦1049** de esta ronda, esperando el «dale», y su push, esperando el «pushea». (3) Lo heredado: P3 (los alias de Workspace), Node 22 en el servidor (recompilar `better-sqlite3` para el ABI 127), el respaldo off-site, `npm audit`, T6/T7/T8, y la ratificación externa del abogado (J6/J8/J9 y la pregunta de la errata).
 
+> **Actualización 2026-11-12 (noche, cierre de la jornada) — LAS SIETE DECISIONES DE FONDO QUEDARON CERRADAS POR DETERMINACIÓN (L1 a L7), la v1.4 se armó con ese texto, y la ronda quedó commiteada en `d41f2cda` (📦1058).**
+>
+> **Lo que se cerró.** El owner encargó que el agente legal **cerrara** las decisiones pendientes L1 a L7 —no que generara planes— y que el worker cumpliera lo que el agente legal propusiera. Las siete están **determinadas y escritas** en el repositorio: `dictamen-legal-l1-2026-11-12.md` (L1, con 12 correcciones y los anexos A y B), `dictamen-legal-2026-11-12-tandas-2-y-3.md` (L2, L3, L6, L7) y `pedido-6-backblaze-v1-4-2026-11-12.md` (L4, L5).
+>
+> **Lo que se determinó de fondo.** La entidad contractual es **Google LLC** (por el perfil de pago de la cuenta). Google es **Responsable** (art. 3.e) sobre la cuenta del administrador y la telemetría, y **Encargado** (art. 3.d) sobre los datos del cliente. La operación es **transmisión internacional a un Encargado** (art. 2 num. 5 del Decreto 1377), **no transferencia**: **no se activa el art. 26**, y rigen el art. 24 num. 2 y el art. 25. **P1 cerrado.** El CDPA se identificó **por huella** (`0e1c7294…`, 97 831 B), con fecha de efectividad **10-nov-2026**. La auditoría del **§7.5.2(a)** no se activa. Estados Unidos es **uno** de los países posibles, no el único. El **CDPA no fija 24 ni 48 horas**: el plazo de 48 horas es propio de K+AIR. La fila de Google traía **nueve celdas para ocho columnas**. Backblaze es **subencargado** y entra al **§4** del Nube y al **§5** del Encargo, y el bucket debe crearse en la región **United States**.
+>
+> **La v1.1 no se contrafirmó, y esa fue la decisión correcta.** Fabricar una contrafirma de la v1.1 habría sido un falso documental. Lo que sí se hizo es **declarar** lo que pasó bajo ella: hubo una firma completada el **6-nov** (`SIGN-2026-738564`), así que «bajo la v1.1 no se trató dato alguno» **no se sostiene**. Queda en `nota-expediente-v1-1-2026-11-12.md`, con el comando `sqlite3 -readonly` para leer las cinco filas de producción.
+>
+> **Lo que llegó al código, medido.** `retencion.js` con C1 a C4: el cómputo pasó a **años calendario** y terminó la equivalencia falsa de «10 años (3650 días)»; el piso legal no es bajable por la tabla de la Empresa; la fecha de cese la valida la Empresa. Y `_tablaActivada()` **rechaza el marcador `PENDIENTE…` por nombre**: un marcador no es una validación escrita, y la compuerta sigue **cerrada**. **Seis pruebas nuevas.** La variable `FIRMA_EXIGIR_MEDIO_PERSONAL_OTP` quedó documentada como **inerte** (y se corrigió el bloque obsoleto que la decía «SIEMPRE ACTIVO»), con el comando literal para quitar la línea del `.env` en `deploy/README-DESPLIEGUE.md` y en `docs/MIGRACION-SERVIDOR-FIRMA.md`.
+>
+> **La v1.4 se armó leyendo el texto legal, no transcribiéndolo.** `scripts/determinaciones-v1.4.js` extrae los literales de los propios documentos legales **en tiempo de ejecución**, con anclas por rango y el guard de que casa **exactamente una vez**; el generador va en **dos fases** y **no escribe nada** si falla una sola. El test comprueba que **el texto del candidato es byte a byte el de la determinación**. Candidatos: Anexo de Nube v1.4 (103 390 B, `4f23c605…0ebbd`) y Anexo de Encargo 2026-11-12 (97 962 B, `fa1a79b2…57a15`). La fila de Google quedó con **ocho** celdas, la de Backblaze con ocho, y **cero** líneas huérfanas.
+>
+> **El conteo del mapa NO se movió: sigue en 30 bloques, 9 cerrados / 21 pendientes.** Y el motivo es la regla, no la inacción: un bloque cierra cuando lo que su texto dice que falta está **hecho y medido**; si lo que falta es **firma, credencial, ventana o respuesta de un tercero**, es **PARCIALMENTE**. Lo que sí cambió en la ronda 15 fue el **«qué falta»** de **M.5, M.6, M.15, M.18 y M.20**: ya no dice «falta la determinación», dice el **acto concreto con su responsable**.
+>
+> **El desglose de los 21 pendientes.** **10 PENDIENTE**: M.1 (ninguna empresa real suscrita), M.2 (compuerta del Anexo de Nube apagada), M.4 (A4 sin firmar), M.8 (📦1051 sin desplegar), M.9 (236 archivos en 777), M.10 (flujo electrónico nunca ejercitado contra el código que corre), M.11 (los tres alias de Workspace sin verificar), M.16 (inventario de buzones por repetir), M.19 (el valor de `TRUST_PROXY` sin leer) y M.28 (el destino del respaldo abre una transmisión internacional). **11 PARCIALMENTE**: M.3, M.5, M.6, M.7, M.12, M.13, M.14, M.18, M.21, M.23 y M.24. **9 CERRADOS**: M.15, M.17, M.20, M.22, M.25, M.26, M.27, M.29 y M.30.
+>
+> **Lo que NO se hizo, y es lo importante.** No se tocó el **manifiesto legal** (`d9b59699…c9097b`): sus afirmaciones pendientes se corrigen **al armar y firmar** la v1.4, porque un manifiesto que declara un texto no suscrito es un gate mintiendo en verde. No se tocó `legal/` (la v1.3 = `fdd10551…` y el Encargo vigente = `6308b1f7…`, verificados), ni `sitio/`, ni los textos ya suscritos, ni la v1.1. La v1.4 y el Encargo nuevo son **copias marcadas no firmables**. No se desplegó, no se encendió ninguna compuerta, no se firmó nada y no se borró nada del servidor.
+>
+> **Los commits.** `d41f2cda` 📦1058 — 30 archivos, +3 525 / −300, `feat(firma-electronica): las siete decisiones cerradas y los candidatos v1.4 armados con las determinaciones`. **Sin push**: `origin/Dev` sigue en `ed7e436b`, y el push lo autoriza el owner con «pushea». Este cierre documental y la corrección de los dos programas nuevos van en el commit siguiente.
+>
+> **La cola, en orden y con dueño.** (1) **El owner**: cuenta y bucket Backblaze B2 en la región **United States**, llave, custodia de la frase **fuera del servidor y fuera del bucket**, primera copia verificada por SHA-256, prueba de restauración y rotación; Contrato u Orden de **Google LLC**; fecha de renovación del Acuerdo de Google Workspace; **P3** (los alias) y **P6** (revocación); ratificación de J6 y J7; T8 y A4 sin firmar; el `chmod` de los 777; el despliegue del 📦1051 con `npm ci --omit=dev` (producción sigue con `proxy-addr 2.0.7` crítica, `express 4.22.2`, `nodemailer 6.10.1`, `zod 3.25.76` y Node v20.20.2); encender `FIRMA_EXIGIR_ANEXO_NUBE` **al final**; el `TRUST_PROXY` del `.env`; y la primera firma de una **empresa real** (hoy la única es ASEPLUS, que es de prueba). (2) **El abogado matriculado**: ratificar L1 a L7, llenar `validado_por`, `validado_at` y `validado_por_documento`, y redactar y firmar la v1.4 final. (3) **Producción**: el manifiesto vivo sigue con sus dos notas contraditorias; solo el despliegue lo alinea.
+>
+> **Medido al cierre.** Suite oficial **2 684 tests · 2 682 pass · 0 fail · 0 cancelled · 2 skipped** (180 archivos, `exit 0`, corrida en solitario), **reproducida sobre el commit**. Cuadro canónico **77 cerrados / 19 pendientes**. Paquete del abogado **14 de 14**. `npm audit` **0**. Verificación de cierre: **sin inconsistencias**. Barrido final sobre el commit: **30 archivos, 0 problemas** (0 BOM, 0 CJK, y la estructura EOL de `Historial.md`, `CONTEXT.md` y `BITACORA.md` intacta).
+
 
 
 > **Actualización 2026-11-10 (cierre de jornada) — P7 CERRADO: la contrafirma del Anexo de Nube sigue DENTRO del servicio, y la condición del abogado sobre la FACULTAD de quien contrafirma por Gesstiar quedó implementada, verificada y DECIDIDA.**
@@ -9442,7 +9466,7 @@ El worker de código hizo `git stash` de sus cambios para medir una línea base 
 el mismo árbol. Las dos corridas se cruzaron: la línea base salió con **26 fallos** que no existen (eran ruido
 de concurrencia) y la corrida con los cambios con **un fallo**. Se detecto porque un test que pasaba en
 aislamiento fallaba en la suite completa, y se **detubo el worker**, se **restauro** el `stash` (que estaba
-intacto) y se **volvio a correr la suite sola**: **2 683 tests, 2 681 pass, 0 fail, 2 skipped**, `exit 0`.
+intacto) y se **volvio a correr la suite sola**: **2 684 tests, 2 682 pass, 0 fail, 2 skipped**, `exit 0`.
 Regla que sale de ahí: **en este árbol, una sola corrida a la vez**, y si hay que medir una línea base, se
 mide con el árbol quieto y **nadie más corriendo nada**.
 
@@ -9456,9 +9480,11 @@ mide con el árbol quieto y **nadie más corriendo nada**.
 - **Cuadro canonico: 77 cerrados / 19 pendientes** de 96 (sin cambios). **Paquete del abogado: 14 de 14**.
 - **Manifiesto**: el del repositorio `d9b59699…c9097b`, el de produccion `191c08b8…a4013f` (dos notas). **No
   se toco** el manifiesto legal: sus afirmaciones pendientes se corrigen **al armar y firmar la v1.4**.
-- **Suite oficial: 2 683 tests · 2 681 pass · 0 fail · 0 cancelled · 2 skipped** (180 archivos, `exit 0`,
-  310 s, Node 22, corrida **en solitario**). Los **+13** sobre la ronda 14 son las seis pruebas de C1 a C4 y
-  de la compuerta con marcador, y las siete del generador de los candidatos de la v1.4.
+- **Suite oficial: 2 684 tests · 2 682 pass · 0 fail · 0 cancelled · 2 skipped** (180 archivos, `exit 0`,
+  299 s, Node 22, corrida **en solitario**). Los **+14** sobre la ronda 14 son las seis pruebas de C1 a C4 y
+  de la compuerta con marcador, las siete del generador de los candidatos de la v1.4 y el
+  guard de ASCII puro (que exige que los dos programas de la v1.4 no tengan ni un byte
+  sobre 127, ni BOM, ni CRLF).
 - **La cabecera del mapa decía «veintiocho puntos»** y el mapa tiene treinta: corregido.
 
 ### 6. Lo que NO se hizo en esta ronda

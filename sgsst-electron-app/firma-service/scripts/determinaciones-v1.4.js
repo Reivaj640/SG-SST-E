@@ -138,19 +138,19 @@ function bloque(secciones, clave, indice) {
 const NUBE_RANGOS = [
   {
     id: 'L1-B3-CDNA',
-    donde: 'Anexo de Nube v1.4, §11, la viñeta del CDPA',
+    donde: 'Anexo de Nube v1.4, seccion 11, la vineta del CDPA',
     desde: 903, hasta: 915,
     dest: [{ t: 'dict', k: 'B.3', i: 3 }],
   },
   {
     id: 'L1-B3-REF',
-    donde: 'Anexo de Nube v1.4, §11, las referencias normativas',
+    donde: 'Anexo de Nube v1.4, seccion 11, las referencias normativas',
     desde: 885, hasta: 897,
     dest: [{ t: 'dict', k: 'B.3', i: 1 }],
   },
   {
     id: 'L1-A5',
-    donde: 'Anexo de Nube v1.4, la linea de opinion del abogado, al final del §4',
+    donde: 'Anexo de Nube v1.4, la linea de opinion del abogado, al final de la seccion 4',
     desde: 530, hasta: 530,
     dest: [
       { t: 'dict', k: 'A.5' },
@@ -158,59 +158,59 @@ const NUBE_RANGOS = [
       { t: 'txt', s: '  <h2>5. Seguridad</h2>' },
     ],
     nota: 'El dictamen da la linea de opinion pero no dice donde va: se pone al '
-      + 'final del §4, que es la seccion de la que habla ("en esta seccion").',
+      + 'final de la seccion 4, que es la seccion de la que habla ("en esta seccion").',
   },
   {
     id: 'L1-B2',
-    donde: 'Anexo de Nube v1.4, §4, el parrafo del contrato de transmision',
+    donde: 'Anexo de Nube v1.4, seccion 4, el parrafo del contrato de transmision',
     desde: 488, hasta: 496,
     dest: [{ t: 'dict', k: 'B.2', i: 1 }],
   },
   {
     id: 'L1-A23',
-    donde: 'Anexo de Nube v1.4, §4, el parrafo del uso real del canal',
+    donde: 'Anexo de Nube v1.4, seccion 4, el parrafo del uso real del canal',
     desde: 350, hasta: 366,
     dest: [{ t: 'dict', k: 'A.2.3' }],
   },
   {
     id: 'L1-A22',
-    donde: 'Anexo de Nube v1.4, §4, el parrafo de cierre',
+    donde: 'Anexo de Nube v1.4, seccion 4, el parrafo de cierre',
     desde: 336, hasta: 348,
     dest: [{ t: 'dict', k: 'A.2.2' }],
   },
   {
     id: 'L5-IB',
-    donde: 'Anexo de Nube v1.4, §4, el parrafo de respaldos, monitoreo y soporte',
+    donde: 'Anexo de Nube v1.4, seccion 4, el parrafo de respaldos, monitoreo y soporte',
     desde: 333, hasta: 335,
     dest: [{ t: 'ped', k: 'i-b' }],
   },
   {
     id: 'L1-A1',
-    donde: 'Anexo de Nube v1.4, §4, la fila de Google y la fila de Backblaze',
+    donde: 'Anexo de Nube v1.4, seccion 4, la fila de Google y la fila de Backblaze',
     desde: 287, hasta: 330,
     dest: [{ t: 'dict', k: 'A.1' }, { t: 'ped', k: 'i-a' }],
   },
   {
     id: 'L1-A21',
-    donde: 'Anexo de Nube v1.4, §4, el parrafo introductorio (y la linea huerfana)',
+    donde: 'Anexo de Nube v1.4, seccion 4, el parrafo introductorio (y la linea huerfana)',
     desde: 242, hasta: 254,
     dest: [{ t: 'dict', k: 'A.2.1' }],
   },
   {
     id: 'L5-IC',
-    donde: 'Anexo de Nube v1.4, §3, el parrafo de Respaldos',
+    donde: 'Anexo de Nube v1.4, seccion 3, el parrafo de Respaldos',
     desde: 204, hasta: 239,
     dest: [{ t: 'ped', k: 'i-c' }],
   },
   {
     id: 'L1-B1',
-    donde: 'Anexo de Nube v1.4, §3, la clasificacion del flujo',
+    donde: 'Anexo de Nube v1.4, seccion 3, la clasificacion del flujo',
     desde: 186, hasta: 196,
     dest: [{ t: 'dict', k: 'B.1', i: 1 }],
   },
   {
     id: 'L4-C2',
-    donde: 'Anexo de Nube v1.4, §1, el bullet del cifrado (el destino ya se decidio)',
+    donde: 'Anexo de Nube v1.4, seccion 1, el bullet del cifrado (el destino ya se decidio)',
     desde: 116, hasta: 117,
     dest: [{
       t: 'txt',
@@ -219,11 +219,11 @@ const NUBE_RANGOS = [
     }],
     nota: 'El texto de C2 decia "hasta que el owner decida el destino y se '
       + 'verifique la primera copia": el destino YA se decidio (Backblaze B2, '
-      + '12-nov-2026) y el §3 nuevo lo dice. Dejarlo seria contradecirse.',
+      + '12-nov-2026) y el seccion 3 nuevo lo dice. Dejarlo seria contradecirse.',
   },
   {
     id: 'L4-IIA-IIIA',
-    donde: 'Anexo de Nube v1.4, §1, los literales de los actos del 12-nov y del estado de firma',
+    donde: 'Anexo de Nube v1.4, seccion 1, los literales de los actos del 12-nov y del estado de firma',
     desde: 111, hasta: 111,
     dest: [
       { t: 'txt', s: '      redacci&oacute;n.</li>' },
@@ -236,25 +236,25 @@ const NUBE_RANGOS = [
 const ENCARGO_RANGOS = [
   {
     id: 'L1-B63',
-    donde: 'Anexo de Encargo 2026-11-12, §12, la constancia de la version',
+    donde: 'Anexo de Encargo 2026-11-12, seccion 12, la constancia de la version',
     desde: 886, hasta: 893,
     dest: [{ t: 'dict', k: 'B.6.3', i: 1 }],
   },
   {
     id: 'L4-IIB',
-    donde: 'Anexo de Encargo 2026-11-12, §5, el parrafo de prevalencia y de actos ejecutados',
+    donde: 'Anexo de Encargo 2026-11-12, seccion 5, el parrafo de prevalencia y de actos ejecutados',
     desde: 566, hasta: 576,
     dest: [{ t: 'ped', k: 'ii-b' }],
   },
   {
     id: 'L1-A4',
-    donde: 'Anexo de Encargo 2026-11-12, §5, la determinacion del papel del proveedor',
+    donde: 'Anexo de Encargo 2026-11-12, seccion 5, la determinacion del papel del proveedor',
     desde: 495, hasta: 523,
     dest: [{ t: 'dict', k: 'A.4' }],
   },
   {
     id: 'L1-B4',
-    donde: 'Anexo de Encargo 2026-11-12, §5, los tres parrafos de las comunicaciones',
+    donde: 'Anexo de Encargo 2026-11-12, seccion 5, los tres parrafos de las comunicaciones',
     desde: 469, hasta: 494,
     dest: [
       { t: 'dict', k: 'B.4', i: 1 },
@@ -264,13 +264,13 @@ const ENCARGO_RANGOS = [
   },
   {
     id: 'L1-A3',
-    donde: 'Anexo de Encargo 2026-11-12, §5, la fila de Google',
+    donde: 'Anexo de Encargo 2026-11-12, seccion 5, la fila de Google',
     desde: 444, hasta: 458,
     dest: [{ t: 'dict', k: 'A.3' }],
   },
   {
     id: 'L1-B5',
-    donde: 'Anexo de Encargo 2026-11-12, §5, la remision a la auditoria del CDPA',
+    donde: 'Anexo de Encargo 2026-11-12, seccion 5, la remision a la auditoria del CDPA',
     desde: 420, hasta: 424,
     dest: [{ t: 'dict', k: 'B.5', i: 1 }],
   },

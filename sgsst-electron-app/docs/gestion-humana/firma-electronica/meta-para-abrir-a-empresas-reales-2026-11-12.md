@@ -1337,7 +1337,7 @@ Esto se midio el 12-nov-2026 y **no** es un bloqueante:
 - El **Acuerdo v1.6 esta publicado**, y el Anexo de Nube v1.3 y el Anexo de Encargo 2026-11-11
   estan **suscritos y contrafirmados**, con sus actas.
 - El sitio publico sirve **exactamente** las huellas suscribidas (6 URLs comprobadas).
-- La **suite** del servicio: **2 683 tests, 2 681 pass, 0 fail, 2 skipped** (corrida final del 12-nov
+- La **suite** del servicio: **2 684 tests, 2 682 pass, 0 fail, 2 skipped** (corrida final del 12-nov
   por la noche, 180 archivos de prueba, `exit 0`), y **vinculada a un commit**: el 12-nov por la
   manana se corrio tambien desde un clon limpio del commit `e4dd5f31` y dio el mismo resultado que
   la corrida de esa manana (2 665 / 2 663 / 0 / 2, mismo conjunto de nombres de prueba, clon byte a

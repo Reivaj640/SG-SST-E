@@ -786,7 +786,7 @@ habilitar por Empresa), y la tabla supletoria de conservacion, que sigue en PROP
 
 **Que se verifico.** Que la suite completa del firma-service pasa.
 
-**Evidencia.** Corrida registrada por el equipo el **12-nov-2026** (noche): **2 683 pruebas, 2 681 pass, 0
+**Evidencia.** Corrida registrada por el equipo el **12-nov-2026** (noche): **2 684 pruebas, 2 682 pass, 0
 fail, 2 skipped** (179 archivos de prueba, `exit 0`; publicada en la seccion 7 de
 `sgsst-electron-app/docs/MIGRACION-SERVIDOR-FIRMA.md`, con el acta
 `verificacion-cierre/t1-corrida-desde-clon-limpio.md` de las tres corridas desde clon limpio, 0

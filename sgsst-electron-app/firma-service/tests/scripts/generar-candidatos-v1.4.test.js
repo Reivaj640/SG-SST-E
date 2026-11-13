@@ -138,7 +138,7 @@ test('el Anexo de Nube v1.4 dice lo que la determinacion de L1 decidio', () => {
   assert.ok(planoTexto.includes('Esta versi&oacute;n 1.4'),
     'se declara que esta version 1.4 no esta suscrita');
   assert.ok(planoTexto.includes('Decreto 1377 de 2013, art&iacute;culo 2, numerales 4 y 5'),
-    'el §11 cita el Decreto 1377');
+    'el seccion 11 cita el Decreto 1377');
 
   // Y NO puede quedar lo que la determinacion corrigio.
   assert.equal(texto.includes('determinado en el &sect;5 del Anexo de Encargo:'), false,
@@ -159,7 +159,7 @@ test('el Anexo de Encargo 2026-11-12 lleva la version unificada', () => {
   assert.ok(lineas[33].includes('12 de noviembre de 2026') && lineas[33].includes('2026-11-12'),
     'la cabecera dice 12 de noviembre de 2026, version 2026-11-12');
   assert.ok(plano(texto).includes('Determinaci&oacute;n del papel del proveedor de correo (Google LLC)'),
-    'el §5 determina el papel del proveedor');
+    'el seccion 5 determina el papel del proveedor');
   assert.ok(plano(texto).includes('las certificaciones y revisiones y los subencargados'),
     'la remision dice certificaciones y revisiones, no auditoria');
   assert.ok(plano(texto).includes('los dos instrumentos anteriores no son pasos pendientes'),
@@ -240,4 +240,25 @@ test('los textos vigentes y el manifiesto siguen intactos', () => {
     '6308b1f7a51007cb1e973de0210d1e5659d3b3ceb8e3e3b7a3ee52a7275b8948',
     'el Anexo de Encargo vigente es el que estaba, byte a byte'
   );
+});
+
+test('los dos programas nuevos son ASCII puro, LF y sin BOM', () => {
+  // La cabecera de `determinaciones-v1.4.js` AFIRMA que el archivo es ASCII
+  // puro, LF y sin BOM. Una afirmacion en una cabecera no es un dato: este
+  // check la vuelve cierta, y muerde si alguien mete una tilde.
+  // (El control de ausencia es el que sostiene la correccion.)
+  for (const archivo of [DETERMINACIONES, __filename]) {
+    const b = fs.readFileSync(archivo);
+    const nombre = path.basename(archivo);
+
+    const noAscii = [...b].filter((x) => x > 127);
+    assert.equal(noAscii.length, 0, nombre + ': sin bytes sobre 127 (ASCII puro)');
+
+    const bom = b.length >= 3 && b[0] === 0xef && b[1] === 0xbb && b[2] === 0xbf;
+    assert.equal(bom, false, nombre + ': sin BOM');
+
+    const texto = b.toString('latin1');
+    assert.equal((texto.match(/\r\n/g) || []).length, 0, nombre + ': sin CRLF');
+    assert.equal((texto.match(/\r/g) || []).length, 0, nombre + ': sin CR suelto');
+  }
 });
