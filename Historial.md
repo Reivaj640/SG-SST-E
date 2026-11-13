@@ -36,6 +36,8 @@
 > **Huellas que se re-declararon.** El escrito al abogado (`solicitudes-al-abogado-2026-11-13.md`) y la revisión de asesoría declaraban huellas de insumos que **ya no correspondían** a los archivos del repositorio (el dictamen pasó de 90 936 B a **114 882 B**): los dos documentos se **anotaron** con las huellas vigentes, sin reescribir el registro con fecha.
 >
 > **Medido después de la corrección.** Suite completa de `firma-service` (180 archivos): **2 696 tests, 2 694 pass, 0 fail, 2 skipped** (183 s). Test del generador **10/10** (con el guard nuevo) y test del script del conteo **17/17**. Mapa **31 bloques · 31 cerrados · 0 pendientes**. Candidatos: **111 462 B / `ba664e6f…e3b47`** y **100 153 B / `d4df187a…4e2967`** — **sin cambios de bytes**: lo que cambió fue de dónde salía el texto. Texto vigente y manifiesto **intactos** (`fdd10551…`, `6308b1f7…`, `d9b59699…`). El motor `determinaciones-v1.4.js` **sí cambió** (22 902 B / `57b5298e…`), el generador `generar-candidatos-v1.4.js` **también** (sus diez `§` pasaron a `Seccion`: su cabecera afirma que es ASCII puro y el guard ahora lo comprueba — **14 549 B / `323d6d87…`**), y el dictamen L1 quedó en **114 882 B / `d77e6d8b…`**.
+>
+> **El commit.** Esta ronda queda en el **📦1063** (`8294e973`, 22 archivos, +1409 / −201); la anotacion de esta misma linea va en el commit siguiente. **Sin push**: `origin/Dev` sigue en `72a06dda` (el 📦1062 ya estaba pusheado) hasta que el owner diga «pushea».
 
 > **Actualización 2026-11-13 (tarde, séptima parte) — CUATRO SOLICITUDES CERRADAS POR RESOLUCIÓN (S-01, S-03, S-04 Y S-23): LA TABLA PASÓ A 19 `EMITIDA` / 5 `CERRADA`, Y EL CRITERIO QUEDÓ ESCRITO EN LA LEYENDA DE LA TABLA, EN EL MAPA, EN EL GUARD Y EN EL PROMPT.**
 >
