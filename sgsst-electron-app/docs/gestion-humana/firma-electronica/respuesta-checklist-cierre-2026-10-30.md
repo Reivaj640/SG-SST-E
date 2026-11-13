@@ -1579,7 +1579,7 @@ byte** igual al arbol del owner: **4 810 archivos identicos, 0 diferentes, 0 aus
 
 **Ojo con las dos cifras:** la del clon es la del commit `e4dd5f31`, **anterior** a las dos pruebas
 de regresion del manifiesto que se agregaron el 12-nov por la tarde; el arbol de hoy da
-**2 684 / 2 682 / 0 / 2**.
+**2 689 / 2 687 / 0 / 2**.
 
 **Un hallazgo que hay que dejar escrito.** El primer clon se hizo con la configuracion del sistema
 (`core.autocrlf = true`) y **no reproducia el arbol del owner**: materializo 2 697 de los 4 781
@@ -1594,11 +1594,11 @@ de `npm audit` resueltas) y los tests nuevos de esta ronda, la suite completa se
 sobre el arbol de trabajo del owner:
 
 ```
-tests 2684 | pass 2682 | fail 0 | cancelled 0 | skipped 2 | todo 0
-duration_ms 309549
+tests 2689 | pass 2687 | fail 0 | cancelled 0 | skipped 2 | todo 0
+duration_ms 325319
 ```
 
-179 archivos de prueba, `exit 0`, sin bloques `not ok`. **Esta es la cifra que publica ahora la
+180 archivos de prueba, `exit 0`, sin bloques `not ok`. **Esta es la cifra que publica ahora la
 seccion 7 del runbook** (`sgsst-electron-app/docs/MIGRACION-SERVIDOR-FIRMA.md`); la de 2 606 / 2 604
 que publicaba antes ya no era vigente, y la de **2 665 / 2 663** es la de la corrida sobre el commit
 `e4dd5f31` (12-nov por la manana), que es **anterior** a las dos pruebas de regresion del manifiesto.

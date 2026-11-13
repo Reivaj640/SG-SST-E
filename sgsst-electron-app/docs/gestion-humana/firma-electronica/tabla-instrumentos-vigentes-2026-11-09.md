@@ -194,7 +194,8 @@ no se marca "ok".
 > (`publicacion` y `primera_firma`) dieron **`listo: true`**: 42 ítems cada uno, **40 `ok`**,
 > **0 pendientes**, **0 bloqueantes**, 1 aviso y 1 N/A. La **suite** del servicio cerró en
 > **2 684 tests** (2 682 verdes, 0 rojos, 2 omitidos; corrida del 12-nov por la noche) y la corrida se repitió desde un clon limpio
-> del commit. Esta tabla de §4.2 se conserva como la foto del 11-nov: **no se reescribe**.
+> del commit. La **cifra vigente** es la del **13-nov-2026 (tarde, segunda parte)**: **2 689 tests** (2 687 verdes,
+> 0 rojos, 2 omitidos). Esta tabla de §4.2 se conserva como la foto del 11-nov: **no se reescribe**.
 
 ## 4.3 Lo que cambió el 11-nov-2026 (los tres textos nuevos)
 

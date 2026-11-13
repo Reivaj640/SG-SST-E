@@ -26,6 +26,9 @@
  *   nada** (es idempotente).
  * - Que **todos** los bloques declaran su origen: un bloque sin origen no es
  *   trazable, y este mapa existe para ser trazado.
+ * - Que la TABLA DE SOLICITUDES esta atada al mapa: un bloque que invoca una
+ *   solicitud que no existe hace fallar la verificacion, y una solicitud que
+ *   no invoca ningun bloque tambien (es un pedido que nadie pidio).
  *
  * NADA DE ESTO TOCA EL DOCUMENTO REAL: todas las pruebas trabajan sobre una
  * COPIA en un directorio temporal.
@@ -40,7 +43,10 @@ const path = require('path');
 
 const {
   correr,
+  _parsear,
+  _parsearSolicitudes,
   SECCIONES,
+  RUTA_SOLICITUDES,
 } = require('../../scripts/contar-estados-meta-apertura');
 
 /** El mapa real, relativo a este test. */
@@ -48,6 +54,9 @@ const MAPA_REAL = path.resolve(
   __dirname, '..', '..', '..', 'docs', 'gestion-humana', 'firma-electronica',
   'meta-para-abrir-a-empresas-reales-2026-11-12.md'
 );
+
+/** La tabla de solicitudes real. */
+const RUTA_SOLICITUDES_REAL = RUTA_SOLICITUDES;
 
 /**
  * Copia el mapa a un directorio temporal para poder romperlo sin tocar el
@@ -109,11 +118,12 @@ test('detecta un estado que no es una de las cuatro palabras', () => {
   const copia = copiarMapa();
   try {
     const texto = fs.readFileSync(copia, 'utf8');
-    fs.writeFileSync(
-      copia,
-      texto.replace('— PENDIENTE', '— CASI LISTO', 1),
-      'utf8'
-    );
+    // El estado se altera en el PRIMER bloque, sea el que sea: el mapa ya no
+    // tiene ningun "PENDIENTE" (todos se cerraron por solicitud el
+    // 13-nov-2026), y una mutacion que no encuentra nada pasa en falso.
+    const alterado = texto.replace(/^(###\s+M\.\d+\s+-\s+.*?) — CERRADO/m, '$1 — CASI LISTO');
+    assert.notEqual(alterado, texto, 'el mapa tiene que traer un encabezado al que alterarle el estado');
+    fs.writeFileSync(copia, alterado, 'utf8');
     const codigo = correr(copia, false);
     assert.notEqual(codigo, 0, 'un estado inventado tiene que hacer fallar la verificacion');
   } finally {
@@ -196,4 +206,69 @@ test('todos los bloques declaran su origen', () => {
       'el bloque ' + (i + 1) + ' no declara su linea de **Origen.**'
     );
   });
+});
+
+// ---------------------------------------------------------------- solicitudes
+
+test('la tabla de solicitudes declara 21 filas, todas EMITIDA, y el mapa las nombra todas', () => {
+  const texto = fs.readFileSync(RUTA_SOLICITUDES_REAL, 'utf8');
+  const ps = _parsearSolicitudes(texto);
+  assert.equal(ps.errores.length, 0, 'la tabla de solicitudes no tiene errores: ' + ps.errores.join('; '));
+  assert.equal(ps.solicitudes.length, 21, 'hay 21 solicitudes');
+  const estados = {};
+  for (const s of ps.solicitudes) estados[s.estado] = (estados[s.estado] || 0) + 1;
+  assert.equal(estados.EMITIDA, 21, 'las 21 estan EMITIDA');
+  assert.equal(estados.RESPONDIDA || 0, 0, 'ninguna esta respondida todavia');
+
+  // Cada bloque que dice "CERRADO. Solicitud S-XX" tiene que invocar una
+  // solicitud que exista.
+  const mapa = fs.readFileSync(MAPA_REAL, 'utf8');
+  const bloques = _parsear(mapa).bloques;
+  const ids = new Set(ps.solicitudes.map((s) => s.id));
+  let conSolicitud = 0;
+  for (const b of bloques) {
+    for (const id of b.solicitudes) {
+      assert.ok(ids.has(id), 'el bloque ' + b.id + ' invoca ' + id + ', que no existe');
+    }
+    if (b.solicitudes.length) conSolicitud++;
+  }
+  assert.equal(conSolicitud, 21, 'los 21 bloques cerrados por solicitud invocan su fila');
+});
+
+test('detecta un bloque que invoca una solicitud que no existe', () => {
+  const copia = copiarMapa();
+  try {
+    const texto = fs.readFileSync(copia, 'utf8');
+    const alterado = texto.replace('Solicitud S-01 emitida', 'Solicitud S-99 emitida');
+    assert.notEqual(alterado, texto, 'el mapa tiene que traer una solicitud que se pueda cambiar');
+    fs.writeFileSync(copia, alterado, 'utf8');
+    const codigo = correr(copia, false);
+    assert.notEqual(codigo, 0, 'una solicitud inexistente tiene que hacer fallar la verificacion');
+  } finally {
+    fs.rmSync(path.dirname(copia), { recursive: true, force: true });
+  }
+});
+
+test('detecta una solicitud huerfana (en la tabla, pero en ningun bloque)', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'meta-solicitudes-'));
+  const copiaSol = path.join(dir, 'solicitudes.md');
+  const texto = fs.readFileSync(RUTA_SOLICITUDES_REAL, 'utf8');
+  // Se agrega una fila que no invoca ningun bloque.
+  const fila = '| S-99 | M.1 | Nadie | Una solicitud huerfana | Nada | EMITIDA | 2026-11-30 |';
+  fs.writeFileSync(copiaSol, texto + '\n' + fila + '\n', 'utf8');
+  try {
+    const codigo = correr(MAPA_REAL, false, copiaSol);
+    assert.notEqual(codigo, 0, 'una solicitud huerfana tiene que hacer fallar la verificacion');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('la frase de conciliacion nombra las solicitudes y dice que cerrado no es acto cumplido', () => {
+  const texto = fs.readFileSync(MAPA_REAL, 'utf8');
+  assert.ok(texto.indexOf('Las 21 solicitudes de la tabla') >= 0,
+    'la frase nombra las solicitudes');
+  assert.ok(texto.indexOf('no que el acto este cumplido') >= 0,
+    'la frase aclara que cerrado no significa acto cumplido');
+  assert.ok(texto.indexOf('21 EMITIDA') >= 0, 'la frase dice cuantas hay emitidas');
 });

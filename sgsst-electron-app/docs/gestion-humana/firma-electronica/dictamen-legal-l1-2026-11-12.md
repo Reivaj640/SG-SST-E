@@ -17,7 +17,7 @@
 
 ---
 
-## 0. Las doce correcciones al encargo (0.1 a 0.12)
+## 0. Las trece correcciones al encargo (0.1 a 0.13)
 
 | # | Afirmación que hay que corregir | Corrección precisa | Evidencia |
 |---|---|---|---|
@@ -25,7 +25,7 @@
 | 0.2 | el CDPA es el «**texto vigente del 30 de octubre de 2026**» | **El texto oficial no declara fecha de versión.** Se identifica por **huella**: SHA-256 `0e1c729406410a15758ae1ceb6d93b6b4e200208b325abf17b09ef74f0dc69b1`, 97 831 bytes, descargado el 9-nov-2026 y **re-verificado el 12-nov-2026 con resultado idéntico**. La cabecera `Last-Modified` del recurso estático (`Mon, 03 Oct 2022 11:26:32 GMT`) no es la fecha del texto. La fecha «30-oct-2026» proviene del registro interno del equipo, no del texto de Google. **Corrección de redacción:** toda mención a «texto vigente del 30 de octubre de 2026» se sustituye por «texto identificado por su huella SHA-256, descargado el 9 de noviembre de 2026». | `https://admin.google.com/terms/apps/8/1/en/dpa_terms.html` (descarga viva 12-nov-2026: `BYTES=97831`, `SHA256=0e1c7294…`, coincide con el manifiesto); `decision-regularizacion-correo-2026-11-09.md` |
 | 0.3 | `fecha_efectividad_addendum: null` | El **§2 del CDPA** define el *Addendum Effective Date* como «la fecha en que el Cliente aceptó el Addendum». La aceptación del administrador consta el **10-nov-2026** (captura de consola, SHA-256 `9d989067…`, 96 520 B). **Por definición contractual, la fecha de efectividad del Addendum es el 10-nov-2026.** La consola no muestra ese campo y por eso el manifiesto lo deja en `null`: no falta el acto, falta la lectura del campo. | `legal-readiness.json:88-106`; CDPA §§1-2 |
 | 0.4 | «**Su incorporación a esta cuenta y su fecha de efectividad están pendientes de verificación por el owner (P1)**» | **P1 está cerrado.** La aceptación existe, con fecha, modo (`aceptado_por_administrador`) y captura hasheada verificada en la máquina. **Corrección:** la v1.4 no puede volver a declarar pendiente lo que está cumplido; lo que queda abierto es la **fecha de renovación del Acuerdo** que rija la cuenta y la re-aceptación si el texto del CDPA cambia. | `legal-readiness.json:86-107`; `readinessLegal.js:1067-1089` |
-| 0.5 | **Fondo:** «el envío es una **transferencia internacional** a Estados Unidos… y **sigue rigiendo el artículo 26 de la Ley 1581 de 2012**» | **La operación es una TRANSMISIÓN, no una transferencia.** Con el CDPA vigente y Google como Encargado, el receptor trata por cuenta del Responsable y no es Responsable del tratamiento: aplica el art. 2 num. 5 del Decreto 1377 de 2013 y no el num. 4. **No se activa el art. 26 de la Ley 1581 de 2012**; rigen el **art. 24 num. 2** y el **art. 25** del Decreto 1377. El propio Anexo se contradice: declara a Google «proveedor contractual encargado (Subencargado)» y, en el mismo §4, que «no crea, no declara ni presupone un contrato de transmisión». Con un Encargado, el contrato **es** de transmisión. | D. 1377 arts. 2 (num. 4 y 5), 24 num. 2, 25; CDPA §§4.3, 5.1.2, 5.1.3, 5.2.1; Circular Única SIC Título V num. 2.1 y 3.2; SIC Concepto 25-625951 |
+| 0.5 | **Fondo:** «el envío es una **transferencia internacional** a Estados Unidos… y **sigue rigiendo el artículo 26 de la Ley 1581 de 2012**» | **La operación es una TRANSMISIÓN, no una transferencia.** Con el CDPA vigente y Google como Encargado, el receptor trata por cuenta del Responsable y no es Responsable del tratamiento: aplica el art. 3 num. 5 del Decreto 1377 de 2013 y no el num. 4. **No se activa el art. 26 de la Ley 1581 de 2012**; rigen el **art. 24 num. 2** y el **art. 25** del Decreto 1377. El propio Anexo se contradice: declara a Google «proveedor contractual encargado (Subencargado)» y, en el mismo §4, que «no crea, no declara ni presupone un contrato de transmisión». Con un Encargado, el contrato **es** de transmisión. | D. 1377 arts. 3 (num. 4 y 5), 24 num. 2, 25; CDPA §§4.3, 5.1.2, 5.1.3, 5.2.1; Circular Única SIC Título V num. 2.1 y 3.2; SIC Concepto 25-625951 |
 | 0.6 | la auditoría se afirma sin condición: «el **derecho de auditoría del Cliente del §7.5.2**, que puede nombrar un auditor independiente» | El **§7.5.2(a)** condiciona ese derecho a que **se aplique la Ley Europea**. Para esta cuenta, que no está sometida al Reglamento (UE) 2016/679, **el derecho no se activa por sí solo**. Lo exigible en todo caso: §7.4 y §7.5.1 (certificaciones e informes SOC), §7.5.2(c) (revisión de la *Security Documentation*), §7.1 con Anexo 2 (medidas de seguridad). | CDPA §§7.4, 7.5, 7.5.1, 7.5.2 |
 | 0.7 | «Google LLC, **con sede en Estados Unidos**» | La ubicación es «**cualquier país en que Google o sus subprocesadores tengan instalaciones**» (§10.1 del CDPA, confirmado por los Service Specific Terms §1.3). **Estados Unidos es uno de esos países, no el único**, y la fase no es de transferencia. | CDPA §10.1; `https://workspace.google.com/terms/service-terms/` §1.3 |
 | 0.8 | (implicito) que el plazo de 48 h del Encargo refleja un plazo de Google | **El CDPA no fija plazo de 24 h ni de 48 h** para incidentes: el §7.2.1 exige «*promptly and without undue delay*». El plazo de **cuarenta y ocho (48) horas** del Anexo de Encargo es **compromiso propio de K+AIR** y no puede presentarse como reflejo de un plazo de Google. | `legal/anexo-encargo.html:403-405`; CDPA §7.2.1 |
@@ -33,6 +33,7 @@
 | 0.10 | el encargo remitía al «**§11**» del Anexo de Nube para la ficha de proveedores | El **§11 del Anexo de Nube es «Referencias normativas»**. La ficha de proveedores vive en el **§4 del Anexo de Nube** (`<h2>4. Proveedores externos y subencargados</h2>`) y en el **§5 del Anexo de Encargo** (`<h2>5. Proveedores externos y subencargados</h2>`). El «§11» del expediente es el **§11 del CDPA de Google** (Subprocessors). | `legal/anexo-nube-v1.3.html:883`; `candidatos-v1.4/anexo-nube-v1.4.html:241, 885`; `legal/anexo-encargo.html:428` |
 | 0.11 | el §4 de la v1.4 candidata remite al «Anexo de Encargo **version 2026-11-11**» | El Anexo de Encargo nuevo es la versión **2026-11-12**. Además el propio candidato es internamente inconsistente: su cabecera dice «Versión 2026-11-11» mientras su cláusula de prevalencia habla de «esta **versión 2026-11-12** de este Anexo de Encargo». Hay que unificar etiqueta de versión, cabecera, meta y remisiones. | `candidatos-v1.4/anexo-encargo-2026-11-12.html:8, 34, 535, 571-575`; `candidatos-v1.4/anexo-nube-v1.4.html:252` |
 | 0.12 | (defecto de edición) | El §4 de la v1.4 candidata termina su párrafo introductorio con una **línea huérfana** que repite el cierre del párrafo anterior y deja la frase partida. Hay que eliminarla al sustituir el párrafo (queda subsumida en el texto nuevo). | `candidatos-v1.4/anexo-nube-v1.4.html:253-254` |
+| 0.13 | la cita del Decreto 1377 que aparece en toda la Determinación y en sus literales: la que remite al **art. 2 num. 5 → art. 3 num. 5** (transmisión) y la que remite al **art. 2 num. 4 → art. 3 num. 4** (transferencia) | **Las dos definiciones están en el art. 3 del Decreto 1377 de 2013, no en el art. 2.** El art. 2 es «Tratamiento de datos en el ámbito personal o doméstico» (compilado en el art. 2.2.2.25.1.2 del Decreto 1074 de 2015) y el art. 3 es «Definiciones», donde el **num. 4** es Transferencia y el **num. 5** es Transmisión. Hay que sustituir la cita en la Determinación, en los literales que van a la v1.4 y en el Encargo 2026-11-12: **art. 2 num. 5 → art. 3 num. 5** y **art. 2 num. 4 → art. 3 num. 4**. Los textos **ya suscritos** (la v1.3 y el Encargo 2026-11-11) **no se tocan**: no tienen esta cita (usan la forma compilada, art. 2.2.2.25.1.3, numeral 4 y 5, del Decreto 1074 de 2015), y la corrección queda en la v1.4. | Revisión de asesoría del 13-nov-2026 (`revision-asesoria-s01-s04-2026-11-13.md`, 9 132 B, sha256 `7c1a0e67d89d…`); compilación oficial del Decreto 1377 de 2013 (Cancillería/Normograma, 13-nov-2026): «ARTÍCULO 2o. TRATAMIENTO DE DATOS EN EL ÁMBITO PERSONAL O DOMÉSTICO» y «ARTÍCULO 3o. Definiciones… 4. Transferencia… 5. Transmisión» |
 
 ---
 
@@ -42,7 +43,7 @@
 de la cuenta y no por el nombre del subprocesador; (ii) Google tiene **dos papeles calificados por
 operación**: **Responsable** (art. 3(e) Ley 1581) sobre la cuenta del administrador y la telemetría, y
 **Encargado** (art. 3(d)) sobre los datos del cliente del canal, donde «Subencargado» es solo figura
-contractual; (iii) la operación es una **transmisión internacional a un Encargado** (art. 2 num. 5 del Decreto
+contractual; (iii) la operación es una **transmisión internacional a un Encargado** (art. 3 num. 5 del Decreto
 1377 de 2013) y **no una transferencia**, por lo que **no se activa el art. 26 de la Ley 1581 de 2012** y rigen
 el **art. 24 num. 2** y el **art. 25** del Decreto 1377; (iv) **P1 está cerrado**, el CDPA se identifica **por
 huella SHA-256 sin fecha de versión** y su fecha de efectividad es el **10-nov-2026** por el §2; (v) el derecho
@@ -108,8 +109,8 @@ confirmarlo**: Consola de Google → Facturación → perfil de pago).
 |---|---|---|---|---|
 | **Cuenta del administrador de Workspace** (correo del administrador, nombre, uso, configuración) | **Responsable** (art. 3(e) Ley 1581) | Proveedor por cuenta propia | La Empresa no determina finalidades ni medios sobre estos datos; no son datos del cliente | **Nada que K+AIR pueda invocar** contra Google por cuenta de la Empresa. K+AIR responde por ellos ante el administrador, no ante la Empresa |
 | **Telemetría del servicio de Google** (registros, métricas, uso) | **Responsable** (art. 3(e)) | Proveedor por cuenta propia | Ídem; ya declarado en el Anexo | Fuera de las obligaciones invocables en nombre de la Empresa |
-| **Datos del cliente del canal de correo**: (i) correo del destinatario; (ii) información técnica del envío (fecha, hora, metadatos); (iii) OTP; (iv) enlace individual | **Encargado** (art. 3(d)), contratado por K+AIR | **Subencargado**: figura contractual del CDPA (*another processor*, §§2 y 5.1.2) | Opera por cuenta del Responsable, con instrucciones documentadas (CDPA §5.2.1 y §5.1.2) | **Transmisión internacional** (D. 1377 art. 2 num. 5). Rigen el art. 24 num. 2 y el art. 25; **no** se activa el art. 26 |
-| **Proveedor de correo propio de la Empresa** (primera fila de la tabla del §4), cuando la Empresa lo configura | **Responsable** por los datos de su propia cuenta, según declara esa fila | Proveedor de la Empresa | La Empresa determina finalidades y medios | Aquí **sí** puede haber una **transferencia internacional** (art. 2 num. 4) si el proveedor es un Responsable en el exterior, y entonces **sí** aplican el art. 26 y el numeral 3.2. **Esta determinación no toca esa fila**: la corrección 0.5 es de la fila de Google |
+| **Datos del cliente del canal de correo**: (i) correo del destinatario; (ii) información técnica del envío (fecha, hora, metadatos); (iii) OTP; (iv) enlace individual | **Encargado** (art. 3(d)), contratado por K+AIR | **Subencargado**: figura contractual del CDPA (*another processor*, §§2 y 5.1.2) | Opera por cuenta del Responsable, con instrucciones documentadas (CDPA §5.2.1 y §5.1.2) | **Transmisión internacional** (D. 1377 art. 3 num. 5). Rigen el art. 24 num. 2 y el art. 25; **no** se activa el art. 26 |
+| **Proveedor de correo propio de la Empresa** (primera fila de la tabla del §4), cuando la Empresa lo configura | **Responsable** por los datos de su propia cuenta, según declara esa fila | Proveedor de la Empresa | La Empresa determina finalidades y medios | Aquí **sí** puede haber una **transferencia internacional** (art. 3 num. 4) si el proveedor es un Responsable en el exterior, y entonces **sí** aplican el art. 26 y el numeral 3.2. **Esta determinación no toca esa fila**: la corrección 0.5 es de la fila de Google |
 
 **La etiqueta del CDPA no es la que decide.** La designación de Google como *processor* del §5.1.1(b) está
 formulada **bajo la condición de que se aplique la ley europea**; para una cuenta fuera de EMEA rige el
@@ -120,7 +121,7 @@ deber de reenviar al controlador las notificaciones de §§5.2.2, 7.2.1, 9.2.1 y
 
 ### 3.3 La operación es TRANSMISIÓN, no transferencia
 
-| Criterio | Transferencia (art. 2 num. 4) | Transmisión (art. 2 num. 5) | Lo que ocurre en el canal de correo |
+| Criterio | Transferencia (art. 3 num. 4) | Transmisión (art. 3 num. 5) | Lo que ocurre en el canal de correo |
 |---|---|---|---|
 | ¿Quién recibe? | Un receptor que **a su vez es Responsable** del Tratamiento | Un **Encargado** que trata por cuenta del Responsable | Google **no** es Responsable de los datos del cliente: es Encargado (art. 3(d)) |
 | ¿Con qué objeto? | El receptor decide sobre el tratamiento | El Encargado trata **por cuenta** del Responsable | Google trata con las instrucciones de K+AIR (CDPA §5.2.1, §5.1.2) |
@@ -316,8 +317,8 @@ en los textos que se publiquen.
         y los Service Specific Terms de Google Workspace lo confirman: los datos del cliente que no est&aacute;n
         cubiertos por la Data Regions Policy pueden almacenarse o procesarse en cualquier pa&iacute;s de
         instalaciones de Google o de sus subencargados. <strong>La comunicaci&oacute;n al exterior es una
-        transmisi&oacute;n internacional de datos personales a un Encargado</strong> (art&iacute;culo 2, numeral 5,
-        del Decreto 1377 de 2013), <strong>no una transferencia internacional</strong> (art&iacute;culo 2, numeral
+        transmisi&oacute;n internacional de datos personales a un Encargado</strong> (art&iacute;culo 3, numeral 5,
+        del Decreto 1377 de 2013), <strong>no una transferencia internacional</strong> (art&iacute;culo 3, numeral
         4), porque el receptor trata por cuenta del Responsable y no es Responsable del tratamiento: en
         consecuencia <strong>no se activa la prohibici&oacute;n de transferencia del art&iacute;culo 26 de la Ley
         1581 de 2012</strong>. La transmisi&oacute;n se rige por el art&iacute;culo 24, numeral 2, del Decreto 1377
@@ -396,7 +397,7 @@ en los textos que se publiquen.
   trata los datos del cliente como procesado; sin esa condici&oacute;n, este Anexo no afirma ese papel. En la
   operaci&oacute;n descrita, y <strong>mientras el CDPA este vigente y aplicable a la cuenta del Encargado</strong>,
   Google LLC interviene como <strong>Encargado (Subencargado)</strong> de los datos del servicio de correo y el flujo
-  constituye una <strong>transmisi&oacute;n internacional a un Encargado</strong> (art&iacute;culo 2, numeral 5, del
+  constituye una <strong>transmisi&oacute;n internacional a un Encargado</strong> (art&iacute;culo 3, numeral 5, del
   Decreto 1377 de 2013), que se rige por el art&iacute;culo 24, numeral 2, y el art&iacute;culo 25 del mismo
   Decreto, con el CDPA y el Anexo de Encargo versi&oacute;n 2026-11-12 como base del v&iacute;nculo contractual con el
   proveedor. <strong>En consecuencia, en esta operaci&oacute;n no se activa la prohibici&oacute;n de transferencia del
@@ -479,8 +480,8 @@ en los textos que se publiquen.
   cuenta fuera de EMEA rige el &sect;5.1.3, conforme al cual cada parte cumple las obligaciones que le correspondan
   bajo la ley que le aplique; siguen siendo exigibles las obligaciones contractuales del CDPA que este Anexo cita.
   <strong>Por eso esta determinaci&oacute;n es condicional y no absoluta.</strong> <strong>La operaci&oacute;n es una
-  transmisi&oacute;n internacional de datos personales a un Encargado</strong> (art&iacute;culo 2, numeral 5, del
-  Decreto 1377 de 2013), <strong>no una transferencia internacional</strong> (art&iacute;culo 2, numeral 4), porque
+  transmisi&oacute;n internacional de datos personales a un Encargado</strong> (art&iacute;culo 3, numeral 5, del
+  Decreto 1377 de 2013), <strong>no una transferencia internacional</strong> (art&iacute;culo 3, numeral 4), porque
   Google no es Responsable del tratamiento de esos datos: <strong>en consecuencia no se activa la prohibici&oacute;n
   del art&iacute;culo 26 de la Ley 1581 de 2012</strong>, y el r&eacute;gimen aplicable es el del art&iacute;culo 24,
   numeral 2, y el art&iacute;culo 25 del Decreto 1377 de 2013, con el numeral 3.2 del T&iacute;tulo V de la
@@ -504,7 +505,7 @@ en los textos que se publiquen.
 ```html
   <p><strong>Opini&oacute;n jur&iacute;dica del asesor legal de K+AIR (determinaci&oacute;n de L1, fila J6 del
   checklist del abogado, 12 de noviembre de 2026).</strong> La operaci&oacute;n de correo descrita en esta secci&oacute;n
-  es una <strong>transmisi&oacute;n internacional de datos personales a un Encargado</strong> (art&iacute;culo 2,
+  es una <strong>transmisi&oacute;n internacional de datos personales a un Encargado</strong> (art&iacute;culo 3,
   numeral 5, del Decreto 1377 de 2013): Google trata por cuenta del Responsable, con instrucciones del Encargado y un
   v&iacute;nculo contractual que es el Cloud Data Processing Addendum, de modo que <strong>no se configura una
   transferencia internacional a los efectos del art&iacute;culo 26 de la Ley 1581 de 2012</strong>, y el r&eacute;gimen
@@ -559,8 +560,8 @@ en los textos que se publiquen.
   exterior es una transmisi&oacute;n internacional a un Encargado:</strong> el &sect;10.1 del CDPA permite que los
   datos del cliente se procesen en cualquier pa&iacute;s donde Google o sus subencargados tengan instalaciones, y
   como Google trata esos datos por cuenta del Responsable, con instrucciones del Encargado, la operaci&oacute;n es una
-  <strong>transmisi&oacute;n internacional de datos personales a un Encargado</strong> (art&iacute;culo 2, numeral 5,
-  del Decreto 1377 de 2013), <strong>no una transferencia internacional</strong> (art&iacute;culo 2, numeral 4):
+  <strong>transmisi&oacute;n internacional de datos personales a un Encargado</strong> (art&iacute;culo 3, numeral 5,
+  del Decreto 1377 de 2013), <strong>no una transferencia internacional</strong> (art&iacute;culo 3, numeral 4):
   <strong>en consecuencia no se activa el art&iacute;culo 26 de la Ley 1581 de 2012</strong> y el r&eacute;gimen
   aplicable es el del art&iacute;culo 24, numeral 2, y el art&iacute;culo 25 del Decreto 1377 de 2013, con el numeral
   3.2 del T&iacute;tulo V de la Circular &Uacute;nica (Estados Unidos, pa&iacute;s con nivel adecuado de protecci&oacute;n)
@@ -600,7 +601,7 @@ en los textos que se publiquen.
   contrato con la Empresa: entre ambos queda constituida la relaci&oacute;n de <strong>transmisi&oacute;n
   internacional</strong> del art&iacute;culo 24, numeral 2, y del art&iacute;culo 25 del Decreto 1377 de 2013, porque
   Google trata los datos del cliente por cuenta del Responsable y con instrucciones del Encargado;
-  <strong>no se trata de una transferencia internacional</strong> (art&iacute;culo 2, numeral 4), de modo que
+  <strong>no se trata de una transferencia internacional</strong> (art&iacute;culo 3, numeral 4), de modo que
   <strong>no se activa el art&iacute;culo 26 de la Ley 1581 de 2012</strong>, y el numeral 3.2 del T&iacute;tulo V de
   la Circular &Uacute;nica (Estados Unidos con nivel adecuado de protecci&oacute;n) se mantiene como marco de
   referencia, con el deber del Responsable de poder demostrar medidas apropiadas y efectivas. A Google no se le
@@ -633,7 +634,7 @@ en los textos que se publiquen.
     secci&oacute;n 4 no se activa por no tratarse de una transferencia) y art&iacute;culo 27 (normas corporativas
     vinculantes).</li>
     <li>Decreto 1072 de 2015, art&iacute;culo 2.2.4.6.13 (plazos de conservaci&oacute;n de los registros del SG-SST).</li>
-    <li>Decreto 1377 de 2013, art&iacute;culo 2, numerales 4 y 5 (transferencia y transmisi&oacute;n internacional),
+    <li>Decreto 1377 de 2013, art&iacute;culo 3, numerales 4 y 5 (transferencia y transmisi&oacute;n internacional),
     art&iacute;culo 24, numeral 2 (transmisi&oacute;n internacional entre el Responsable y el Encargado) y
     art&iacute;culo 25 (contenido m&iacute;nimo del contrato de transmisi&oacute;n y obligaciones del Encargado).</li>
     <li>Decreto 1074 de 2015, art&iacute;culos 2.2.2.25.5.1 y 2.2.2.25.5.2 (transmisi&oacute;n internacional y
@@ -729,7 +730,7 @@ de Nube, declara el papel y la clasificación:
   viajan en el correo, se obtienen desde la aplicaci&oacute;n. <strong>En esta operaci&oacute;n Google interviene como
   Encargado (Subencargado por v&iacute;nculo contractual)</strong>, trata los datos del cliente por cuenta del
   Responsable y con instrucciones del Encargado, y en consecuencia <strong>la comunicaci&oacute;n al exterior es una
-  transmisi&oacute;n internacional de datos personales a un Encargado</strong> (art&iacute;culo 2, numeral 5, del
+  transmisi&oacute;n internacional de datos personales a un Encargado</strong> (art&iacute;culo 3, numeral 5, del
   Decreto 1377 de 2013), <strong>no una transferencia internacional</strong>, y <strong>no se activa el art&iacute;culo
   26 de la Ley 1581 de 2012</strong>. Cuando el enlace sale de la cuenta de la Empresa y el c&oacute;digo de la cuenta
   del Encargado, se usan cuentas remitentes distintas; ello no demuestra por s&iacute; solo que los destinatarios
@@ -937,7 +938,7 @@ La calificación del papel de Google en el canal de correo no queda pendiente de
 operación** —**Responsable** (art. 3(e) Ley 1581 de 2012) sobre los datos de la cuenta del administrador y sobre
 la telemetría del servicio, y **Encargado** (art. 3(d)) sobre los datos del cliente que salen por el canal, donde
 «Subencargado» es figura exclusivamente contractual (CDPA §§2 y 5.1.2), no categoría legal—; y la operación es una
-**transmisión internacional de datos personales a un Encargado** (art. 2 num. 5 del Decreto 1377 de 2013), **no
+**transmisión internacional de datos personales a un Encargado** (art. 3 num. 5 del Decreto 1377 de 2013), **no
 una transferencia** (num. 4), por lo que **no se activa la prohibición del art. 26 de la Ley 1581 de 2012** y
 rigen el **art. 24 num. 2** y el **art. 25** del Decreto 1377, con el numeral 3.2 del Título V de la Circular
 Única (Estados Unidos con nivel adecuado; parágrafo primero: responsabilidad demostrada) como marco de referencia.
@@ -949,7 +950,7 @@ la Ley Europea. **Estados Unidos es uno de los países posibles, no el único** 
 Terms §1.3). El **CDPA no fija plazo de 24 h ni de 48 h** para incidentes, y el plazo de 48 h del Anexo de Encargo
 es **compromiso propio de K+AIR**.
 
-**Condición de cierre:** las **doce correcciones (0.1 a 0.12)** deben estar incorporadas antes de publicar la v1.4.
+**Condición de cierre:** las **trece correcciones (0.1 a 0.13)** deben estar incorporadas antes de publicar la v1.4.
 Mientras no lo estén, los textos de la v1.4 candidata **se contradicen entre sí** (declaran a Google Encargado y, a
 la vez, que «no existe contrato de transmisión»; afirman «transferencia internacional» y, a la vez, la aplicación
 del art. 26 frente a la propia calificación del receptor), y esa es exactamente la contradicción que esta
@@ -981,7 +982,8 @@ como **acto del owner** y marcados `⚠️ No verificado` en el expediente.
 piezas que faltaban de la entrega anterior (cierre de B.3, B.4 a B.7 y el veredicto).
 
 **VEREDICTO: PASS** — determinación de L1 entregada en el formato de 5 secciones con base normativa verificada
-(12-nov-2026), doce correcciones con su corrección precisa, siete actos del owner, texto literal HTML listo para
+(12-nov-2026), trece correcciones con su corrección precisa (la **0.13** del 13-nov-2026, sobre la cita del
+art. 3 num. 4 y 5 del Decreto 1377), siete actos del owner, texto literal HTML listo para
 pegar, y lista completa de pasajes incoherentes con ubicación, texto actual y texto propuesto. Dos puntos quedan
 marcados `⚠️ No verificado` (fecha de versión del CDPA y entidad contractual por perfil de pago) y ninguno bloquea
 el cierre.

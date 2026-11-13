@@ -1172,17 +1172,22 @@ la suite contra `firma.sqlite` y se perdio `SIGN-2026-037663`.
 
 ## 7. Estado de la suite
 
-La medicion vigente es la del **2026-11-12** (corrida final sobre el arbol de trabajo de esta
-ronda, ya con el arbol de dependencias nuevo y los 41 tests nuevos que trajo):
+La medicion vigente es la del **2026-11-13** (corrida en solitario sobre el arbol de trabajo de esta
+ronda, con el arbol de dependencias nuevo y los tests de la ronda de cierre):
 
 ```
-tests 2684 | pass 2682 | fail 0 | skipped 2
+tests 2689 | pass 2687 | fail 0 | skipped 2
 ```
 
 Medido con **Node 22.23.4** (ABI 127) en el PC de trabajo, con `better-sqlite3` 11.10.0
-recompilado para ese ABI: 317 s. Los 2 `skipped` son los que ya estaban asi el 11-nov.
-**Actualizada el 12-nov-2026 (noche):** la corrida dio **2 684 / 2 682 / 0 / 2** (299 s, 180
-archivos, `exit 0`). Los **+14** sobre la corrida de la tarde son las pruebas de la
+recompilado para ese ABI: 325 s. Los 2 `skipped` son los que ya estaban asi el 11-nov.
+**Actualizada el 13-nov-2026 (tarde, segunda parte):** la corrida dio **2 689 / 2 687 / 0 / 2**
+(325 s, 180 archivos, `exit 0`). Los **+5** sobre la corrida de la noche del 12-nov son las cuatro
+pruebas nuevas del enlace entre cada bloque del mapa y su fila en la tabla de solicitudes
+(`tabla-de-solicitudes-2026-11-13.md`) y la del guard que **falla si la cita errada del Decreto
+1377** reaparece en cualquiera de los dos candidatos de la v1.4.
+**La anterior, del 12-nov-2026 (noche):** la corrida dio **2 684 / 2 682 / 0 / 2** (299 s, 180
+archivos, `exit 0`). Los **+14** sobre la corrida de la tarde de ese dia son las pruebas de la
 compuerta de conservacion con las condiciones C1 a C4, las del marcador de pendiente, las
 del generador de los candidatos de la v1.4 (que hasta ahora no tenia test) y el guard de
 ASCII puro (que exige que los dos programas de la v1.4 no tengan ni un byte sobre 127,
@@ -1190,8 +1195,8 @@ ni BOM, ni CRLF).
 
 La medicion anterior (12-nov-2026, antes del cambio de dependencias) fue
 `tests 2606 | pass 2604 | fail 0 | skipped 2`, en 415 s; la de antes (11-nov-2026) fue
-`tests 2574 | pass 2572 | fail 0 | skipped 2`, en 220 s. **La diferencia son 61 pruebas nuevas**
-(2 684 - 2 606), todas en verde; el numero de la seccion 7 se queda
+`tests 2574 | pass 2572 | fail 0 | skipped 2`, en 220 s. **La diferencia son 83 pruebas nuevas**
+(2 689 - 2 606), todas en verde; el numero de la seccion 7 se queda
 atrasado si no se actualiza, y una cifra vencida leida como vigente es un verde falso.
 
 > La reproduccion desde **clon limpio** esta medida y registrada en
@@ -1202,7 +1207,7 @@ atrasado si no se actualiza, y una cifra vencida leida como vigente es un verde 
 > los 2 665 nombres de prueba identico** al de la corrida de ese momento. El clon quedo **byte a byte**
 > igual al arbol del owner (4 810 archivos, 0 diferentes). El 6.11 del cuadro canonico quedo
 > **CERRADO** por esto. **Ojo con las dos cifras:** la del clon es la de `e4dd5f31`, que es
-> **anterior** a las dos pruebas de regresion del manifiesto; el arbol de hoy da **2 684 / 2 682**.
+> **anterior** a las dos pruebas de regresion del manifiesto; el arbol de hoy da **2 689 / 2 687**.
 > Compararlas como si fueran la misma corrida seria un error de lectura.
 
 > **El EOL de este archivo esta fijado por su test.** Si lo abres en un editor que normalice a

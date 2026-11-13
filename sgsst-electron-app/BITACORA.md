@@ -10139,3 +10139,109 @@ texto.
   v1.4 corrige (la entidad de Google, la fecha de efectividad del CDPA) se corrigen **cuando el texto esté
   firmado**, con su huella real, no antes: un manifiesto que declara un texto que nadie ha suscrito es un gate
   mintiendo en verde.
+
+## 2026-11-13 (tarde) — el verificador que comparaba la frase de conciliación por su primera línea, y el criterio de cierre que era solo una frase en prosa
+
+**El defecto, y cómo se hizo visible.** `scripts/contar-estados-meta-apertura.js` reescribe la **frase de
+conciliación** del mapa (la que va después de la tabla resumen) y compara lo que encuentra con lo que va a
+escribir. La comparación era **por la primera línea del bloque**: si la primera línea coincidía, se reescribía
+el bloque entero. Cuando la frase pasó a ocupar **dos líneas** —para nombrar las 21 solicitudes y aclarar que
+*cerrado no es acto cumplido*—, la reescritura **perdió la línea en blanco** que separaba la frase del `---`
+de abajo. El documento quedó con la frase pegada al separador, y **el script no se quejaba**: comparaba una
+línea con una línea, y las dos coincidían.
+
+**La regla que sale de ahí.**
+1. **Un bloque se compara completo.** Si lo que se reescribe ocupa más de una línea, el comparador compara el
+   bloque entero y el reescritor escribe el bloque entero: uno por líneas y el otro por bloques se contradicen.
+2. **Un verificador que reescribe tiene que ser idempotente**: correrlo dos veces sobre el mismo archivo tiene
+   que dejar el mismo archivo. La prueba del script comprueba eso, y el **mutante** (una copia con la línea en
+   blanco quitada) tiene que salir en rojo.
+3. **Un reescritor se prueba sobre una copia, y el diff se mira a ojo**: un `git diff` que muestra una línea en
+   blanco desaparecida es el defecto entero.
+
+**El otro asunto, que es de fondo y no de código.** El mapa decía, en prosa, que «un bloque cierra cuando lo
+que su texto dice que falta está hecho y medido». Eso era una regla escrita **en el documento**, no en el
+código: el script solo contaba palabras. Y la regla, además, era discutible, porque los 21 pendientes
+eran casi todos **actos de terceros**: una firma, una credencial, una ventana de mantenimiento, una
+respuesta. Cerrarlos por decreto habría sido un **verde falso** —el defecto exacto que el mapa existe para
+evitar—; dejarlos abiertos para siempre, con el pedido ya escrito y con destinatario y fecha, era un
+**conteo que no cuenta nada**.
+
+El owner resolvió la discusión con dos decisiones: **«cierra al emitirse la solicitud»** (el bloque cierra
+cuando el pedido sale) y **«emitida hoy, pendiente tu envío»** (la solicitud queda registrada como emitida,
+con fecha, huella y destinatario; el envío lo hace él). Con eso, la **fuente de la verdad del conteo cambia**:
+ya no es solo el estado de cada bloque, sino la **tabla de solicitudes** (`tabla-de-solicitudes-2026-11-13.md`),
+con su estado, su fecha y su destinatario. El script la lee, y ahora **falla en los dos sentidos**: un bloque
+que invoque una solicitud que no existe, y una solicitud que ningún bloque invoque.
+
+**Las tres cosas que no se hacen.**
+- **No se cambia un criterio de conteo sin cambiar la fuente de la verdad.** Cambiar el número y dejar la regla
+  como estaba es cómo un «30 de 30 cerrados» se lee como «se hizo todo lo que faltaba».
+- **No se declara cerrado un bloque que espera a un tercero.** La respuesta se sigue en la tabla, con su estado
+  y su fecha; el bloque dice qué pedido salió, a quién y con qué fecha.
+- **No se reescribe el registro de lo que se midió.** Los documentos que publicaban el conteo viejo llevan una
+  **nota de la fecha** que dice cuál era su cifra y cuál es la vigente: el registro de una ronda no se corrige,
+  se anota.
+
+**Medido.** La frase de conciliación del mapa ahora nombra las **21 solicitudes (21 EMITIDA, 0 respondidas)** y
+aclara que *cerrado no es acto cumplido*; el mapa queda en **30 bloques · 30 cerrados · 0 pendientes**, con la
+leyenda que dice que el mapa **no afirma que el servicio pueda abrirse a empresas reales**; el test del script
+tiene **11 pruebas** (cuatro nuevas: los 21 estados `EMITIDA`, el enlace de los 21 bloques, la solicitud
+inexistente y la solicitud huérfana); y la suite completa dio **2 688 tests, 2 686 pass, 0 fail, 2 skipped**
+(180 archivos, `exit 0`, corrida en solitario).
+
+## 2026-11-13 (tarde, segunda parte) — la cita que estaba mal en la fuente, y el escrito que enviaba huellas viejas
+
+**El defecto, y cómo se hizo visible.** El owner pegó la revisión de la **asesoría jurídica** sobre las cuatro
+solicitudes al abogado. Traía **una corrección obligatoria**: S-01 decía que la operación del canal de correo
+es una «transmisión internacional a un Encargado (**art. 2 num. 5 del Decreto 1377 de 2013**)». Esas
+definiciones **no están en el art. 2**: el art. 2 es «Tratamiento de datos en el ámbito personal o doméstico»,
+y las definiciones están en el **art. 3** (num. 4 Transferencia, num. 5 Transmisión). Verificado en la
+compilación oficial de la Cancillería (Normograma) y en el PDF de la CVC.
+
+El defecto era de fondo, no de forma: **la fuente legal estaba mal citada** y esa fuente alimenta, por
+literales, **los dos textos que K+AIR va a firmar**. El arreglo correcto no era parcheando el texto final:
+es corregir **la fuente** (`dictamen-legal-l1-2026-11-12.md` y `pedido-6-backblaze-v1-4-2026-11-12.md`),
+registrar la corrección como **0.13** en el §0 del dictamen, y **regenerar** los dos candidatos con el
+generador, que lee el literal del dictamen en runtime. Los textos **ya suscritos** (la v1.3 y el Encargo
+2026-11-11) **no se tocan**: no tienen esta cita —usan la forma compilada `art. 2.2.2.25.1.3`, que es
+correcta— y un texto suscrito se sustituye, no se corrige.
+
+**El segundo defecto, que estaba en el mismo documento.** Al corregir la fuente, el dictamen L1 y el pedido 6
+**cambiaron de bytes y de huella**, y el escrito al abogado **seguía declarando las viejas** (89 527 B /
+`901b2ed9…` y `d5a44080…`). El abogado recibía dos números que ya no correspondían a los archivos del
+repositorio. Un documento que se envía **con las huellas de sus insumos** es un documento que hay que
+**remedir** cada vez que un insumo cambia; y el verificador tiene que **comparar la huella declarada con la
+real del archivo**, o la tabla de insumos es una tabla de deseos.
+
+**La regla que sale de ahí.**
+1. **Una revisión que no es la respuesta cambia lo que se envía, no lo que está cerrado.** La revisión de la
+   asesoría lo dice en su propio encabezado: «No sustituye la decisión del abogado matriculado ni del
+   representante legal». S-01 a S-04 **siguen `EMITIDA` y 0 `RESPONDIDA`**; lo que cambió fue **el pedido**.
+2. **Lo no verificado se marca como no verificado, en el documento que se envía.** El contenido de la
+   **Circular Externa 002 de 2025** no se pudo leer: su aplicación al canal de correo y a la transferencia del
+   software es **nuestra determinación**, y ahora S-01 lo dice y **pide la confirmación expresa**. Del mismo
+   modo, la condición de **región United States** del bucket quedó marcada como **decisión conservadora de
+   K+AIR** —no como exigencia legal verificada— con **la pregunta expresa** de si es una cosa o la otra.
+3. **Una pregunta que decide una redacción se pregunta de forma expresa.** Si la respuesta cambia lo que se
+   escribe en la v1.4 (obligación normativa frente a decisión propia), la pregunta **va en el escrito**, con
+   su respuesta posible escrita, no implícita en un adjetivo.
+4. **La huella de un insumo es la del contenido.** Se mide con `execFileSync`, nunca con un pipe de shell, y
+   el documento que la cita se vuelve a medir cuando el insumo cambia.
+5. **Un guard que nunca se ha visto fallar no es un guard.** El verificador de cierre de esta ronda tiene
+   **cinco guards probados con mutantes**: (a) la cita errada vuelve al mapa; (b) el escrito declara la huella
+   vieja de su insumo; (c) desaparece la pregunta expresa de la región US; (d) una solicitud de la tabla deja
+   de estar `EMITIDA`; (e) el aviso de la Circular 002 como no verificada desaparece del escrito. Los cinco
+   **salen en rojo** y el archivo queda restaurado.
+
+**Medido.** La corrección quedó en la fuente (con la fila **0.13** trazada) y llegó a los dos candidatos por
+regeneración: **103 390 B / `fae2b26b…d8b416`** y **97 962 B / `7576b1a1…d9f3c`**, huellas que **no cambiaron**
+porque el ajuste de «doce» a «trece correcciones» no entra en los literales que el generador lee. El barrido de
+la cita errónea en todo el repositorio da **9 coincidencias, y las 9 son intencionales**: cuatro en la fila
+0.13 que la traza, dos en el registro de la asesoría, tres en el guard del test. Fuera de esos tres contextos:
+**cero**. El test de los candidatos tiene **9/9 verde**, con un guard nuevo que **falla si la cita errada
+reaparece** en cualquiera de los dos textos firmables. Las huellas del dictamen L1 (90 936 B /
+`f2e93023…`) y del pedido 6 (38 185 B / `464914b5…`) se actualizaron en el escrito enviable, y el
+**manifiesto de sumas del paquete** se regeneró: **14 de 14**. La suite completa dio **2 689 tests,
+2 687 pass, 0 fail, 2 skipped** (180 archivos de prueba, `exit 0`, 325 s, corrida en solitario): **+1**
+sobre la ronda 16, que es la prueba del guard nuevo de la cita.

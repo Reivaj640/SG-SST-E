@@ -96,6 +96,20 @@ del agente legal sería un **verde falso**, que es exactamente el defecto que es
 Lo que sí cambió en el mapa es el **«qué falta»** de M.5, M.6, M.15, M.18 y M.20: ya no dice «falta la
 determinación» sino **el acto concreto, con su responsable**. Ese es el avance real de la ronda.
 
+> **Actualización del 13-nov-2026 (esta acta mide la mesa del 12-nov y eso no cambia).** El owner **cambió el
+> criterio de cierre del mapa**: un bloque cierra cuando **el pedido está emitido y medido** —con su
+> destinatario, su fecha y su verificación—, y los actos de un tercero (firma, credencial, ventana,
+> respuesta) **no** cierran un bloque: se siguen en `tabla-de-solicitudes-2026-11-13.md` (21 solicitudes, las
+> 21 **EMITIDA**, **0 respondidas**). Con ese criterio el mapa quedó en **30 cerrados / 0 pendientes**, y
+> **no afirma que el servicio pueda abrirse a empresas reales**. La cifra de arriba (9 cerrados / 21
+> pendientes) es la de esta acta, con la regla de entonces.
+>
+> **Nota del 13-nov-2026 sobre las «doce correcciones».** Esta acta mide la mesa del 12-nov, y ese día fueron
+> **doce**. Hoy el dictamen de L1 tiene **trece**: la **0.13** (la cita del Decreto 1377: las definiciones de
+> Transferencia y Transmisión están en el **art. 3**, no en el art. 2), que entró con la revisión de la
+> asesoría jurídica del 13-nov-2026 (`revision-asesoria-s01-s04-2026-11-13.md`). Esa revisión **no es la
+> respuesta del abogado**: S-01 a S-04 **siguen `EMITIDA` y 0 `RESPONDIDA`**.
+
 ---
 
 ## 6. Cierre

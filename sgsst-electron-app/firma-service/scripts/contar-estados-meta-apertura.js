@@ -19,6 +19,14 @@
  *    bloque sin origen no es trazable, y este mapa existe para ser trazado.
  * 6. Regenera el bloque de la tabla resumen y la frase de conciliacion. Los
  *    numeros NO se escriben a mano: salen del conteo real de las filas.
+ * 7. Verifica el enlace con la TABLA DE SOLICITUDES: la solicitud que un
+ *    bloque invoca tiene que existir en la tabla, y una solicitud de la tabla
+ *    tiene que estar referenciada por un bloque. Un bloque "cerrado" que
+ *    invoca una solicitud inexistente es un verde falso, y una solicitud
+ *    huerfana es un pedido que nadie pidio.
+ * 8. La frase de conciliacion nombra las solicitudes y su estado, para que un
+ *    mapa con 30 bloques cerrados y 21 solicitudes sin responder no se lea
+ *    como "listo para abrir".
  *
  * INTERFAZ
  * --------
@@ -47,6 +55,18 @@
  *   - "No aplica..."          -> no aplica
  * Todo lo demas es un error y el script sale con codigo distinto de 0.
  *
+ * QUE SIGNIFICA "CERRADO" (criterio del 13-nov-2026)
+ * ---------------------------------------------------
+ * Un bloque CERRADO significa: "el pedido esta emitido y medido". El acto de
+ * un tercero (una firma, una credencial, una ventana, una respuesta) NO es
+ * lo que cierra el bloque: lo que lo cierra es que el pedido salio, con su
+ * destinatario, su fecha y su verificacion. Los actos de terceros se siguen
+ * en la tabla de solicitudes, con su estado.
+ *
+ * La clave de un bloque cerrado por solicitud lo dice:
+ *   "### M.5 - <titulo> - CERRADO. Solicitud S-01 emitida el 13-nov-2026"
+ * y el script comprueba que esa S-01 exista en la tabla.
+ *
  * Este archivo es codigo: se escribe en ASCII puro (sin tildes ni enie),
  * como el resto del codigo del repositorio.
  */
@@ -64,6 +84,22 @@ const RUTA_DOC = path.resolve(
 
 /** Rayon largo (el que separa el texto del estado). */
 const RAYON = '\u2014';
+/**
+ * La tabla de solicitudes, relativo a este script.
+ *
+ * Es la fuente de la verdad de los actos de terceros: cada pendiente que se
+ * pidio por escrito tiene su fila (estado, destinatario, fecha y
+ * verificacion). El mapa dice que bloques se cerraron "por solicitud"; este
+ * archivo dice CUAL solicitud, y si ya la respondieron.
+ */
+const RUTA_SOLICITUDES = path.resolve(
+  __dirname, '..', '..', 'docs', 'gestion-humana', 'firma-electronica',
+  'tabla-de-solicitudes-2026-11-13.md'
+);
+
+/** Los estados que una solicitud puede tener. */
+const ESTADOS_SOLICITUD = ['PREPARADA', 'EMITIDA', 'RESPONDIDA', 'CERRADA'];
+
 /** La cabecera de la tabla resumen. */
 const CABECERA = '| Bloque | Cerrados | Pendientes | No aplica | Total |';
 /** El separador de la tabla resumen. */
@@ -157,6 +193,11 @@ function _parsear(texto) {
       seccion: seccion,
       estado: estado,
       clave: clave.trim(),
+      // Las solicitudes que este bloque invoca en su clave (por ejemplo
+      // "CERRADO. Solicitud S-01 emitida el 13-nov-2026"). Un bloque puede
+      // invocar mas de una: un acto puede tener su parte juridica y su parte
+      // de ejecucion.
+      solicitudes: (clave.match(/\bS-\d+\b/g) || []),
     });
   }
   return { bloques: bloques, errores: errores };
@@ -218,6 +259,94 @@ function _verificarIds(bloques) {
 }
 
 /**
+ * Parsea la tabla de solicitudes.
+ *
+ * Cada fila es "| S-XX | bloque | destinatario | que se pide | como se
+ * verifica | estado | vence |". El estado se reconoce por su palabra, no por
+ * su posicion: si la tabla cambia de columnas, el parser sigue leyendo la
+ * misma celda.
+ *
+ * @param {string} texto
+ * @returns {{solicitudes: Array, errores: string[]}}
+ */
+function _parsearSolicitudes(texto) {
+  const solicitudes = [];
+  const errores = [];
+  const lineas = texto.split('\n');
+  for (const linea of lineas) {
+    const m = /^\|\s*(S-\d+)\s*\|/.exec(linea);
+    if (!m) continue;
+    const id = m[1];
+    const celdas = linea.split('|').map((c) => c.trim()).filter((c) => c !== '');
+    let estado = null;
+    for (const c of celdas) {
+      if (ESTADOS_SOLICITUD.indexOf(c.toUpperCase()) >= 0) {
+        estado = c.toUpperCase();
+        break;
+      }
+    }
+    if (!estado) {
+      errores.push(
+        'La solicitud ' + id + ' no declara un estado que se reconozca ('
+          + ESTADOS_SOLICITUD.join(', ') + ').'
+      );
+      continue;
+    }
+    const bloque = (celdas[1] || '').match(/M\.\d+/);
+    solicitudes.push({
+      id: id,
+      estado: estado,
+      bloque: bloque ? bloque[0] : '',
+      celdas: celdas,
+    });
+  }
+  return { solicitudes: solicitudes, errores: errores };
+}
+
+/**
+ * Ata los bloques del mapa con la tabla de solicitudes.
+ *
+ * El control que muerde: un bloque que dice "CERRADO. Solicitud S-01" tiene
+ * que existir en la tabla, y una solicitud que esta en la tabla tiene que
+ * estar referenciada por algun bloque. Si uno de los dos lados se desincroniza,
+ * el verificador falla: un bloque "cerrado" que no tiene solicitud es un
+ * verde falso, y una solicitud huerfana es un pedido que nadie pedio.
+ *
+ * @param {Array} bloques
+ * @param {Array} solicitudes
+ * @returns {string[]} los problemas encontrados (vacio si todo cuadra).
+ */
+function _verificarSolicitudes(bloques, solicitudes) {
+  const problemas = [];
+  const porId = {};
+  for (const s of solicitudes) porId[s.id] = s;
+  const referenciadas = {};
+  for (const b of bloques) {
+    for (const id of b.solicitudes) {
+      referenciadas[id] = true;
+      if (!porId[id]) {
+        problemas.push(
+          'El bloque ' + b.id + ' invoca la solicitud ' + id + ', que no esta en la tabla de solicitudes.'
+        );
+      }
+    }
+    if (b.estado === 'cerrado' && b.solicitudes.length === 0) {
+      // No es un error: hay bloques cerrados que no dependen de ninguna
+      // solicitud. Se cuenta aparte para poder informarlo.
+      b.sinSolicitud = true;
+    }
+  }
+  for (const s of solicitudes) {
+    if (!referenciadas[s.id]) {
+      problemas.push(
+        'La solicitud ' + s.id + ' esta en la tabla pero ningun bloque la invoca.'
+      );
+    }
+  }
+  return problemas;
+}
+
+/**
  * Cuenta por seccion.
  * @param {Array} bloques
  * @returns {Array} [{n, etiqueta, cerrados, pendientes, noAplica, total}]
@@ -261,10 +390,16 @@ function _armarTabla(conteo) {
 
 /**
  * Arma la frase que concilia los pendientes.
+ *
+ * La frase dice las DOS cosas: cuantos pendientes quedan, y cuantos bloques
+ * "cerrados" lo estan porque su pedido salio. Sin la segunda parte, un mapa
+ * con 30 cerrados y 21 solicitudes sin responder es un verde falso.
+ *
  * @param {Array} conteo
+ * @param {Array} solicitudes
  * @returns {string}
  */
-function _armarFrase(conteo) {
+function _armarFrase(conteo, solicitudes) {
   const partes = [];
   let total = 0;
   for (const c of conteo) {
@@ -282,6 +417,18 @@ function _armarFrase(conteo) {
       partesNa.push(c.noAplica + ' del bloque ' + c.n);
     }
     frase += ' Los ' + noAplica + ' que no aplican: ' + partesNa.join(' + ') + '.';
+  }
+  if (solicitudes && solicitudes.length) {
+    const porEstado = {};
+    for (const s of solicitudes) porEstado[s.estado] = (porEstado[s.estado] || 0) + 1;
+    const detalle = ESTADOS_SOLICITUD
+      .filter((e) => porEstado[e])
+      .map((e) => porEstado[e] + ' ' + e);
+    frase += ' Las ' + solicitudes.length + ' solicitudes de la tabla'
+      + ' (`tabla-de-solicitudes-2026-11-13.md`): ' + detalle.join(', ') + '.'
+      + ' Cerrado en este mapa significa que el pedido esta emitido y medido,'
+      + ' no que el acto este cumplido: cada acto de un tercero se sigue en esa tabla,'
+      + ' con su estado, su destinatario y su fecha.';
   }
   return frase;
 }
@@ -303,6 +450,36 @@ function _ubicarTabla(lineas) {
   let fin = inicio;
   for (let i = inicio + 1; i < lineas.length; i++) {
     if (!/^\s*\|/.test(lineas[i])) break;
+    fin = i;
+  }
+  return { inicio: inicio, fin: fin };
+}
+
+/**
+ * Ubica la frase de conciliacion dentro de un bloque de lineas.
+ *
+ * La frase se dobla a un ancho fijo, asi que puede ocupar VARIAS lineas: se
+ * toma la primera linea que no esta en blanco (si empieza con "Los ") y se
+ * sigue mientras las lineas sigan sin estar en blanco.
+ *
+ * @param {string[]} lineas
+ * @returns {{inicio: number, fin: number}}
+ */
+function _ubicarFrase(lineas) {
+  let inicio = -1;
+  for (let i = 0; i < lineas.length; i++) {
+    if (lineas[i].trim() === '') continue;
+    if (lineas[i].indexOf('Los ') === 0) inicio = i;
+    break;
+  }
+  if (inicio < 0) return { inicio: -1, fin: -1 };
+  let fin = inicio;
+  for (let i = inicio; i < lineas.length; i++) {
+    // El bloque de la frase termina en la primera linea en blanco, en un
+    // encabezado o en un separador: lo que sigue no es parte de la frase.
+    if (lineas[i].trim() === '') break;
+    if (lineas[i].startsWith('#')) break;
+    if (lineas[i].trim() === '---') break;
     fin = i;
   }
   return { inicio: inicio, fin: fin };
@@ -345,20 +522,37 @@ function _doblar(texto, ancho) {
  * Ejecuta la verificacion (y, si se pide, escribe la tabla y la frase).
  * @param {string} rutaDoc
  * @param {boolean} escribir
+ * @param {string} [rutaSolicitudes] la tabla de solicitudes (por defecto, la del
+ *   repositorio). Se puede apuntar a otra para probar el verificador sobre una
+ *   COPIA, sin tocar el archivo real.
  * @returns {number} el codigo de salida.
  */
-function correr(rutaDoc, escribir) {
+function correr(rutaDoc, escribir, rutaSolicitudes) {
   if (!fs.existsSync(rutaDoc)) {
     console.error('No existe el mapa: ' + rutaDoc);
     return 2;
   }
+  const rutaSol = rutaSolicitudes || RUTA_SOLICITUDES;
   const texto = fs.readFileSync(rutaDoc, 'utf8');
   const parseo = _parsear(texto);
   const problemas = parseo.errores.concat(_verificarIds(parseo.bloques));
 
+  // Las solicitudes: la tabla de actos de terceros. Cada bloque que dice
+  // "CERRADO. Solicitud S-XX" tiene que tener su fila, y cada fila tiene que
+  // estar referenciada por un bloque.
+  let solicitudes = [];
+  if (fs.existsSync(rutaSol)) {
+    const ps = _parsearSolicitudes(fs.readFileSync(rutaSol, 'utf8'));
+    solicitudes = ps.solicitudes;
+    problemas.push(...ps.errores);
+    problemas.push(..._verificarSolicitudes(parseo.bloques, solicitudes));
+  } else {
+    problemas.push('No existe la tabla de solicitudes: ' + rutaSol);
+  }
+
   const conteo = _contar(parseo.bloques);
   const tabla = _armarTabla(conteo);
-  const frase = _armarFrase(conteo);
+  const frase = _armarFrase(conteo, solicitudes);
 
   // La tabla del documento tiene que ser EXACTAMENTE la que sale del conteo.
   const lineas = _lineas(texto);
@@ -378,13 +572,15 @@ function correr(rutaDoc, escribir) {
     problemas.push(e.message);
   }
 
-  // La frase de conciliacion, si esta, tambien se compara.
+  // La frase de conciliacion, si esta, tambien se compara. Se compara
+  // COMPLETA: ahora puede ocupar varias lineas porque nombra las solicitudes.
   if (inicio >= 0) {
-    let i = fin + 1;
-    while (i < lineas.length && lineas[i].trim() === '') i++;
-    if (i < lineas.length && lineas[i].indexOf('Los ') === 0) {
+    const despuesDeTabla = lineas.slice(fin + 1);
+    const u = _ubicarFrase(despuesDeTabla);
+    if (u.inicio >= 0) {
       const esperada = _doblar(frase, ANCHO).join('\n');
-      if (lineas[i] !== esperada.split('\n')[0]) {
+      const actual = despuesDeTabla.slice(u.inicio, u.fin + 1).join('\n');
+      if (actual !== esperada) {
         problemas.push(
           'La frase de conciliacion NO cuadra con el conteo real. '
             + (escribir ? 'Se regenero.' : 'Corre con --escribir.')
@@ -421,6 +617,13 @@ function correr(rutaDoc, escribir) {
   );
   console.log('  cerrados: ' + tot.cerrados + ' | pendientes: ' + tot.pendientes
     + ' | no aplica: ' + tot.noAplica);
+  if (solicitudes.length) {
+    const porEstado = {};
+    for (const s of solicitudes) porEstado[s.estado] = (porEstado[s.estado] || 0) + 1;
+    const detalle = ESTADOS_SOLICITUD.filter((e) => porEstado[e])
+      .map((e) => porEstado[e] + ' ' + e).join(', ');
+    console.log('  solicitudes: ' + solicitudes.length + ' (' + detalle + ')');
+  }
   return 0;
 }
 
@@ -435,23 +638,33 @@ function _reescribir(texto, tabla, frase) {
   const lineas = _lineas(texto);
   const u = _ubicarTabla(lineas);
   const antes = lineas.slice(0, u.inicio);
-  const despues = lineas.slice(u.fin + 1);
-  // Se descarta la frase vieja (si la hay) y se pone la nueva.
+  let despues = lineas.slice(u.fin + 1);
+  // Se descarta la frase vieja (si la hay) COMPLETA: puede ocupar varias
+  // lineas, porque se dobla a un ancho fijo.
+  const p = _ubicarFrase(despues);
+  if (p.inicio >= 0) {
+    despues = despues.slice(0, p.inicio).concat(despues.slice(p.fin + 1));
+  }
   let i = 0;
   while (i < despues.length && despues[i].trim() === '') i++;
-  if (i < despues.length && despues[i].indexOf('Los ') === 0) despues.splice(i, 1);
   const fraseDoblada = _doblar(frase, ANCHO);
-  return antes.concat(tabla, [''], fraseDoblada, despues.slice(i)).join('\n');
+  // La tabla, un blanco, la frase y un blanco: la frase nunca se come el
+  // separador que viene despues.
+  return antes.concat(tabla, [''], fraseDoblada, [''], despues.slice(i)).join('\n');
 }
 
 module.exports = {
   correr: correr,
   _parsear: _parsear,
+  _parsearSolicitudes: _parsearSolicitudes,
+  _verificarSolicitudes: _verificarSolicitudes,
   _contar: _contar,
   _armarTabla: _armarTabla,
   _armarFrase: _armarFrase,
   _estadoDeClave: _estadoDeClave,
   SECCIONES: SECCIONES,
+  ESTADOS_SOLICITUD: ESTADOS_SOLICITUD,
+  RUTA_SOLICITUDES: RUTA_SOLICITUDES,
 };
 
 if (require.main === module) {
@@ -462,6 +675,8 @@ if (require.main === module) {
   }
   const escribir = args.indexOf('--escribir') >= 0;
   const deDoc = (args.find((a) => a.indexOf('--doc=') === 0) || '').split('=')[1];
+  const deSol = (args.find((a) => a.indexOf('--solicitudes=') === 0) || '').split('=')[1];
   const rutaDoc = deDoc ? path.resolve(deDoc) : RUTA_DOC;
-  process.exit(correr(rutaDoc, escribir));
+  const rutaSol = deSol ? path.resolve(deSol) : RUTA_SOLICITUDES;
+  process.exit(correr(rutaDoc, escribir, rutaSol));
 }

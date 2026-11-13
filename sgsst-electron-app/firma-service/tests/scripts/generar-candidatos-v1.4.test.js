@@ -137,7 +137,7 @@ test('el Anexo de Nube v1.4 dice lo que la determinacion de L1 decidio', () => {
     'se declaran los actos del 12-nov');
   assert.ok(planoTexto.includes('Esta versi&oacute;n 1.4'),
     'se declara que esta version 1.4 no esta suscrita');
-  assert.ok(planoTexto.includes('Decreto 1377 de 2013, art&iacute;culo 2, numerales 4 y 5'),
+  assert.ok(planoTexto.includes('Decreto 1377 de 2013, art&iacute;culo 3, numerales 4 y 5'),
     'el seccion 11 cita el Decreto 1377');
 
   // Y NO puede quedar lo que la determinacion corrigio.
@@ -149,6 +149,36 @@ test('el Anexo de Nube v1.4 dice lo que la determinacion de L1 decidio', () => {
     'el destino ya se decidio: el C2 quedo corregido');
   assert.equal(texto.includes('transferencia internacional a Estados Unidos'), false,
     'no queda la clasificacion de transferencia que la determinacion corrigio');
+});
+
+test('los dos candidatos NO citan mal el Decreto 1377 (la correccion del 13-nov-2026)', () => {
+  // Las definiciones de Transferencia (num. 4) y de Transmision (num. 5) estan
+  // en el ART. 3 del Decreto 1377 de 2013. El art. 2 es "Tratamiento de datos
+  // en el ambito personal o domestico". La cita equivocada la trajo la mesa L1
+  // y llego a los dos textos firmables; el 13-nov-2026 se corrigio en la fuente
+  // (el dictamen) y los candidatos se rearmaron.
+  //
+  // La comprobacion va sobre el texto plano porque la cita puede partirse
+  // entre dos lineas del HTML.
+  const erratas = [
+    'art&iacute;culo 2, numeral 4',
+    'art&iacute;culo 2, numeral 5',
+    'art&iacute;culo 2, numerales 4 y 5',
+  ];
+  for (const archivo of [NUBE_CANDIDATO, ENCARGO_CANDIDATO]) {
+    const planoTexto = plano(fs.readFileSync(archivo, 'utf8'));
+    for (const e of erratas) {
+      assert.equal(planoTexto.includes(e), false,
+        path.basename(archivo) + ' no debe decir "' + e + '" (las definiciones estan en el art. 3)');
+    }
+  }
+  // Y el texto correcto tiene que estar: si no, la prueba pasaria sola.
+  const nube = plano(fs.readFileSync(NUBE_CANDIDATO, 'utf8'));
+  assert.ok(nube.includes('Decreto 1377 de 2013, art&iacute;culo 3, numerales 4 y 5'),
+    'el seccion 11 cita el art. 3 num. 4 y 5');
+  const encargo = plano(fs.readFileSync(ENCARGO_CANDIDATO, 'utf8'));
+  assert.ok(encargo.includes('art&iacute;culo 3, numeral 5'),
+    'el Encargo cita el art. 3 num. 5');
 });
 
 test('el Anexo de Encargo 2026-11-12 lleva la version unificada', () => {

@@ -1239,8 +1239,62 @@ verifica, y el siguiente que lo lea se apoya en ella (y mete una tilde «porque 
 5. **Antes de convertir a ASCII se mira qué texto es literal legal.** El texto que se aplica a los
    documentos va en **entidades HTML** (`&sect;`), que ya son ASCII y **no se tocan**: la conversión afecta
    solo a las cadenas descriptivas. Y se comprueba que el resultado no cambió: los candidatos siguieron
-   dando las mismas huellas (`4f23c605…` y `fa1a79b2…`), el **texto del candidato sigue siendo byte a byte
+   dando las mismas huellas (`fae2b26b…` y `7576b1a1…`), el **texto del candidato sigue siendo byte a byte
    el de la determinación**, y los **8** tests del generador siguen verdes.
+
+### 5.39 🔴 Cambiar el criterio con el que se cuenta un estado cambia la fuente de la verdad, no el número
+
+**El caso real (13-nov-2026), la ronda 16.** El owner decidió que un bloque del mapa de la meta cierra
+cuando **el pedido sale**, y no cuando el acto de un tercero se cumple. El mapa tenía 30 bloques: **9
+cerrados y 21 pendientes**, y esos 21 pendientes eran, sobre todo, cosas que dependían de **alguien más**:
+una firma, una credencial, una ventana de mantenimiento, una respuesta. Con el criterio viejo, cerrarlos por
+decreto habría sido un **verde falso**; dejarlos abiertos para siempre, con el pedido ya escrito y con
+destinatario y fecha, era un **conteo que no contaba nada**.
+
+**Reglas:**
+
+1. **Un cambio de criterio no se propaga como un cambio de número.** Si el conteo pasa de 9/21 a 30/0
+   porque cambió la regla, el documento tiene que **decir cuál es la regla**; si no, el número nuevo se lee
+   como «se hizo todo lo que faltaba».
+2. **La fuente de la verdad del conteo se cambia CON el criterio.** Antes la fuente era el estado de cada
+   bloque; ahora es la **tabla de solicitudes** (`tabla-de-solicitudes-2026-11-13.md`), con su estado, su
+   fecha y su destinatario. El script que cuenta lee esa tabla y **falla en los dos sentidos**: un bloque que
+   invoque una solicitud que no existe, y una solicitud que ningún bloque invoque.
+3. **El estado que nadie va a cambiar desde el código vive en la tabla, no en el pie de nota.** La respuesta
+   del tercero (`RESPONDIDA`, `CERRADA`) se sigue en la tabla, con su fecha: así el conteo puede seguir
+   diciendo «cerrado = pedido emitido» sin mentir sobre el acto.
+4. **El documento declara lo que NO afirma.** La leyenda del mapa dice, de entrada, que `CERRADO` significa
+   «el pedido está emitido y medido» y que el mapa **no afirma que el servicio pueda abrirse a empresas
+   reales**. Cambiar el criterio de un estado sin decir qué pasó es exactamente cómo se cuela un verde falso.
+5. **El registro de lo que se midió no se corrige: se anota.** Los documentos que publicaban el conteo viejo
+   llevan una **nota de la fecha** que dice cuál era su cifra y cuál es la vigente.
+
+### 5.40 🔴 Una revisión que no es la respuesta cambia lo que se envía, no lo que está cerrado
+
+**El caso real (13-nov-2026), la ronda 17.** El owner pegó una revisión de la **asesoría jurídica** sobre
+las cuatro solicitudes al abogado matriculado. El escrito lo dice en su propio encabezado: «No
+sustituye la decisión del abogado matriculado ni del representante legal». Traía **una corrección
+obligatoria** (una cita normativa mal puesta), **dos avisos** (dos cosas que no se habían verificado) y
+un punto a favor. Alguien podía leer eso como «ya está, el abogado respondió» y cerrar el círculo.
+
+**Reglas:**
+
+1. **Una revisión cambia el pedido, no el estado.** Las cuatro solicitudes **siguen `EMITIDA` y 0
+   `RESPONDIDA`**: lo que se corrige es **lo que se manda**, no lo que el destinatario contestó. El
+   registro de solicitudes es el que dice si alguien respondió.
+2. **Una corrección va a la FUENTE, y la salida se regenera.** No se parchea el documento final: se
+   corrige el texto legal que lo alimenta y se **regenera**. Un texto **ya suscrito no se corrige**: se
+   sustituye, y la corrección vive en la versión nueva.
+3. **Lo no verificado se marca como no verificado, en el documento que se envía.** Un texto que afirma
+   algo que nadie comprobó es un defecto, aunque el texto sea correcto en el fondo. Si la afirmación no
+   se pudo verificar, **se pide la confirmación** y se dice que no está verificada.
+4. **Una pregunta que decide una redacción se pregunta de forma expresa.** Si la respuesta cambia lo que
+   se escribe en la v1.4 (una obligación legal frente a una decisión propia), la pregunta **va en el
+   escrito**, con su posible respuesta escrita, no implícita en un adjetivo.
+5. **La huella de un insumo es la del contenido, no la que tenía cuando se escribió el documento que lo
+   cita.** Si el insumo cambia, el documento que lo cita se vuelve a medir: bytes y SHA-256 con
+   `execFileSync`, nunca con un pipe de shell.
+
 ### 6.1 Backend — bridges
 
 Sufijo **`-bridge.js`** (no `bridge-*.js`). Hay 30 en `main/`.
@@ -2029,6 +2083,9 @@ Caso real (31-oct-2026): al corregir el único rojo de la suite del `firma-servi
 | 158 | 🔴 **Un test que se corre SIN el `--require ./tests/setup.js` usa la base de desarrollo, no la base de pruebas: el fallo parece un defecto del código y es una base equivocada** | `sgsst-electron-app/firma-service/tests/setup.js`, `tests/helpers.js` (`resetDb`), `src/db/connection.js` (la ruta de la base sale de `DB_PATH`) | Caso real (12-nov-2026), los tests del manifiesto: al correr `node --test` a mano, **39 de 64 fallaron** con `gh_solicitudes_titular_eventos is append-only: no se puede DELETE` (`SQLITE_CONSTRAINT_TRIGGER`). El runner oficial sí lleva `--require ./tests/setup.js`; sin él, la conexión abre `data/manual-8bc/firma.sqlite` (la de **desarrollo**), donde las migraciones append-only **no se omiten** y el `DELETE` de limpieza aborta. Reglas: (1) **un test se corre como lo corre el runner oficial**: `node --test --require ./tests/setup.js --test-concurrency=1`; (2) **un `SQLITE_CONSTRAINT_TRIGGER` en un trigger append-only, en un test que antes pasaba, es una base equivocada** hasta que se demuestre lo contrario; (3) la base de pruebas se regenera antes de la corrida (`node scripts/migrate-test.js`): un `DELETE` que aborta la deja sucia y **el siguiente `resetDb` también aborta**, así que el fallo se propaga a toda la suite; (4) el error de un trigger **no se "arregla" apagando el trigger**: el trigger es la garantía de que el rastro no se reescribe |
 | 159 | 🔴 **Un pipe entre dos comandos nativos en PowerShell 5.1 PASA POR TEXTO: convierte los LF en CRLF y le mete un BOM, y la medición de un archivo da un resultado que no es el del archivo** | `%TEMP%\kair-p8\eol-count.js`, `git cat-file blob` medido a través de un pipe de PowerShell, cualquier `nativo \| nativo` de PowerShell 5.1 | Caso real (12-nov-2026), la ronda 15: al medir el EOL del blob **staged** contra el archivo del working tree —para confirmar que el índice no iba a aplanar el EOL mixto de `Historial.md` y de `CONTEXT.md`— la medición por pipe devolvió `crlf=9471, lf=0, bom=true` y **1 793 bytes de más**: el archivo del índice era **byte a byte igual** al del working tree (`crlf=7684, lf=1787, bom=false`, 825 978 B en los dos). Medido con `execFileSync` de Node, que lee bytes crudos, el mismo `git cat-file` dio el resultado correcto. Reglas: (1) **medir bytes es leer bytes**: un pipe de PowerShell entre dos procesos nativos **decodifica a texto y reescribe los finales de línea**, así que lo que sale de ahí **no es el archivo**; (2) **un BOM que aparece solo en la medición es la señal de que pasó por el pipe**, no de que el archivo tenga BOM; (3) **la medición byte a byte se hace con `execFileSync`** (o escribiendo a un archivo), nunca a través del pipe de la shell; (4) **un conteo que no cuadra se contrasta con un segundo método ANTES de tocar el archivo**: si el `git diff` del archivo está vacío y el índice dice que cambió, el que miente es el medidor, y "arreglar" el archivo para que cuadre la medición rompe un archivo que estaba bien |
 
+| 160 | 🔴 **Un verificador que compara un bloque de varias líneas por su primera línea acepta una reescritura que pierde líneas: el documento queda mal formado y el guard en verde** | `sgsst-electron-app/firma-service/scripts/contar-estados-meta-apertura.js` (la frase de conciliación), `sgsst-electron-app/docs/gestion-humana/firma-electronica/meta-para-abrir-a-empresas-reales-2026-11-12.md` | Caso real (13-nov-2026), la ronda 16: el script que reescribe la frase de conciliación del mapa **comparaba el bloque por su primera línea** y lo reescribía entero. Cuando la frase pasó a ocupar **dos líneas** (para nombrar las 21 solicitudes y aclarar que *cerrado no es acto cumplido*), la reescritura **perdió la línea en blanco** que separaba la frase del `---` de abajo: el documento quedó con la frase pegada al separador, y el script **no se quejaba**, porque comparaba una línea con una línea y las dos coincidían. Reglas: (1) **un bloque se compara completo**: si lo que se reescribe ocupa más de una línea, el comparador compara el bloque entero y el reescritor escribe el bloque entero —uno por líneas y el otro por bloques se contradicen—; (2) **un verificador que reescribe tiene que ser idempotente**: correrlo dos veces tiene que dejar el mismo archivo, y el **mutante** (una copia a la que se le quita la línea en blanco) tiene que salir en rojo; (3) **un reescritor se prueba sobre una copia y el diff se mira a ojo**: un `git diff` que muestra una línea en blanco desaparecida es el defecto entero; (4) **cuando el texto comparado crece a más de una línea, el comparador y el reescritor se cambian juntos** |
+
+| 161 | 🔴 **La huella que un documento declara es la del contenido: si el insumo cambia, la huella queda vieja y el documento que se envía pasa a mentir** | `sgsst-electron-app/docs/gestion-humana/firma-electronica/solicitudes-al-abogado-2026-11-13.md` (las tablas de insumos), `sgsst-electron-app/firma-service/scripts/generar-candidatos-v1.4.js` | Caso real (13-nov-2026), la ronda 17: al corregir **en la fuente** la cita del Decreto 1377, cambiaron el dictamen de L1 y el pedido 6, y el escrito al abogado **seguía declarando sus huellas viejas** (89 527 B / `901b2ed9…` y `d5a44080…`): el abogado recibía dos números que ya no correspondían a los archivos del repositorio. Reglas: (1) **la huella que se declara es la del archivo en ese momento**, medida con `execFileSync`; (2) **si el insumo cambia, el documento que lo cita se vuelve a medir y se vuelve a escribir**; (3) **el verificador compara la huella declarada con la real del archivo y falla si no coinciden** —una tabla de insumos sin ese check es una tabla de deseos—; (4) **la huella del texto generado no se mueve porque haya cambiado el texto fuente**: si la corrección no está en la región que el generador lee, el candidato sale idéntico, y eso **no** significa que la corrección no llegó (medido: el dictamen pasó de 90 850 B a 90 936 B y los dos candidatos conservaron `fae2b26b…` y `7576b1a1…`) |
 
 **Formato de commit real** (verificá con `git log` antes de cada uno, la convención migró varias veces):
 

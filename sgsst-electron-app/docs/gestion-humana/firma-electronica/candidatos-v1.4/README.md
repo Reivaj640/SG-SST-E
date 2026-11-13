@@ -8,8 +8,8 @@
 
 | Archivo | Bytes | SHA-256 | Que es |
 |---|---|---|---|
-| `anexo-nube-v1.4.html` | 103 390 | `4f23c605bb3a6577271c04250e8c408df9eb4b178c6b84cb438c1e26f100ebbd` | Candidato del Anexo de Nube v1.4 (6 anclas de C1 a C7 + 35 determinaciones de L1, L4 y L5) |
-| `anexo-encargo-2026-11-12.html` | 97 962 | `fa1a79b2be4f29d59681e52a0c9d857773bf53dd68bd6ff96b9b168617157a15` | Candidato del Anexo de Encargo del 12-nov-2026 (5 anclas de C1 a C7 + 10 determinaciones de L1, L4 y L5) |
+| `anexo-nube-v1.4.html` | 103 390 | `fae2b26b87867d24d558c948e7f90f886f76d6cf6b3eb39eb19deda4dbd8b416` | Candidato del Anexo de Nube v1.4 (6 anclas de C1 a C7 + 35 determinaciones de L1, L4 y L5) |
+| `anexo-encargo-2026-11-12.html` | 97 962 | `7576b1a1dd7f7ded71ac6be7ff556a7041e04538266f199372e4f9c7082d9f3c` | Candidato del Anexo de Encargo del 12-nov-2026 (5 anclas de C1 a C7 + 10 determinaciones de L1, L4 y L5) |
 
 ## Que NO se toco
 

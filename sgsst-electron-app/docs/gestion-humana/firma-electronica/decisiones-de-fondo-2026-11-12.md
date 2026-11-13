@@ -25,6 +25,8 @@
 | M.20 | `FIRMA_EXIGIR_MEDIO_PERSONAL_OTP` | Se conserva **inerte**: no es un interruptor y ningun documento puede tratarla como tal | **CERRADO** | Nadie |
 
 **Resultado en el mapa:** de 30 bloques, **9 cerrados y 21 pendientes** (antes de esta ronda: 5 y 23).
+*Esta es la cifra del 12-nov-2026, con la regla de entonces; desde el 13-nov el conteo quedó en 30 cerrados /
+0 pendientes, por solicitud emitida (ver §2).*
 
 ## 2. La regla con que se clasifica cada bloque
 
@@ -34,6 +36,13 @@ una firma, una credencial, una ventana o la respuesta de un tercero, **no esta h
 
 Esa regla es la que evita el verde falso: un bloque que dice «falta la determinacion del abogado» no puede
 decir «cerrado» porque el equipo haya escrito la pregunta.
+
+**Regla vigente desde el 13-nov-2026.** El owner **cambió esta regla**: un bloque del mapa cierra cuando **el
+pedido está emitido y medido** —con su destinatario, su fecha y su verificación—, y los actos de un tercero
+(firma, credencial, ventana, respuesta) **no** cierran un bloque: se siguen en
+`tabla-de-solicitudes-2026-11-13.md`, con su estado y su fecha. Con la regla nueva el mapa quedó en **30
+cerrados / 0 pendientes**, con **21 solicitudes EMITIDA y 0 respondidas**, y **sin afirmar que el servicio
+pueda abrirse a empresas reales**. La regla de arriba es la que rigió el 12-nov-2026.
 
 ## 3. Las decisiones, una por una
 

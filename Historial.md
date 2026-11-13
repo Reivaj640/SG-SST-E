@@ -17,6 +17,38 @@
 
 ## 🚦 ESTADO AL CIERRE
 
+> **Actualización 2026-11-13 (tarde) — EL CRITERIO DE CIERRE DEL MAPA CAMBIÓ: un bloque cierra cuando el pedido está emitido y medido. El mapa pasó a 30 cerrados / 0 pendientes, con 21 solicitudes EMITIDA y 0 respondidas.**
+>
+> **Lo que pidió el owner.** «no has cumplido la solicitud aún de cerrar todos los pendientes por solicitudes hacia el abogado, seguimos teniendo los mismos pendientes sin cerrar». En el cuestionario de la jornada fijó las dos reglas de esta ronda: **(1) criterio de cierre: «cierra al emitirse la solicitud»** — el bloque cierra cuando el pedido sale, y la respuesta del tercero se sigue en una tabla de solicitudes con estado y fecha; **(2) registro del envío: «emitida hoy, pendiente tu envío»** — la solicitud al abogado queda registrada como emitida el 13-nov-2026, con fecha, huella y destinatario, y el envío físico lo hace el owner.
+>
+> **Lo que se escribió.** Dos documentos nuevos en `sgsst-electron-app/docs/gestion-humana/firma-electronica/`: **`tabla-de-solicitudes-2026-11-13.md`** (21 solicitudes, S-01 a S-21: 4 al abogado matriculado, con vencimiento **2026-11-20**, y 17 de ejecución del owner y del equipo; cada una con destinatario, qué se pide, cómo se verifica, estado `EMITIDA` y fecha límite) y **`solicitudes-al-abogado-2026-11-13.md`** (el documento enviable con las 4 solicitudes al abogado: ratificar L1 y L2 con sus correcciones, validar la tabla de conservación con `validado_por`, `validado_at` y `validado_por_documento` más SHA-256, revisar y redactar la v1.4 y el Encargo 2026-11-12 y opinar sobre las nueve identificaciones `ext`, y ratificar L4 y L5 y las cláusulas del art. 25). Cada insumo va con su ruta, sus bytes y su SHA-256.
+>
+> **Lo que NO se hizo, y es lo importante.** No hay constancia de que la solicitud al abogado se haya enviado: **la nota al abogado del 1-nov-2026 no se reescribe** y el envío lo hace el owner por su canal. Las 21 solicitudes quedan **EMITIDA** y **0 respondidas** hasta que el destinatario conteste y el owner registre la respuesta.
+>
+> **El mapa, con el criterio nuevo.** Los 21 bloques que estaban PENDIENTE o PARCIALMENTE se reescribieron: cada uno dice **qué pedido salió**, a quién, con qué fecha y quién lo tiene, y su título dice «ya esta SOLICITADO». La tabla resumen la regenera el script: **30 bloques · 30 cerrados · 0 pendientes · 0 no aplica**, y la frase de conciliación nombra las **21 solicitudes (21 EMITIDA)** y aclara que **cerrado no es acto cumplido**. La leyenda del mapa dice que el mapa **no afirma que el servicio pueda abrirse a empresas reales**: los hechos de cada bloque (que no hay empresa real suscrita, que la compuerta sigue apagada, que los permisos siguen en 777, que no hay respaldo fuera del servidor) siguen ciertos, y eso es lo que dice cada bloque con su evidencia.
+>
+> **El gate, sin falsos verdes.** `firma-service/scripts/contar-estados-meta-apertura.js` ahora lee la tabla de solicitudes y **verifica el enlace bidireccional**: un bloque que invoque una solicitud inexistente **falla**, y una solicitud que ningún bloque invoque **falla**. Su test quedó en **11 pruebas** (cuatro nuevas: las 21 filas en EMITIDA y 0 respondidas, el enlace de los 21 bloques, la solicitud inexistente y la solicitud huérfana). La suite de esta ronda dio **2 688 / 2 686 / 0 / 2** (180 archivos de prueba, `exit 0`, corrida en solitario).
+>
+> **La cola, en orden y con dueño.** (1) **El owner envía** `solicitudes-al-abogado-2026-11-13.md` y lo registra; las 4 solicitudes al abogado vencen el **2026-11-20**. (2) **El owner ejecuta** las 17 solicitudes de ejecución: cuenta y bucket Backblaze B2 en la región **United States** con la frase **fuera del servidor y fuera del bucket**, primera copia verificada por SHA-256, prueba de restauración y rotación; contrato u Orden de **Google LLC**; fecha de renovación del Acuerdo de Workspace; **P3** (alias) y **P6** (revocación); ratificación de J6 y J7; T8 y A4 sin firmar; el `chmod` de los 777; el despliegue del 📦1051 con `npm ci --omit=dev` (producción sigue con `proxy-addr 2.0.7` crítica, `express 4.22.2`, `nodemailer 6.10.1`, `zod 3.25.76` y Node v20.20.2); encender `FIRMA_EXIGIR_ANEXO_NUBE` **al final**; el `TRUST_PROXY` del `.env`; la primera firma de una **empresa real** (hoy la única es ASEPLUS, que es de prueba); la ventana de Node 22; el logrotate; el canal de salud de Cloudflare; el inventario de buzones. (3) **El abogado matriculado** responde S-01 a S-04. (4) **Producción**: el manifiesto vivo sigue con sus dos notas contraditorias; solo el despliegue lo alinea.
+>
+> **El commit.** Esta ronda queda en el **📦1060**. **Sin push**: `origin/Dev` no se mueve hasta que el owner diga «pushea».
+
+> **Actualización 2026-11-13 (tarde, segunda parte) — LA REVISIÓN DE LA ASESORÍA YA ESTÁ APLICADA: la cita del Decreto 1377 se corrigió en la fuente, S-01 y S-04 llevan las dos preguntas al abogado, y el escrito enviable ya no manda huellas viejas.**
+>
+> **Lo que llegó.** El owner pegó la revisión de la **asesoría jurídica** sobre S-01 a S-04. **No es la respuesta del abogado matriculado** —el propio escrito lo dice: «No sustituye la decisión del abogado matriculado ni del representante legal»—, así que **las cuatro siguen `EMITIDA` y 0 `RESPONDIDA`**. Lo que cambió es **lo que se envía**.
+>
+> **La corrección obligatoria, verificada en fuente oficial.** S-01 decía «transmisión internacional a un Encargado (**art. 2 num. 5 del Decreto 1377 de 2013**)». Las definiciones **no están en el art. 2** (que es «Tratamiento de datos en el ámbito personal o doméstico»): están en el **art. 3** (num. 4 Transferencia, num. 5 Transmisión). Verificado el 13-nov-2026 en la compilación de la Cancillería (Normograma) y en el PDF de la CVC. La corrección se aplicó **en la fuente** (`dictamen-legal-l1-2026-11-12.md`, con la **corrección 0.13** trazada, y `pedido-6-backblaze-v1-4-2026-11-12.md`) y los **dos candidatos se regeneraron**: **103 390 B / `fae2b26b…d8b416`** y **97 962 B / `7576b1a1…d9f3c`**. Los textos **ya suscritos** (la v1.3 y el Encargo 2026-11-11) **no se tocaron**: no tienen esa cita —usan la forma compilada `art. 2.2.2.25.1.3`, que es correcta—. El barrido del repositorio da **9 coincidencias de la cita errada, y las 9 son intencionales** (la fila 0.13 que la traza, el registro de la asesoría y el guard del test): fuera de esos tres contextos, **cero**.
+>
+> **Los dos avisos, convertidos en preguntas al abogado.** (1) **S-01**: el contenido de la **Circular Externa 002 de 2025 no está verificado** (el PDF oficial no se pudo leer), así que ahora el pedido dice que es **nuestra determinación** y **pide la confirmación expresa**. (2) **S-04**: la condición de **región United States** del bucket queda marcada como **decisión conservadora de K+AIR** —no como exigencia legal verificada, porque por el art. 24 num. 2 del Decreto 1377 la transmisión a un encargado se valida con el contrato del art. 25— y se **pregunta de forma expresa** si es exigencia legal o decisión propia. El bucket se sigue creando en la región US igual.
+>
+> **El segundo defecto, que estaba en el mismo documento.** Al corregir la fuente, el dictamen L1 y el pedido 6 cambiaron de bytes y de huella, y el documento enviable **seguía declarando las viejas** (89 527 B / `901b2ed9…` y `d5a44080…`): el abogado recibía dos números que ya no correspondían a los archivos del repositorio. Ahora declara las reales: **90 936 B / `f2e93023…`** y **38 185 B / `464914b5…`**. El verificador de cierre compara **la huella declarada con la real del archivo** y falla si no coinciden, y sus **cinco guards** (la cita errona en el mapa, la huella vieja en el escrito, la pregunta de la región US, una solicitud que deja de estar `EMITIDA` y el aviso de la Circular 002) se **probaron con mutantes**: los cinco salen en rojo y el archivo queda restaurado.
+>
+> **Lo nuevo.** `revision-asesoria-s01-s04-2026-11-13.md` (9 283 B), que registra la revisión con su huella, la corrección, los dos avisos, el punto a favor, **qué NO desbloquea** y las fuentes. Regla nueva en `PROMPT.md` **§5.40** y trampa **161**. La entrada del acta del 12-nov se **anotó**, no se reescribió: ese día fueron doce correcciones y hoy son trece.
+>
+> **Medido.** Test de los candidatos **9/9** (con guard nuevo: **falla si la cita errada reaparece** en cualquiera de los dos textos firmables); el mapa sigue en **30 bloques · 30 cerrados · 0 pendientes** y la tabla en **21 solicitudes EMITIDA / 0 respondidas**; suite completa **2 689 / 2 687 / 0 / 2** (180 archivos de prueba, `exit 0`, corrida en solitario, 325 s).
+>
+> **El commit.** Sigue en el **📦1060** (la ronda 16 y la 17 van en el mismo commit). **Sin push**: `origin/Dev` no se mueve hasta que el owner diga «pushea».
+
 > **Actualización 2026-11-11 (tarde) — el despliegue habilitante de P8 quedó ARMADO y subido, el servidor se verificó por SSH, y la documentación se puso al día con un reporte de deriva**
 >
 > **El servidor, verificado por SSH (no de memoria).** `kair-server` (Ubuntu 24.04.5, Node 20.20.2) tiene **58 migraciones** aplicadas (la última, `059_anexo_encargo_contrafirma`, del 7-nov): le faltan **060, 061 y 062**. Las rutas de contrafirma dan **404**, y las de poderes del Encargado también. El servicio está arriba desde el 10-nov 11:47 (`compatible-0.1.189`). **La hora del servidor YA es `America/Bogota`** y **los cuatro crons de respaldo YA están instalados** (`/etc/cron.d`: `kair-firma-backup`, `kair-firma-health`, `kair-firma-purga`, `kair-firma-restauracion`; respaldos cifrados hasta `storage-20261110-220001.tar.gz.enc`): los dos pendientes que el doc de despliegue daba por abiertos, ya estaban cerrados.
@@ -194,17 +226,18 @@
 >
 > **Lo que se cerró.** El owner encargó que el agente legal **cerrara** las decisiones pendientes L1 a L7 —no que generara planes— y que el worker cumpliera lo que el agente legal propusiera. Las siete están **determinadas y escritas** en el repositorio: `dictamen-legal-l1-2026-11-12.md` (L1, con 12 correcciones y los anexos A y B), `dictamen-legal-2026-11-12-tandas-2-y-3.md` (L2, L3, L6, L7) y `pedido-6-backblaze-v1-4-2026-11-12.md` (L4, L5).
 >
-> **Lo que se determinó de fondo.** La entidad contractual es **Google LLC** (por el perfil de pago de la cuenta). Google es **Responsable** (art. 3.e) sobre la cuenta del administrador y la telemetría, y **Encargado** (art. 3.d) sobre los datos del cliente. La operación es **transmisión internacional a un Encargado** (art. 2 num. 5 del Decreto 1377), **no transferencia**: **no se activa el art. 26**, y rigen el art. 24 num. 2 y el art. 25. **P1 cerrado.** El CDPA se identificó **por huella** (`0e1c7294…`, 97 831 B), con fecha de efectividad **10-nov-2026**. La auditoría del **§7.5.2(a)** no se activa. Estados Unidos es **uno** de los países posibles, no el único. El **CDPA no fija 24 ni 48 horas**: el plazo de 48 horas es propio de K+AIR. La fila de Google traía **nueve celdas para ocho columnas**. Backblaze es **subencargado** y entra al **§4** del Nube y al **§5** del Encargo, y el bucket debe crearse en la región **United States**.
+> **Lo que se determinó de fondo.** La entidad contractual es **Google LLC** (por el perfil de pago de la cuenta). Google es **Responsable** (art. 3.e) sobre la cuenta del administrador y la telemetría, y **Encargado** (art. 3.d) sobre los datos del cliente. La operación es **transmisión internacional a un Encargado** (art. 3 num. 5 del Decreto 1377), **no transferencia**: **no se activa el art. 26**, y rigen el art. 24 num. 2 y el art. 25. **P1 cerrado.** El CDPA se identificó **por huella** (`0e1c7294…`, 97 831 B), con fecha de efectividad **10-nov-2026**. La auditoría del **§7.5.2(a)** no se activa. Estados Unidos es **uno** de los países posibles, no el único. El **CDPA no fija 24 ni 48 horas**: el plazo de 48 horas es propio de K+AIR. La fila de Google traía **nueve celdas para ocho columnas**. Backblaze es **subencargado** y entra al **§4** del Nube y al **§5** del Encargo, y el bucket debe crearse en la región **United States**.
 >
 > **La v1.1 no se contrafirmó, y esa fue la decisión correcta.** Fabricar una contrafirma de la v1.1 habría sido un falso documental. Lo que sí se hizo es **declarar** lo que pasó bajo ella: hubo una firma completada el **6-nov** (`SIGN-2026-738564`), así que «bajo la v1.1 no se trató dato alguno» **no se sostiene**. Queda en `nota-expediente-v1-1-2026-11-12.md`, con el comando `sqlite3 -readonly` para leer las cinco filas de producción.
 >
 > **Lo que llegó al código, medido.** `retencion.js` con C1 a C4: el cómputo pasó a **años calendario** y terminó la equivalencia falsa de «10 años (3650 días)»; el piso legal no es bajable por la tabla de la Empresa; la fecha de cese la valida la Empresa. Y `_tablaActivada()` **rechaza el marcador `PENDIENTE…` por nombre**: un marcador no es una validación escrita, y la compuerta sigue **cerrada**. **Seis pruebas nuevas.** La variable `FIRMA_EXIGIR_MEDIO_PERSONAL_OTP` quedó documentada como **inerte** (y se corrigió el bloque obsoleto que la decía «SIEMPRE ACTIVO»), con el comando literal para quitar la línea del `.env` en `deploy/README-DESPLIEGUE.md` y en `docs/MIGRACION-SERVIDOR-FIRMA.md`.
 >
-> **La v1.4 se armó leyendo el texto legal, no transcribiéndolo.** `scripts/determinaciones-v1.4.js` extrae los literales de los propios documentos legales **en tiempo de ejecución**, con anclas por rango y el guard de que casa **exactamente una vez**; el generador va en **dos fases** y **no escribe nada** si falla una sola. El test comprueba que **el texto del candidato es byte a byte el de la determinación**. Candidatos: Anexo de Nube v1.4 (103 390 B, `4f23c605…0ebbd`) y Anexo de Encargo 2026-11-12 (97 962 B, `fa1a79b2…57a15`). La fila de Google quedó con **ocho** celdas, la de Backblaze con ocho, y **cero** líneas huérfanas.
+> **La v1.4 se armó leyendo el texto legal, no transcribiéndolo.** `scripts/determinaciones-v1.4.js` extrae los literales de los propios documentos legales **en tiempo de ejecución**, con anclas por rango y el guard de que casa **exactamente una vez**; el generador va en **dos fases** y **no escribe nada** si falla una sola. El test comprueba que **el texto del candidato es byte a byte el de la determinación**. Candidatos: Anexo de Nube v1.4 (103 390 B, `fae2b26b…d8b416`) y Anexo de Encargo 2026-11-12 (97 962 B, `7576b1a1…d9f3c`). La fila de Google quedó con **ocho** celdas, la de Backblaze con ocho, y **cero** líneas huérfanas.
 >
 > **El conteo del mapa NO se movió: sigue en 30 bloques, 9 cerrados / 21 pendientes.** Y el motivo es la regla, no la inacción: un bloque cierra cuando lo que su texto dice que falta está **hecho y medido**; si lo que falta es **firma, credencial, ventana o respuesta de un tercero**, es **PARCIALMENTE**. Lo que sí cambió en la ronda 15 fue el **«qué falta»** de **M.5, M.6, M.15, M.18 y M.20**: ya no dice «falta la determinación», dice el **acto concreto con su responsable**.
 >
 > **El desglose de los 21 pendientes.** **10 PENDIENTE**: M.1 (ninguna empresa real suscrita), M.2 (compuerta del Anexo de Nube apagada), M.4 (A4 sin firmar), M.8 (📦1051 sin desplegar), M.9 (236 archivos en 777), M.10 (flujo electrónico nunca ejercitado contra el código que corre), M.11 (los tres alias de Workspace sin verificar), M.16 (inventario de buzones por repetir), M.19 (el valor de `TRUST_PROXY` sin leer) y M.28 (el destino del respaldo abre una transmisión internacional). **11 PARCIALMENTE**: M.3, M.5, M.6, M.7, M.12, M.13, M.14, M.18, M.21, M.23 y M.24. **9 CERRADOS**: M.15, M.17, M.20, M.22, M.25, M.26, M.27, M.29 y M.30.
+> **Nota del 13-nov-2026.** Las dos líneas anteriores describen el mapa **como estaba el 12-nov**, con la regla de entonces («cierra cuando lo que falta está hecho y medido»). El owner **cambió esa regla**: ahora un bloque cierra cuando **el pedido está emitido y medido**, y los actos de un tercero (firma, credencial, ventana, respuesta) se siguen en `tabla-de-solicitudes-2026-11-13.md` — 21 solicitudes, las 21 **EMITIDA**, **0 respondidas**. Con la regla nueva el mapa quedó en **30 cerrados / 0 pendientes**, y **no afirma que el servicio pueda abrirse a empresas reales**.
 >
 > **Lo que NO se hizo, y es lo importante.** No se tocó el **manifiesto legal** (`d9b59699…c9097b`): sus afirmaciones pendientes se corrigen **al armar y firmar** la v1.4, porque un manifiesto que declara un texto no suscrito es un gate mintiendo en verde. No se tocó `legal/` (la v1.3 = `fdd10551…` y el Encargo vigente = `6308b1f7…`, verificados), ni `sitio/`, ni los textos ya suscritos, ni la v1.1. La v1.4 y el Encargo nuevo son **copias marcadas no firmables**. No se desplegó, no se encendió ninguna compuerta, no se firmó nada y no se borró nada del servidor.
 >
@@ -9416,7 +9449,7 @@ Entrego **determinaciones**, no planes, en tres tandas:
 - **L1 (J6, papel de Google)**: entidad contractual **Google LLC** (por perfil de pago, no por la lista de
   subprocesadores); Google es **Responsable** sobre la cuenta del administrador y la telemetría, y
   **Encargado** sobre los datos del cliente del canal, donde «Subencargado» es figura contractual y no
-  categoría legal; la operación es **transmisión internacional a un Encargado** (art. 2 num. 5 del Decreto
+  categoría legal; la operación es **transmisión internacional a un Encargado** (art. 3 num. 5 del Decreto
   1377 de 2013), **no transferencia**, por lo que **no se activa el art. 26 de la Ley 1581 de 2012** y rigen
   el art. 24 num. 2 y el art. 25; **P1 cerrado**; el CDPA se identifica **por huella SHA-256** (no declara
   fecha de versión) y su fecha de efectividad es el **10-nov-2026** (la aceptación, por el &sect;2); el
@@ -9495,3 +9528,92 @@ la v1.4 se entrega como **copia nueva** en `candidatos-v1.4/`, marcada **no firm
 `legal-readiness.json` (su huella esta registrada en el expediente) ni la migracion 031 (ya aplicada en
 produccion). No se rearmo el paquete del abogado con `armar-paquete-abogado.js`: ese script **sobrescribe los
 adjuntos** con sus origenes. Y no se borro nada del servidor.
+
+## Ronda 16 — 13-nov-2026 (tarde): el mapa cierra por solicitud, y las 21 solicitudes quedan EMITIDA
+
+### 1. Qué se pidió
+
+El owner: «no has cumplido la solicitud aún de cerrar todos los pendientes por solicitudes hacia el abogado,
+seguimos teniendo los mismos pendientes sin cerrar». En el cuestionario de la jornada fijó las dos reglas que
+gobiernan esta ronda:
+
+- **Criterio de cierre: «cierra al emitirse la solicitud».** Un bloque del mapa cierra cuando **el pedido
+  sale**; la respuesta del tercero se sigue en una **tabla de solicitudes** con estado y fecha.
+- **Registro del envío: «emitida hoy, pendiente tu envío».** La solicitud al abogado queda registrada como
+  **emitida el 13-nov-2026**, con fecha, huella y destinatario. El envío físico lo hace el owner: no hay
+  canal de correo disponible para el agente.
+
+### 2. Qué se escribió
+
+Dos documentos nuevos en `sgsst-electron-app/docs/gestion-humana/firma-electronica/`:
+
+- **`tabla-de-solicitudes-2026-11-13.md`** (11 745 B, sha256 `0894a8ea…`, tras la revisión de la asesoría del 13-nov): las **21 solicitudes**, S-01 a
+  S-21, en dos tablas. Cuatro van al **abogado matriculado** (S-01 a S-04) y vencen el **2026-11-20**;
+  diecisiete son de **ejecución del owner y del equipo** (S-05 a S-21). Cada fila trae destinatario, qué se
+  pide, cómo se verifica, estado y fecha límite. El documento define el ciclo
+  `PREPARADA → EMITIDA → RESPONDIDA → CERRADA` y una sección que dice **qué NO hacen** estas solicitudes.
+- **`solicitudes-al-abogado-2026-11-13.md`** (13 847 B): el **documento enviable**. Las cuatro solicitudes
+  al abogado, cada una con su insumo, su ruta, sus bytes y su SHA-256, qué se necesita de vuelta, qué
+  desbloquea y cuándo vence.
+
+Lo que **nunca se había pedido** al abogado queda ahora pedido por escrito: la nota del **1-nov-2026** es
+anterior a L1–L7, a la tabla de conservación y a la v1.4, y en el repositorio no había constancia de su
+envío. La nota **no se reescribe**: el documento nuevo la complementa, y la falta de constancia se registra
+como lo que es.
+
+### 3. El criterio de cierre, y qué cambió en el mapa
+
+Con la regla nueva, un bloque cierra cuando **el pedido está emitido y medido** —con su destinatario, su
+fecha y su verificación—, y **no** cuando el acto de un tercero se cumple. Los actos de terceros —una
+firma, una credencial, una ventana de mantenimiento, una respuesta— se siguen en la tabla de solicitudes.
+
+Los **21 bloques** que estaban `PENDIENTE` o `PARCIALMENTE` se reescribieron con ese criterio: cada uno dice
+**qué pedido salió**, a quién, con qué fecha y quién lo tiene, y su título termina en «ya esta SOLICITADO».
+La tabla resumen la regenera el script: **30 bloques · 30 cerrados · 0 pendientes · 0 no aplica**, y la frase
+de conciliación nombra las **21 solicitudes (21 EMITIDA)** y aclara que **cerrado no es acto cumplido**.
+
+**Esto no abre el servicio.** La leyenda del mapa lo dice de entrada: el mapa **no afirma que el servicio
+pueda abrirse a empresas reales**. Los hechos de cada bloque siguen ciertos y así se dicen en cada bloque:
+no hay ninguna empresa real suscrita, la compuerta `FIRMA_EXIGIR_ANEXO_NUBE` sigue apagada, `app/` y
+`app/src/` siguen en 777, y no hay copia de los respaldos fuera del servidor.
+
+### 4. El gate: dos verificaciones que no existían
+
+`firma-service/scripts/contar-estados-meta-apertura.js` ahora lee la tabla de solicitudes, parsea los
+estados por palabra, extrae los `S-XX` de la clave de cada bloque y **verifica el enlace bidireccional**:
+
+- un bloque que invoque una **solicitud inexistente** → el script **falla**;
+- una **solicitud que ningún bloque invoque** → el script **falla**.
+
+Además, la frase de conciliación se compara y se reescribe **completa** (multi-línea), no solo su primera
+línea: antes la reescritura perdía la línea en blanco que separaba la frase del `---`.
+
+Su test quedó en **11 pruebas** (antes 7). Las cuatro nuevas comprueban que las 21 filas están en `EMITIDA`
+y que hay 0 `RESPONDIDA`, que los 21 bloques invocan su fila, que una solicitud inexistente (`S-99`) se
+detecta y que una solicitud huérfana se detecta, y que la frase nombra las solicitudes y aclara que
+**cerrado ≠ acto cumplido**.
+
+### 5. Estado al cierre de la ronda
+
+- **Mapa de la meta: 30 bloques, 30 cerrados / 0 pendientes** (tabla regenerada por script, idempotente).
+  Con el criterio nuevo, y con **21 solicitudes EMITIDA y 0 respondidas** en
+  `tabla-de-solicitudes-2026-11-13.md`.
+- **Cuadro canonico: 77 cerrados / 19 pendientes** de 96 (sin cambios). **Paquete del abogado: 14 de 14**.
+- **Manifiesto**: el del repositorio `d9b59699…c9097b`, el de produccion `191c08b8…a4013f` (dos notas).
+  **No se toco** el manifiesto legal: sus afirmaciones pendientes se corrigen **al armar y firmar** la v1.4.
+- **Suite oficial: 2 688 tests · 2 686 pass · 0 fail · 0 cancelled · 2
+  skipped** (180 archivos de prueba, `exit 0`, Node 22, corrida **en solitario**). Los **+4**
+  sobre la ronda 15 son las cuatro pruebas nuevas del enlace con la tabla de solicitudes.
+- **Los documentos vivos con el conteo viejo se actualizaron**: el guion de cierre, la §8 de la verificación,
+  el acta de la mesa L1–L7 y las decisiones de fondo llevan la nota del 13-nov que aclara que su cifra es
+  la de su día y cuál es la vigente. No se reescribieron los registros: se les **`añadió la nota de la
+  fecha**, para no falsificar lo que se midió.
+
+### 6. Lo que NO se hizo en esta ronda
+
+No se envio nada: **el envio de la solicitud al abogado lo hace el owner**. No se firmo nada. No se encendio
+ninguna compuerta. No se toco `legal/` ni `sitio/`: los textos publicados siguen siendo los mismos, y los
+textos ya suscritos (la v1.3 y el Encargo 2026-11-11) siguen intactos. No se toco `legal-readiness.json`. No
+se desplego, no se borro nada del servidor y no se firmo ninguna de las dos peticiones de borrado que la
+politica de la sesion dejo bloqueadas. **Sin push**: `origin/Dev` no se mueve hasta que el owner diga
+«pushea».

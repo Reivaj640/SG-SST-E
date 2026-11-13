@@ -12,6 +12,16 @@
 > `firma-service/scripts/contar-estados-meta-apertura.js`, y ese script **falla** si el documento no
 > cuadra con su propio conteo.
 >
+> **⚠️ Qué significa `CERRADO` desde el 13-nov-2026.** Un bloque cerrado significa **«el pedido esta
+> emitido y medido»**, no «el acto esta cumplido». Los actos de un tercero —una firma, una credencial,
+> una ventana de mantenimiento, una respuesta— **no** cierran un bloque: lo que lo cierra es que el
+> pedido salio, con su destinatario, su fecha y su verificacion. Esos actos se siguen en
+> **`tabla-de-solicitudes-2026-11-13.md`**, que es la tabla de las 21 solicitudes: hoy estan las 21
+> `EMITIDA` y **0 respondidas**. **Este mapa no afirma que el servicio pueda abrirse a empresas
+> reales**: los hechos de cada bloque (que no hay empresa real suscrita, que la compuerta sigue
+> apagada, que los permisos siguen en 777, que no hay respaldo fuera del servidor) siguen siendo
+> ciertos, y eso es lo que dice cada bloque con su evidencia.
+>
 > **Medido el 2026-11-12**, contra el servicio desplegado, no contra una copia.
 >
 > **Alcance.** Estos treinta puntos son los que separan «el servicio funciona» de «una empresa real
@@ -26,7 +36,7 @@
 > Son los que impiden que una empresa real pueda firmar. Mientras estén abiertos, el servicio puede
 > estar sano, monitoreado y con los instrumentos suscritos, y aun así **no se puede abrir**.
 
-### M.1 - No hay ninguna empresa real suscrita: la unica que hay es la de prueba — PENDIENTE
+### M.1 - No hay ninguna empresa real suscrita: la unica que hay es la de prueba, y el recorrido completo ya esta SOLICITADO — CERRADO. Solicitud S-05 emitida el 13-nov-2026
 
 **Origen.** La ficha de las Empresas en produccion; el P8 fue un ensayo sobre ASEPLUS.
 
@@ -40,13 +50,18 @@ primera solicitud de firma **no las ha recorrido nadie**.
 `anexo_nube_ejecutado_at = 2026-11-12T16:13:54.106Z`, `anexo_encargo_suscrito_version = 2026-11-11`,
 `anexo_encargo_suscrito_at = 2026-11-12T15:40:06.992Z`.
 
-**Qué falta.** El recorrido completo con una empresa real: alta, suscripcion del Anexo de Nube v1.3 y
-del Anexo de Encargo 2026-11-11 por esa empresa, contrafirma de K+AIR, primera solicitud de firma,
-primer OTP y primera constancia emitida.
+**Qué falta.** Nada del lado del equipo: el 13-nov-2026 se emitio la solicitud **S-05**, con el
+recorrido completo y su evidencia. Lo que queda es que **exista una empresa real** y que recorra el
+circuito entero: alta, suscripcion del Anexo de Nube v1.3 y del Anexo de Encargo 2026-11-11 por esa
+empresa, contrafirma de K+AIR, primera solicitud de firma, primer OTP y primera constancia emitida.
+El hecho sigue sin ocurrir, y el mapa no afirma lo contrario.
 
-**Quién lo tiene.** El owner (alta y decision) y el equipo (acompañamiento y evidencia).
+**Quién lo tiene.** El owner (alta y decision) y el equipo (acompanamiento y evidencia).
 
-### M.2 - La compuerta del Anexo de Nube sigue apagada: la decision escrita ya existe y el preflight da OK, falta el acto — PENDIENTE
+**Solicitud.** **S-05**, emitida el 13-nov-2026. Esta en `tabla-de-solicitudes-2026-11-13.md`, con
+su destinatario, su verificacion y su fecha limite.
+
+### M.2 - La compuerta del Anexo de Nube sigue apagada: la decision escrita ya existe y el preflight da OK, y el acto ya esta SOLICITADO — CERRADO. Solicitud S-06 emitida el 13-nov-2026
 
 **Origen.** C-1 del informe al abogado; el item `empresas_nube` del gate; la decision C del
 `plan-cierre-abogado-2026-10-31.txt` (§8, linea 100) y su guion de encendido (§13).
@@ -85,24 +100,25 @@ de Nube suscrito y contrafirmado sobre el texto vigente"`, `PREFLIGHT_EXIT=0`; g
 medido el 12-nov-2026: 42 items, 40 `ok`, 0 pendientes, **0 bloqueantes**, 1 `aviso` (`empresas_nube`),
 1 `no_aplica` (`google_dpa`).
 
-**Que falta.** **Solo el acto**, y son tres cosas concretas, no una decision:
+**Qué falta.** Nada del lado del equipo: el 13-nov-2026 se emitio la solicitud **S-06**. Lo que
+queda es el acto, y son tres cosas concretas, no una decision: 1. **Paso 3 del §13** — encender la
+bandera en el entorno del servicio (`FIRMA_EXIGIR_ANEXO_NUBE=true`) y reiniciar. Es el unico paso
+que todavia no se ha ejecutado. 2. **La reejecucion con la bandera encendida** — el preflight con
+`--exigir-compuerta` (que exige la variable en `true` y por eso hoy no se puede correr) tiene que
+dar 0 *despues* de encenderla. 3. **La regularizacion de las empresas que no lo tengan** — hoy es
+una sola y ya lo tiene; con el primer cliente real, la compuerta lo bloquea hasta que suscriba, y
+eso hay que atenderlo una empresa por una. El paso 4 del §13 (publicar el Acuerdo) ya esta cubierto:
+la v1.6 esta publicada con fecha de vigencia del 11-nov-2026. El paso 0 (publicar el Anexo) y el
+paso 1 (la Empresa lo suscribe) tambien: la v1.3 esta publicada y ASEPLUS la suscribio y la
+contrafirmo el 12-nov.
 
-1. **Paso 3 del §13** — encender la bandera en el entorno del servicio (`FIRMA_EXIGIR_ANEXO_NUBE=true`)
-   y reiniciar. Es el unico paso que todavia no se ha ejecutado.
-2. **La reejecucion con la bandera encendida** — el preflight con `--exigir-compuerta` (que exige la
-   variable en `true` y por eso hoy no se puede correr) tiene que dar 0 *despues* de encenderla.
-3. **La regularizacion de las empresas que no lo tengan** — hoy es una sola y ya lo tiene; con el
-   primer cliente real, la compuerta lo bloquea hasta que suscriba, y eso hay que atenderlo una
-   empresa por una.
+**Quién lo tiene.** El owner (encender la bandera y reiniciar: hace falta `sudo` sobre el `.env` y
+el servicio) con el equipo (correr el preflight con `--exigir-compuerta` y dejar la salida fechada).
 
-El paso 4 del §13 (publicar el Acuerdo) ya esta cubierto: la v1.6 esta publicada con fecha de
-vigencia del 11-nov-2026. El paso 0 (publicar el Anexo) y el paso 1 (la Empresa lo suscribe) tambien:
-la v1.3 esta publicada y ASEPLUS la suscribio y la contrafirmo el 12-nov.
+**Solicitud.** **S-06**, emitida el 13-nov-2026. Esta en `tabla-de-solicitudes-2026-11-13.md`, con
+su destinatario, su verificacion y su fecha limite.
 
-**Quien lo tiene.** El owner (encender la bandera y reiniciar: hace falta `sudo` sobre el `.env` y el
-servicio) con el equipo (correr el preflight con `--exigir-compuerta` y dejar la salida fechada).
-
-### M.3 - El caso del buzon corporativo: probado contra el codigo desplegado, pero nunca ha ocurrido en produccion — PARCIALMENTE
+### M.3 - El caso del buzon corporativo: probado contra el codigo desplegado, pero nunca ha ocurrido en produccion, y su ocurrencia ya esta SOLICITADA — CERRADO. Solicitud S-07 emitida el 13-nov-2026
 
 **Origen.** T6 del cuadro canonico; el item `d02` del gate; el acta
 `verificacion-cierre/t6-caso-buzon-corporativo.md`.
@@ -140,7 +156,10 @@ sha256 `2fd3edcad2...`; el script **se niega a correr** si la base es la de prod
 **Quién lo tiene.** El owner (el Trabajador que declara el buzon en produccion) y el equipo (el
 inventario y la actualizacion del manifiesto).
 
-### M.4 - La autorizacion operativa del representante legal (A4) esta sin firmar — PENDIENTE
+**Solicitud.** **S-07**, emitida el 13-nov-2026. Esta en `tabla-de-solicitudes-2026-11-13.md`, con
+su destinatario, su verificacion y su fecha limite.
+
+### M.4 - La autorizacion operativa del representante legal (A4) esta sin firmar, y su firma ya esta SOLICITADA — CERRADO. Solicitud S-08 emitida el 13-nov-2026
 
 **Origen.** T8 del cuadro canonico; la fila J8 de la seccion E del checklist del abogado; el
 requisito 8.6 del cuadro canonico.
@@ -160,11 +179,16 @@ verificaciones»; `legal-readiness.json` -> `constancia.estado = "no_firmada"`;
 `gh_firma_aprobaciones_publicacion` (produccion): id 4 = v1.6 / `08e1eb8b...` / `OPERATIVA` /
 11-nov-2026; `sgsst-electron-app/legal/constancia-aprobacion-acuerdo.html:59-76`.
 
-**Qué falta.** La firma de A4 con la version y la huella que se autorizan.
+**Qué falta.** Nada del lado del equipo: el 13-nov-2026 se emitio la solicitud **S-08**. Lo que
+queda es **la firma de A4** con la version y la huella que se autorizan. El texto esta escrito y es
+el que ya esta en el expediente; lo que falta es el acto de firmarlo.
 
 **Quién lo tiene.** El owner (representante legal de Gesstiar S.A.S.).
 
-### M.5 - La ratificacion externa del abogado: el papel de Google y la Circular 002/2025 — PARCIALMENTE
+**Solicitud.** **S-08**, emitida el 13-nov-2026. Esta en `tabla-de-solicitudes-2026-11-13.md`, con
+su destinatario, su verificacion y su fecha limite.
+
+### M.5 - La ratificacion externa del abogado sobre el papel de Google y la Circular 002/2025: la determinacion esta escrita y la ratificacion ya esta SOLICITADA — CERRADO. Solicitud S-01 emitida el 13-nov-2026
 
 **Origen.** J6 y J7 del informe al abogado.
 
@@ -190,7 +214,7 @@ consultada el 12-nov-2026). No son planes: son determinaciones.
    calificados por operacion**: **Responsable** (art. 3(e) Ley 1581) sobre la cuenta del administrador de
    Workspace y la telemetria, y **Encargado** (art. 3(d)) sobre los datos del cliente que salen por el canal,
    donde «Subencargado» es **figura contractual** y no categoria legal. La operacion del canal de correo es una
-   **transmision internacional a un Encargado** (art. 2 num. 5 del Decreto 1377 de 2013), **no una
+   **transmision internacional a un Encargado** (art. 3 num. 5 del Decreto 1377 de 2013), **no una
    transferencia**: **no se activa el art. 26 de la Ley 1581 de 2012** y rigen el **art. 24 num. 2** y el
    **art. 25** del Decreto 1377. **P1 esta cerrado**; el CDPA se identifica **por huella SHA-256** (no declara
    fecha de version) y su fecha de efectividad es el **10-nov-2026** (la aceptacion, por el &sect;2). El derecho
@@ -206,27 +230,37 @@ consultada el 12-nov-2026). No son planes: son determinaciones.
    **politicas de tratamiento** (art. 25 de la Ley 1581): el texto de la v1.4 es insumo directo de ese registro.
    Detalle: `dictamen-legal-2026-11-12-tandas-2-y-3.md`, seccion 1.
 
+**Nota del 13-nov-2026 (revision de la asesoria).** El **contenido de la Circular Externa 002 de 2025
+no esta verificado**: no se pudo leer el PDF oficial, asi que la lectura de sus dos supuestos (que no
+aplica al canal de correo y que si aplica a la transferencia del software) es **nuestra determinacion**,
+no un hecho verificado. Por eso **S-01 lo pide expresamente** y lo marca como no verificado. Ademas, la
+cita de la transmision internacional se **corrigio en la fuente**: las definiciones del Decreto 1377 estan
+en el **art. 3**, no en el art. 2 (correccion **0.13** del dictamen de L1). Nada de esto cambia el estado:
+**S-01 sigue `EMITIDA` y sin responder.** Detalle: `revision-asesoria-s01-s04-2026-11-13.md`.
+
 **Evidencia.** `10-informe-correcciones-para-asesor-juridico.md`, filas J6 y J7, ambas con
 **PENDIENTE**; `sgsst-electron-app/legal/anexo-nube-v1.3.html`, bloque «Revision profesional» (la
 redaccion que pide la revision juridica profesional); `dictamen-legal-l1-2026-11-12.md` (L1);
 `dictamen-legal-2026-11-12-tandas-2-y-3.md` (L2).
 
-**Que falta.** Ya **no** falta la determinacion: las dos estan escritas. Queda, con nombre y responsable:
-(i) la **ratificacion** del abogado matriculado sobre L1 y L2 (no las suprime: las ratifica o las corrige),
-(ii) los **siete actos del owner** que dependen de L1 (obtener la Order Form o el correo de renovacion de
-Google; registrar la fecha de renovacion del Acuerdo de Google Workspace y re-aceptar el CDPA si el texto
-cambia; adoptar en el manifiesto la correccion de entidad y de clasificacion **despues** de la firma y con la
-huella real; documentar la evidencia de las medidas del paragrafo primero del numeral 3.2; traducir a la Empresa
-el preaviso de 30 dias y el derecho de oponerse del &sect;11 del CDPA; cerrar P3 y P6; suscribir y publicar la
-v1.4 y el Encargo 2026-11-12), y (iii) el **ajuste de los dos textos** que la determinacion dejo señalados: la
-**correccion 0.5** (el &sect;4 del Nube afirmaba «transferencia internacional» y «no existe contrato de
-transmision», en contradiccion con declarar a Google Encargado) y la **correccion 0.6** (el derecho de
-auditoria del &sect;7.5.2(a) esta condicionado a la Ley Europea). Las dos quedan incorporadas en los
-candidatos de la v1.4.
+**Qué falta.** Ya **no** falta la determinacion: las dos estan escritas. El 13-nov-2026 se emitio la
+solicitud **S-01** al abogado matriculado, con los dos dictamenes y los dos candidatos como insumo.
+Lo que queda es su respuesta, que es un acto de tercero: (i) la **ratificacion** (o correccion) de
+L1 y L2, y (ii) el pronunciamiento sobre las correcciones 0.5 y 0.6. Y, en paralelo, los
+**siete actos del owner** que dependen de L1 (obtener la Order Form o el correo de renovacion de
+Google; registrar la fecha de renovacion del Acuerdo de Google Workspace y re-aceptar el CDPA si el
+texto cambia; adoptar en el manifiesto la correccion de entidad y de clasificacion **despues** de la
+firma y con la huella real; documentar la evidencia de las medidas del paragrafo primero del numeral
+3.2; traducir a la Empresa el preaviso de 30 dias y el derecho de oponerse del &sect;11 del CDPA;
+cerrar P3 y P6; suscribir y publicar la v1.4 y el Encargo 2026-11-12).
 
-**Quien lo tiene.** El abogado matriculado (la ratificacion) y el owner (los siete actos y las firmas).
+**Quién lo tiene.** El abogado matriculado (la ratificacion) y el owner (los siete actos y las
+firmas).
 
-### M.6 - La tabla supletoria de conservacion sigue sin validar, con su compuerta cerrada a proposito — PARCIALMENTE
+**Solicitud.** **S-01**, emitida el 13-nov-2026. Esta en `tabla-de-solicitudes-2026-11-13.md`, con
+su destinatario, su verificacion y su fecha limite.
+
+### M.6 - La tabla supletoria de conservacion sigue sin validar, con su compuerta cerrada a proposito, y la validacion escrita ya esta SOLICITADA — CERRADO. Solicitud S-02 emitida el 13-nov-2026
 
 **Origen.** J8 del informe al abogado; la fila 3.1 y 3.2 del cuadro canonico.
 
@@ -297,21 +331,21 @@ abogado externo.
 el catalogo legado no esta alineado y la compuerta sigue cerrada porque depende de su validacion);
 `dictamen-legal-2026-11-12-tandas-2-y-3.md`, seccion 2 (L3).
 
-**Que falta.** Ya **no** falta nada del lado de la maquina: la tabla esta alineada, las cuatro condiciones estan
-en el codigo con sus pruebas, la compuerta esta cerrada por codigo y el marcador no la abre. Queda, con nombre
-y responsable: (i) la **validacion escrita del abogado matriculado** sobre los plazos de diez (10) y cinco (5)
-anos y sobre las condiciones C1 a C4, con `validado_por` (nombre, tarjeta o CC), `validado_at` (fecha de su
-opinion) y `validado_por_documento` (ruta del escrito y su SHA-256); (ii) **despues**, la **apertura** por parte
-del owner, que es un acto **separado y posterior**: cambiar `activada` a `true` y llenar `activado_at`; y
-(iii) la **reejecucion de la suite** entre validacion y apertura, porque abrir la compuerta cambia el
-comportamiento del servicio. **Lo que ya no hace falta**: que la maquina separe el acto de la validacion,
-porque desde el 12-nov-2026 la compuerta **no se abre sin la validacion escrita en el archivo** (M.30), ni que
-alguien redacte los plazos, ni que el equipo separe la validacion de la apertura: el archivo y el codigo ya lo
-hacen.
+**Qué falta.** Ya **no** falta nada del lado de la maquina: la tabla esta alineada, las cuatro
+condiciones estan en el codigo con sus pruebas, la compuerta esta cerrada por codigo y el marcador
+no la abre. El 13-nov-2026 se emitio la solicitud **S-02** al abogado matriculado. Lo que queda: (i)
+la **validacion escrita** sobre los plazos de diez (10) y cinco (5) anos y sobre las condiciones C1
+a C4, con `validado_por`, `validado_at` y `validado_por_documento` mas su SHA-256; (ii) **despues**,
+la **apertura** por parte del owner, que es un acto **separado y posterior**: cambiar `activada` a
+`true` y llenar `activado_at`; y (iii) la **reejecucion de la suite** entre validacion y apertura,
+porque abrir la compuerta cambia el comportamiento del servicio.
 
-**Quien lo tiene.** El abogado matriculado (valida) y el owner (abre, despues).
+**Quién lo tiene.** El abogado matriculado (la validacion) y el owner (la apertura, despues).
 
-### M.7 - No hay copia de los respaldos fuera del servidor, y los actos del P8 aun no estan en ninguno — PARCIALMENTE
+**Solicitud.** **S-02**, emitida el 13-nov-2026. Esta en `tabla-de-solicitudes-2026-11-13.md`, con
+su destinatario, su verificacion y su fecha limite.
+
+### M.7 - No hay copia de los respaldos fuera del servidor, y los actos del P8 aun no estan en ninguno: el destino y la activacion ya estan SOLICITADOS — CERRADO. Solicitud S-09 emitida y Solicitud S-04 emitida el 13-nov-2026
 
 **Origen.** El pendiente «respaldo off-site» de la cola; `7.5` del cuadro canonico.
 
@@ -348,42 +382,32 @@ copiado y verificado», detecta la corrupcion del destino y poda solo el destino
 storage, **todos en el mismo disco**; `tail -1 backups/backup.log`: «Backup OK:
 firma-20261111-220001.sqlite.enc (164714 B, sha256 de14e3f4b..., integrity ok, cifrado gpg)».
 
-**Qué falta.** Que exista **una copia real verificada** en el destino: abrir la cuenta y crear el bucket con
-su llave **en la region United States**, ejecutar la activacion con `sudo` y guardar `backup.passphrase` en
-otro sitio (en custodia colombiana, **fuera del servidor y fuera del bucket**). El ensayo uso un remoto local
-y **no prueba** credenciales, permisos, region ni endpoint. Y, por el destino en el exterior, **la
-determinacion legal de M.28**: la ratificacion del abogado sobre el encuadre, el papel de Backblaze y el
-instrumento que exige el art. 25 del Decreto 1377. La **activacion queda
-condicionada** a esa determinacion (decision del 12-nov-2026): una vez que hay una copia de datos
-personales en el exterior, **retirarla despues no la deshace** — el proveedor ya tuvo los bytes. Hoy que
-no hay copia, la determinacion sale **antes** de que exista el hecho.
+**Qué falta.** El 13-nov-2026 se emitieron dos solicitudes: **S-09** (al owner: el destino, las
+credenciales y la activacion) y **S-04** (al abogado matriculado: la ratificacion de L4 y L5 y el
+instrumento del art. 25). Lo que queda es que exista **una copia real verificada** en el destino:
+abrir la cuenta y crear el bucket con su llave **en la region United States**, ejecutar la
+activacion con `sudo` y guardar `backup.passphrase` en otro sitio (en custodia colombiana,
+**fuera del servidor y fuera del bucket**). Y, antes, la ratificacion del abogado, que es lo que
+habilita la activacion: **la activacion queda condicionada** a esa determinacion (decision del
+12-nov-2026), porque una vez que hay una copia de datos personales en el exterior,
+**retirarla despues no la deshace** — el proveedor ya tuvo los bytes. Hoy que no hay copia, la
+determinacion sale **antes** de que exista el hecho. El ensayo uso un remoto local y **no prueba**
+credenciales, permisos, region ni endpoint.
 
-**Lo que la determinacion legal del 12-nov-2026 ya resolvio, y lo que por eso hay que hacer distinto:**
+**Nota del 13-nov-2026 (revision de la asesoria).** El bucket se sigue creando en la **region United
+States**, pero **la razon que se da para exigirlo no esta verificada**: por el **art. 24 num. 2 del
+Decreto 1377** la transmision a un encargado se valida con el **contrato del art. 25**, sin remitir a la
+lista de paises con nivel adecuado de proteccion, y el alcance de esa lista **no se pudo verificar**.
+Por eso la condicion es, hasta que el abogado lo diga, una **decision conservadora de K+AIR**, y **S-04
+lo pregunta de forma expresa**. El bloque **no cambia de estado**: S-04 sigue `EMITIDA`.
 
-- **El encuadre.** No es «transferencia» sino **transmision internacional** (Encargado a Encargado): la
-  prohibicion del art. 26 **no se activa**, porque los Estados Unidos de America figuran en el numeral 3.2
-  del Titulo V de la Circular Unica de la SIC (nivel adecuado de proteccion), y el art. 24.2 del Decreto
-  1377 exonera de informar y de consentir al Titular porque existe contrato en los terminos del art. 25 —
-  que el Anexo de Encargo del 12-nov ya cumple. **Ninguna de las cuatro vias** que se evaluaron (autorizacion
-  del Titular, art. 26(e), declaracion de conformidad, clausulas modelo) es la via: las clausulas modelo de
-  la Circular Externa 003/2025 son **facultativas** y aqui serian un plus, no un requisito.
-- **La region del bucket es condicion de esa declaracion.** Backblaze guarda los archivos del cliente tambien
-  en CA-East (Canada) y EU-Central (Paises Bajos), y **Canada y Paises Bajos no estan** en la lista del numeral
-  3.2. **El bucket debe crearse en la region United States**, y como la region es fija y el bucket se crea
-  una vez, eso se decide **antes** de crearlo.
-- **La poda del destino ya respeta el deber legal de conservacion.** Antes la borraba por edad sin mirar
-  `hold_legal`, y el destino conservaba **menos** que la copia local: el bloque **M.29** quedo corregido y
-  probado en el servidor el 12-nov-2026 (4 de 4 casos). Por eso la v1.4 ya puede afirmar que el destino
-  respeta el `hold`.
-- **Lo que queda del punto de tercero** es la ratificacion del abogado, el instrumento con Backblaze y la
-  redaccion de la clausula del proveedor: el texto literal de esa redaccion esta en
-  `pedido-6-backblaze-v1-4-2026-11-12.md`, que es el documento que acompana al **punto 6** de la nota al
-  abogado.
+**Quién lo tiene.** El owner (el destino, las credenciales y la activacion) y el abogado matriculado
+(la ratificacion de M.28); el equipo (la instalacion y la prueba, ya hechas).
 
-**Quién lo tiene.** El owner (el destino, las credenciales y la activacion); el abogado (la determinacion
-de M.28); el equipo (la instalacion y la prueba, ya hechas).
+**Solicitud.** **S-09** y **S-04**, emitidas el 13-nov-2026. Estan en
+`tabla-de-solicitudes-2026-11-13.md`, con su destinatario, su verificacion y su fecha limite.
 
-### M.8 - El 📦1051 no esta desplegado: produccion corre las dependencias vulnerables — PENDIENTE
+### M.8 - El 📦1051 no esta desplegado: produccion corre las dependencias vulnerables, y el despliegue ya esta SOLICITADO — CERRADO. Solicitud S-10 emitida el 13-nov-2026
 
 **Origen.** El `npm audit` de la cola; §5.1 del runbook de despliegue.
 
@@ -410,12 +434,16 @@ es el **bump de dependencias** (mas dos scripts auxiliares y dos archivos de des
 comparacion es reproducible con `firma-service/scripts/comparar-despliegue.js`, que sale con codigo 1
 y nombra los archivos mientras haya diferencias.
 
-**Qué falta.** Desplegar el 📦1051 **con el paso de instalacion** (`npm ci --omit=dev` con el servicio
-parado, antes de las migraciones) y volver a medir las versiones en el servidor.
+**Qué falta.** El 13-nov-2026 se emitio la solicitud **S-10**. Lo que queda: desplegar el 📦1051
+**con el paso de instalacion** (`npm ci --omit=dev` con el servicio parado, antes de las
+migraciones) y volver a medir las versiones en el servidor.
 
 **Quién lo tiene.** El owner (el despliegue con `sudo`).
 
-### M.9 - El codigo que corre es escribible por cualquiera: 236 archivos en 777 — PENDIENTE
+**Solicitud.** **S-10**, emitida el 13-nov-2026. Esta en `tabla-de-solicitudes-2026-11-13.md`, con
+su destinatario, su verificacion y su fecha limite.
+
+### M.9 - El codigo que corre es escribible por cualquiera: 236 archivos en 777, y el chmod ya esta SOLICITADO — CERRADO. Solicitud S-11 emitida el 13-nov-2026
 
 **Origen.** El requisito `7.6` del cuadro canonico; la observacion que el abogado marco como
 **bloqueante** el 31-oct-2026.
@@ -437,12 +465,16 @@ nota del abogado: «con permisos 777, cualquier usuario de la maquina puede escr
 corre el servicio, y eso no es "minimo privilegio"»); `/etc/systemd/system/kair-firma.service`:
 `User=kairfirma`.
 
-**Qué falta.** Aplicar el paso 2b del runbook (es una linea, con `sudo`). Es el **unico** punto que el
-abogado habia marcado como bloqueante y que sigue igual cuatro meses despues.
+**Qué falta.** El 13-nov-2026 se emitio la solicitud **S-11**. Lo que queda: aplicar el paso 2b del
+runbook (es una linea, con `sudo`). Es el **unico** punto que el abogado habia marcado como
+bloqueante y que sigue igual cuatro meses despues.
 
 **Quién lo tiene.** El owner (ejecutar el `chmod` con su clave de sudo).
 
-### M.10 - El flujo electronico completo nunca se ha ejercitado contra el codigo que hoy corre — PENDIENTE
+**Solicitud.** **S-11**, emitida el 13-nov-2026. Esta en `tabla-de-solicitudes-2026-11-13.md`, con
+su destinatario, su verificacion y su fecha limite.
+
+### M.10 - El flujo electronico completo nunca se ha ejercitado contra el codigo que hoy corre, y la corrida ya esta SOLICITADA — CERRADO. Solicitud S-12 emitida el 13-nov-2026
 
 **Origen.** El requisito `7.11` del cuadro canonico; el pendiente del runbook «Correr los tests de
 extremo a extremo con datos reales».
@@ -461,23 +493,24 @@ corrido** contra el codigo actual. La referencia historica que cita el cuadro ca
 `MIGRACION-SERVIDOR-FIRMA.md` §8 (el pendiente del smoke de extremo a extremo);
 `respuesta-checklist-cierre-2026-10-30.md:1237` (la corrida historica del 26-oct).
 
-**Qué falta.** Una corrida controlada de extremo a extremo **contra el codigo desplegado hoy**: crear
-la solicitud, enviar la invitacion, firmar desde el celular y descargar la constancia; despues
-retirar el rastro con `limpiar-rastro-prueba.js --solo-firmas` y dejar el acta. Es el unico pendiente
-de esta seccion que exige **una persona con un celular**, no un script. La misma corrida es la que
-produce el caso real del buzon corporativo (M.3).
+**Qué falta.** El 13-nov-2026 se emitio la solicitud **S-12**. Lo que queda: una corrida controlada
+de extremo a extremo **contra el codigo desplegado hoy**: crear la solicitud, enviar la invitacion,
+firmar desde el celular y descargar la constancia; despues retirar el rastro con
+`limpiar-rastro-prueba.js --solo-firmas` y dejar el acta. Es el unico pendiente de esta seccion que
+exige **una persona con un celular**, no un script. La misma corrida es la que produce el caso real
+del buzon corporativo (M.3).
 
 **Quién lo tiene.** El owner (firma desde el celular y descarga de la constancia) con el equipo
 (smoke, limpieza del rastro y acta).
 
----
-
+**Solicitud.** **S-12**, emitida el 13-nov-2026. Esta en `tabla-de-solicitudes-2026-11-13.md`, con
+su destinatario, su verificacion y su fecha limite.
 ## 2. Condiciones de apertura
 
 > No impiden firmar hoy, pero hay que cumplirlas antes de que entre el primer cliente real: son las
 > condiciones que hacen que ese cliente no se encuentre con una excepcion sin resolver.
 
-### M.11 - Los tres alias de Workspace siguen sin verificar — PENDIENTE
+### M.11 - Los tres alias de Workspace siguen sin verificar, y su verificacion ya esta SOLICITADA — CERRADO. Solicitud S-13 emitida el 13-nov-2026
 
 **Origen.** P3 de la decision de regularizacion del correo; el item `canales.excepcion_documentada`.
 
@@ -493,12 +526,16 @@ servicio no tiene acceso.
 `decision-regularizacion-correo-2026-11-09.md`, fila P3: «**Abierto.** No medido en esta sesion. Los
 tres alias siguen sin verificar».
 
-**Qué falta.** Crear los tres alias y **verificarlos con un envio real a cada uno**, dejando la
-evidencia (Message-ID y cabeceras) en el manifiesto.
+**Qué falta.** El 13-nov-2026 se emitio la solicitud **S-13**. Lo que queda: crear los tres alias y
+**verificarlos con un envio real a cada uno**, dejando la evidencia (Message-ID y cabeceras) en el
+manifiesto.
 
 **Quién lo tiene.** El owner (la consola y el envio).
 
-### M.12 - El procedimiento de reversion esta probado, y la prueba encontro un defecto real que ya se corrigio — PARCIALMENTE
+**Solicitud.** **S-13**, emitida el 13-nov-2026. Esta en `tabla-de-solicitudes-2026-11-13.md`, con
+su destinatario, su verificacion y su fecha limite.
+
+### M.12 - El procedimiento de reversion esta probado y el defecto real que encontro ya se corrigio; el despliegue y la restauracion real ya estan SOLICITADOS — CERRADO. Solicitud S-14 emitida el 13-nov-2026
 
 **Origen.** T7 del cuadro canonico.
 
@@ -562,20 +599,23 @@ base); `10-informe-correcciones-para-asesor-juridico.md`, fila T7 (actualizada e
 restauracion cifrada real);
 `ls /opt/kair-firma/backups/restauracion.log` (produccion): no existe.
 
-**Qué falta.**
-1. **Desplegar la correccion en el servidor**: el programa que corre en `/opt/kair-firma/app` sigue
-   siendo el viejo (`a1f3e76b…7175`), o sea el que aborta con `FOREIGN KEY constraint failed`. La
-   correccion esta probada pero **no esta desplegada**. Acto del owner.
-2. **La restauracion cifrada real**: los `.enc` y `backup.passphrase` son `600 root` y `sudo` pide
-   contrasena, asi que la prueba de restauracion se hizo por la via de la copia limpia (`.backup` +
-   `.restore`), que es la que el entorno permite. Falta la prueba del camino real, con root. El cron
-   `0 4 1 * *` solo producira `restauracion.log` el 1-dic-2026.
-3. **La fila T7** del informe al abogado ya quedo actualizada a **PARCIALMENTE** (12-nov-2026): no
-   queda nada que decidir ahi; se cierra cuando se cumplan los puntos 1 y 2.
+**Qué falta.** El 13-nov-2026 se emitio la solicitud **S-14**. Lo que queda: 1.
+**Desplegar la correccion en el servidor**: el programa que corre en `/opt/kair-firma/app` sigue
+siendo el viejo (`a1f3e76b…7175`), o sea el que aborta con `FOREIGN KEY constraint failed`. La
+correccion esta probada pero **no esta desplegada**. Acto del owner. 2.
+**La restauracion cifrada real**: los `.enc` y `backup.passphrase` son `600 root` y `sudo` pide
+contrasena, asi que la prueba de restauracion se hizo por la via de la copia limpia (`.backup` +
+`.restore`), que es la que el entorno permite. Falta la prueba del camino real, con root. El cron
+`0 4 1 * *` solo producira `restauracion.log` el 1-dic-2026. 3. La **fila T7** del informe al
+abogado ya quedo actualizada a **PARCIALMENTE** (12-nov-2026): no queda nada que decidir ahi; se
+cierra cuando se cumplan los puntos 1 y 2.
 
 **Quién lo tiene.** El owner (los puntos 1 y 2, que necesitan `sudo`) y el equipo (el punto 3).
 
-### M.13 - Las dos altas de npm audit estan subidas en el repo: el audit da 0; en produccion siguen vivas hasta el despliegue — PARCIALMENTE
+**Solicitud.** **S-14**, emitida el 13-nov-2026. Esta en `tabla-de-solicitudes-2026-11-13.md`, con
+su destinatario, su verificacion y su fecha limite.
+
+### M.13 - Las dos altas de npm audit estan subidas en el repo: el audit da 0, en produccion siguen vivas, y el despliegue ya esta SOLICITADO — CERRADO. Solicitud S-15 emitida el 13-nov-2026
 
 **Origen.** El pendiente `npm audit` de la cola; §8.1 del runbook.
 
@@ -610,14 +650,18 @@ vulnerabilities»; `package.json` y `package-lock.json` (solo esos dos paquetes)
 `src/schemas/admin-clientes.js`, `src/schemas/admin-empresas.js`, `src/schemas/admin-encargado.js`,
 `src/schemas/admin-excepciones.js`); `MIGRACION-SERVIDOR-FIRMA.md` §8.1.
 
-**Qué falta.** **El despliegue**, y con el se cierra este bloque: el **repositorio** ya esta en 0
+**Qué falta.** El 13-nov-2026 se emitio la solicitud **S-15**. Lo que queda: el **despliegue**, que
+es el mismo de M.8 (S-10) y con el se cierra este bloque: el **repositorio** ya esta en 0
 vulnerabilidades, pero **produccion sigue con `nodemailer 6.10.1` y `zod 3.25.76`** hasta que se
-despliegue el bump (que es M.8). Es decir: **las dos altas siguen vivas en el servidor**, que es
-donde importan. Queda tambien el **envio real contra SMTP**, que la suite no cubre (usa
+despliegue el bump. Queda tambien el **envio real contra SMTP**, que la suite no cubre (usa
 `jsonTransport`) y que habria que ejercitar antes de abrir a una empresa real.
 
 **Quién lo tiene.** El owner (el despliegue, con `sudo`: M.8). El equipo ya hizo el trabajo tecnico.
-### M.14 - Node 22 en el servidor: decidido el 11-nov-2026 y no ejecutado — PARCIALMENTE
+
+**Solicitud.** **S-15**, emitida el 13-nov-2026. Esta en `tabla-de-solicitudes-2026-11-13.md`, con
+su destinatario, su verificacion y su fecha limite.
+
+### M.14 - Node 22 en el servidor: decidido el 11-nov-2026 y no ejecutado, y la ventana ya esta SOLICITADA — CERRADO. Solicitud S-16 emitida el 13-nov-2026
 
 **Origen.** §8.2 del runbook; la decision del owner del 11-nov-2026.
 
@@ -648,10 +692,14 @@ arrancado el 2026-11-12 09:30:23 -05, `NRestarts = 0`; `MIGRACION-SERVIDOR-FIRMA
 de combinaciones y el comando `npm rebuild better-sqlite3`); `crontab` del usuario `root`: `kair-firma-health`
 cada 5 minutos; `deploy/verificar-runtime-node.sh` (solo lectura, codigo 1 ante incoherencia).
 
-**Qué falta.** La ventana de mantenimiento: desactivar el cron, subir el runtime, recompilar el modulo
-nativo, verificar con el script, y su rollback.
+**Qué falta.** El 13-nov-2026 se emitio la solicitud **S-16**. Lo que queda: la ventana de
+mantenimiento: desactivar el cron, subir el runtime, recompilar el modulo nativo, verificar con el
+script, y su rollback.
 
 **Quién lo tiene.** El owner (la ventana). El equipo ya hizo el trabajo tecnico.
+
+**Solicitud.** **S-16**, emitida el 13-nov-2026. Esta en `tabla-de-solicitudes-2026-11-13.md`, con
+su destinatario, su verificacion y su fecha limite.
 
 ### M.15 - La v1.1 del Nube quedo suscrita y sin contrafirma: queda como registro historico — CERRADO
 
@@ -693,16 +741,17 @@ acta `050f223a3665cf7d`. `legal-readiness.json` -> `anexo_nube.versiones_firmada
 evidencia del 5-nov-2026. `nota-expediente-v1-1-2026-11-12.md` (la constancia de L6).
 
 **Que falta.** Nada que impida el cierre: la decision esta tomada y escrita, con su fundamento, y la
-constancia de expediente ya existe. Quedan dos cosas **que no bloquean** y tienen nombre y responsable: (i) la
+constancia de expediente ya existe. Quedan dos cosas **que no bloquean** y tienen nombre y
+responsable: (i) la
 **ratificacion** del abogado matriculado sobre L6, que va en el mismo escrito de M.5, y (ii) una **lectura de
 solo lectura** de las cinco filas de firma de produccion (el comando literal esta en la nota) para dejar en el
 expediente que version y huella del Anexo de Nube rigio cada una; el resultado puede **corregir** el numeral 2.3
 de la nota si el dato no coincide. El **manifiesto no se toco**: su huella esta registrada en el expediente.
 
-**Quien lo tiene.** Nadie bloquea; la ratificacion del abogado se pide en el mismo escrito de M.5 y la lectura
-de produccion es del owner.
+**Quien lo tiene.** Nadie bloquea; la ratificacion del abogado se pide en el mismo escrito de M.5 y
+la lectura de produccion es del owner.
 
-### M.16 - El inventario de buzones hay que repetirlo cuando haya solicitudes reales — PENDIENTE
+### M.16 - El inventario de buzones hay que repetirlo cuando haya solicitudes reales, y esa corrida ya esta SOLICITADA — CERRADO. Solicitud S-17 emitida el 13-nov-2026
 
 **Origen.** El item `d02` del gate; la evidencia del 26-oct-2026.
 
@@ -715,12 +764,16 @@ sustentaria a M.3 en produccion.
 26-oct-2026; `src/services/readinessLegal.js:1610-1611` (el `ok` depende de que el inventario este
 contado y documentado, no de que el numero sea alto).
 
-**Qué falta.** La corrida del inventario `scripts/inventario-buzon-corporativo.js` cuando exista al
-menos una solicitud real con un caso rechazado. El 12-nov-2026 se produjo el caso en una copia
-aislada (ver M.3), pero **el manifiesto no se toco**: `d02.inventario_buzones` sigue en 0 a proposito,
-porque el caso real en produccion todavia no ha ocurrido.
+**Qué falta.** El 13-nov-2026 se emitio la solicitud **S-17**. Lo que queda: la corrida del
+inventario `scripts/inventario-buzon-corporativo.js` cuando exista al menos una solicitud real con
+un caso rechazado. El 12-nov-2026 se produjo el caso en una copia aislada (ver M.3), pero
+**el manifiesto no se toco**: `d02.inventario_buzones` sigue en 0 a proposito, porque el caso real
+en produccion todavia no ha ocurrido. Esta solicitud **depende** de la S-07.
 
 **Quién lo tiene.** El equipo.
+
+**Solicitud.** **S-17**, emitida el 13-nov-2026. Esta en `tabla-de-solicitudes-2026-11-13.md`, con
+su destinatario, su verificacion y su fecha limite.
 
 ### M.17 - La corrida desde un clon limpio del commit da el mismo resultado que la del arbol del owner — CERRADO
 
@@ -758,6 +811,7 @@ un resultado distinto. La trampa quedo escrita en `PROMPT.md` (la 155) y en el a
 clon salio **del commit**, sin parche y sin copia de no versionados:
 
 ```
+
 tests 2665 | pass 2663 | fail 0 | cancelled 0 | skipped 2 | todo 0
 duration_ms 323480
 ```
@@ -786,7 +840,7 @@ ese commit y el clon quedo byte a byte igual al arbol del owner.
 
 ---
 
-### M.18 - Los dos anexos ya suscritos dicen cosas que la realidad ya desmintio: se reemite ahora — PARCIALMENTE
+### M.18 - Los dos anexos ya suscritos dicen cosas que la realidad ya desmintio: se reemite ahora, y la revision y redaccion ya estan SOLICITADAS — CERRADO. Solicitud S-03 emitida el 13-nov-2026
 
 **Origen.** El requisito 1.9 del cuadro canonico (medido en `verificacion-cierre/secciones-1-2.md`)
 y los requisitos 5.5 y 5.6 (medidos en `verificacion-cierre/secciones-3-5.md`).
@@ -824,7 +878,7 @@ suscrito no se toca) y corregir la tabla de instrumentos»); `verificacion-cierr
 requisitos 5.5 y 5.6 (**PENDIENTE** y **PARCIALMENTE**: ambos exigen «una version nueva del Anexo de
 Nube (v1.4)»); `sgsst-electron-app/legal/anexo-nube-v1.3.html` (los §1 y §5);
 `sgsst-electron-app/legal/anexo-encargo.html` (la remision); `candidatos-v1.4/` (candidato Nube v1.4:
-103 390 B, `4f23c605...0ebbd`; candidato Encargo 12-nov: 97 962 B, `fa1a79b2...57a15`; vigentes
+103 390 B, `fae2b26b...d8b416`; candidato Encargo 12-nov: 97 962 B, `7576b1a1...d9f3c`; vigentes
 intactos: `fdd10551...b585d` y `6308b1f7...b8948`).
 
 **LO QUE LA MESA DE DETERMINACIONES LE METIO (12-nov-2026).** El generador de candidatos ahora arma el texto
@@ -841,22 +895,27 @@ unifico la **version del Encargo en 2026-11-12**. El generador tiene ademas **te
 modo `--estado` no escribe, que los vigentes y el manifiesto quedan intactos, que el texto del candidato es
 **byte a byte** el de la determinacion, y que **se niega** cuando un ancla no casa exactamente una vez.
 
-**Que falta.** La revision y redaccion del abogado, la suscripcion de ASEPLUS, la contrafirma de K+AIR y el
-manifiesto al dia con la huella de la v1.4. **Lo que ya no hace falta**: que el equipo redacte el texto ni que
-alguien lo escriba a mano; el texto literal de L1, L4 y L5 ya esta aplicado y es reproducible con un comando.
-Queda una correccion **propia del agente general** (nueve identificaciones de version que el dictamen no
-enumeraba y que decian «esta version 1.3» en un documento que **es** la 1.4), marcada `ext` en
-`determinaciones-v1.4.js` y reportada al abogado: si no le parece bien, se quita y se vuelve a armar.
+**Qué falta.** **Lo que ya no hace falta**: que el equipo redacte el texto ni que alguien lo escriba
+a mano; el texto literal de L1, L4 y L5 ya esta aplicado y es reproducible con un comando. El
+13-nov-2026 se emitio la solicitud **S-03** al abogado matriculado para que revise y redacte la v1.4
+y el Encargo 2026-11-12. Lo que queda: su redaccion, y despues la suscripcion de ASEPLUS, la
+contrafirma de K+AIR y el manifiesto al dia con la huella de la v1.4. Sigue abierta una correccion
+**propia del agente general** (nueve identificaciones de version que el dictamen no enumeraba y que
+decian «esta version 1.3» en un documento que **es** la 1.4), marcada `ext` en
+`determinaciones-v1.4.js` y **reportada al abogado** en la S-03: si no le parece bien, se quita y se
+vuelve a armar.
 
-**Quién lo tiene.** El abogado (la redaccion) y el owner (las firmas). El equipo (huellas, manifiesto y
-firmas) ya tiene los candidatos armados y **verificados**.
+**Quién lo tiene.** El abogado matriculado (la redaccion) y el owner (las firmas). El equipo
+(huellas, manifiesto y firmas) ya tiene los candidatos armados y **verificados**.
 
+**Solicitud.** **S-03**, emitida el 13-nov-2026. Esta en `tabla-de-solicitudes-2026-11-13.md`, con
+su destinatario, su verificacion y su fecha limite.
 ## 3. Riesgos y deuda
 
 > No impiden la apertura. Se anotan porque son cosas que el owner deberia saber antes de abrir, y
 > porque algunos son trampas que ya mordieron una vez.
 
-### M.19 - El valor efectivo de `TRUST_PROXY` no se pudo leer — PENDIENTE
+### M.19 - El valor efectivo de `TRUST_PROXY` no se pudo leer, y su lectura ya esta SOLICITADA — CERRADO. Solicitud S-18 emitida el 13-nov-2026
 
 **Origen.** `src/config.js:58` y `deploy/README-DESPLIEGUE.md:45`.
 
@@ -872,9 +931,13 @@ confirmarlo en el `.env`.
 `/etc/cloudflared/config.yml`: `firma.kair.fyi -> http://127.0.0.1:3001`; `ss -ltn`: el 3001 escucha
 **solo** en `127.0.0.1`; el `.env` es `600 root` (lectura `EACCES`).
 
-**Qué falta.** Un `grep` del owner sobre el `.env` que deje constancia del valor.
+**Qué falta.** El 13-nov-2026 se emitio la solicitud **S-18**. Lo que queda: un `grep` del owner
+sobre el `.env` que deje constancia del valor.
 
 **Quién lo tiene.** El owner.
+
+**Solicitud.** **S-18**, emitida el 13-nov-2026. Esta en `tabla-de-solicitudes-2026-11-13.md`, con
+su destinatario, su verificacion y su fecha limite.
 
 ### M.20 - `FIRMA_EXIGIR_MEDIO_PERSONAL_OTP` es una variable muerta que parece viva — CERRADO
 
@@ -915,14 +978,14 @@ grep sobre `src/` del identificador `exigirMedioPersonalOtp`: la unica aparicion
 `deploy/README-DESPLIEGUE.md` y `docs/MIGRACION-SERVIDOR-FIRMA.md` (el comando del `.env`, escrito);
 `dictamen-legal-2026-11-12-tandas-2-y-3.md`, seccion 5 (L7).
 
-**Que falta.** Nada que bloquee: la decision esta tomada y escrita en el codigo y en los documentos, y el
-comando para el `.env` esta escrito y a la espera de quien tenga el `sudo`. Que el `.env` de produccion la
-traiga o no es un **acto de configuracion del owner**, no una decision de fondo; y mientras la variable siga
-inerte, las dos opciones son correctas.
+**Que falta.** Nada que bloquee: la decision esta tomada y escrita en el codigo y en los documentos,
+y el comando para el `.env` esta escrito y a la espera de quien tenga el `sudo`. Que el `.env` de
+produccion la traiga o no es un **acto de configuracion del owner**, no una decision de fondo; y
+mientras la variable siga inerte, las dos opciones son correctas.
 
 **Quien lo tiene.** El owner, para el paso opcional del `.env`. Nadie bloquea.
 
-### M.21 - El tunel de Cloudflare tuvo un parpadeo y nadie fue avisado — PARCIALMENTE
+### M.21 - El tunel de Cloudflare tuvo un parpadeo y nadie fue avisado, y la instalacion del canal ya esta SOLICITADA — CERRADO. Solicitud S-19 emitida el 13-nov-2026
 
 **Origen.** El monitor de salud del servidor (`/opt/kair-firma/logs/health-check.log`).
 
@@ -950,18 +1013,21 @@ dura, SMTP caido (sale 0 y lo dice en el log), publico arriba (limpia el estado)
 que» de cada paso); el parpadeo medido en `/opt/kair-firma/logs/health-check.log` (lineas de las
 12:50, 12:55 y 13:00 del 12-nov-2026); `journalctl -u kair-firma --since today -p warning`: sin entradas.
 
-**Qué falta.** **Instalar y configurar el canal**, que es del owner y necesita `sudo`:
-
+**Qué falta.** El 13-nov-2026 se emitio la solicitud **S-19**. Lo que queda es
+**instalar y configurar el canal**, que es del owner y necesita `sudo`:
 ```bash
 sudo cp health-check.sh /opt/kair-firma/health-check.sh && sudo chmod 755 /opt/kair-firma/health-check.sh
 # La configuracion SMTP va en /etc/cron.d/kair-firma-health con modo 600 (NO en un .env).
 ```
 
-Mientras eso no se instale, **el estado real de produccion es el de antes**: el parpadeo se sigue
-detectando y **sigue sin avisar a nadie**.
+Mientras eso no se instale, **el estado real de produccion es el de antes**: el parpadeo se sigue detectando y **sigue sin avisar a nadie**.
 
 **Quién lo tiene.** El owner (los tres `sudo`: instalar el script, el `netrc` con modo 600 y el
 cron). El equipo ya dejo el mecanismo escrito y probado.
+
+**Solicitud.** **S-19**, emitida el 13-nov-2026. Esta en `tabla-de-solicitudes-2026-11-13.md`, con
+su destinatario, su verificacion y su fecha limite.
+
 ### M.22 - Las 39 casillas del §7 del SECURITY.md ya estan medidas una por una — CERRADO
 
 **Origen.** `docs/gestion-humana/firma-electronica/SECURITY.md` §7; §8.1 del runbook; la medicion
@@ -989,18 +1055,18 @@ en un arbol sin `.git` y con `"version": "0.1.0"`: no hay sello de version; `sql
 `package-lock.json` desplegado -> **6 vulnerabilidades (1 critica, 4 altas, 1 moderada)** y sobre el
 arbol del repo -> 2 altas.
 
-**Qué falta.** Veinte casillas sin cerrar. Del **owner**: el `sudo` de los permisos de los logs y del
-arbol desplegado (7.20, 7.21, 7.23), la lectura del `.env` (7.7), el canal de alerta (7.28, 7.29,
-7.30), el pentest (7.38) y la ratificacion del abogado (7.31). Del **equipo**: desplegar el paquete
-1051 con `npm ci --omit=dev` (7.25, 7.26), la corrida de suite ligada a un commit candidato (7.35,
-7.36), la deteccion de anomalias del oraculo (7.24), el acta de la restauracion (7.13), el monitor
-externo (7.29), el plan general de incidentes (7.39) y las versiones nuevas de la politica de
-privacidad y de los terminos (7.32, 7.33). El detalle de cada una esta en el informe.
+**Qué falta.** Veinte casillas sin cerrar. Del **owner**: el `sudo` de los permisos de los logs y
+del arbol desplegado (7.20, 7.21, 7.23), la lectura del `.env` (7.7), el canal de alerta (7.28,
+7.29, 7.30), el pentest (7.38) y la ratificacion del abogado (7.31). Del **equipo**: desplegar el
+paquete 1051 con `npm ci --omit=dev` (7.25, 7.26), la corrida de suite ligada a un commit candidato
+(7.35, 7.36), la deteccion de anomalias del oraculo (7.24), el acta de la restauracion (7.13), el
+monitor externo (7.29), el plan general de incidentes (7.39) y las versiones nuevas de la politica
+de privacidad y de los terminos (7.32, 7.33). El detalle de cada una esta en el informe.
 
 **Quién lo tiene.** El equipo (la medicion, ya entregada) y el owner (los puntos que necesitan su
 `sudo`, su lectura del `.env` o su decision).
 
-### M.23 - Los logs no rotan, no tienen retencion y su directorio lo lee cualquiera — PARCIALMENTE
+### M.23 - Los logs no rotan, no tienen retencion y su directorio lo lee cualquiera, y su instalacion ya esta SOLICITADA — CERRADO. Solicitud S-20 emitida el 13-nov-2026
 
 **Origen.** `SECURITY.md` §7.4 (las casillas de rotacion, retencion y acceso restringido); la
 medicion del servidor del 12-nov-2026.
@@ -1029,8 +1095,8 @@ comando de instalacion y el de verificacion);
 `ls /etc/logrotate.d/ | grep -i kair`: sin resultados (no hay configuracion de rotacion para el
 servicio); `SECURITY.md` §7.4 (las tres casillas).
 
-**Qué falta.** **Instalarlo**, que es del owner y necesita `sudo`:
-
+**Qué falta.** El 13-nov-2026 se emitio la solicitud **S-20**. Lo que queda es **instalarlo**, que
+es del owner y necesita `sudo`:
 ```bash
 sudo install -m 644 -o root -g root logrotate-kair-firma.conf /etc/logrotate.d/kair-firma
 sudo chown root:kairfirma /opt/kair-firma/logs && sudo chmod 750 /opt/kair-firma/logs
@@ -1040,14 +1106,12 @@ sudo logrotate -d /etc/logrotate.d/kair-firma | head -20
 ls -ld /opt/kair-firma/logs && sudo -u nobody cat /opt/kair-firma/logs/health-check.log
 ```
 
-**Ojo con la ultima linea de verificacion:** con `640 root:root`, `nobody` **no** debe poder leer
-el log. Si puede, el permiso no quedo bien puesto.
-
-**Mientras no se instale, produccion sigue sin rotar, sin retencion y con el directorio legible**:
-el estado real es el de antes.
-
 **Quién lo tiene.** El owner (los `sudo`). El equipo ya dejo la configuracion escrita.
-### M.24 - El sello de version esta escrito y viaja en el paquete; falta el despliegue que lo instale — PARCIALMENTE
+
+**Solicitud.** **S-20**, emitida el 13-nov-2026. Esta en `tabla-de-solicitudes-2026-11-13.md`, con
+su destinatario, su verificacion y su fecha limite.
+
+### M.24 - El sello de version esta escrito y viaja en el paquete; falta el despliegue que lo instale, y ese despliegue ya esta SOLICITADO — CERRADO. Solicitud S-21 emitida el 13-nov-2026
 
 **Origen.** Los requisitos `7.1` y `7.12` del cuadro canonico.
 
@@ -1090,19 +1154,19 @@ copia al stage, y el `.gitignore` excluye `firma-service/VERSION` (verificado co
 (26/26); `MIGRACION-SERVIDOR-FIRMA.md` §5.1 pasos **1b** y **6b**; `.gitignore` (la exclusion de
 `VERSION`); `verificacion-cierre/acta-despliegue-2026-11-12.md` (la comparacion por sha256).
 
-**Qué falta.** **El despliegue que lo instale** (que es M.8) y, con el, la comprobacion en el
-servidor:
-
+**Qué falta.** El 13-nov-2026 se emitio la solicitud **S-21**. Lo que queda:
+**el despliegue que lo instale** (que es M.8, S-10) y, con el, la comprobacion en el servidor:
 ```bash
 cat /opt/kair-firma/app/VERSION
 cd /opt/kair-firma/app && sudo -u kairfirma node scripts/generar-sello-version.js --comprobar
 ```
 
-**Mientras no se despliegue, `/health` sigue sin decir que version corre**: el campo nuevo todavia
-no existe en produccion.
-
 **Quién lo tiene.** El owner (el despliegue, que es M.8). El equipo ya dejo el mecanismo, el test y
 el runbook.
+
+**Solicitud.** **S-21**, emitida el 13-nov-2026. Esta en `tabla-de-solicitudes-2026-11-13.md`, con
+su destinatario, su verificacion y su fecha limite.
+
 ### M.25 - `BITACORA.md` y `CONTEXT.md` al dia con el estado real — CERRADO
 
 **Origen.** El requisito `8.10` del cuadro canonico; la verificacion de la seccion 8
@@ -1169,11 +1233,11 @@ ese momento; hoy son **77 cerrados / 19 pendientes**).
 `scripts/contar-estados-checklist.js` (hoy **77 cerrados / 19 pendientes**) y los 34 requisitos medidos
 aplicados por `scripts/actualizar-cuadro-canonico-2026-11-12.js` (idempotente).
 
-**Que falta.** Nada de este bloque. **Ojo con lo que el acta dice:** el registro de cierre **no es
-condicion de produccion** (decision del owner del 5-nov-2026: «las ACTAS DE CIERRE dejan de ser
-condicion de produccion»), y lo que bloquea es la **evidencia** que el registro apunta: la **T8** (el
-acto de voluntad del owner), la T7, la T1 y el despliegue del 📦1051. Esos son otros bloques de este
-mapa, no este.
+**Que falta.** Nada de este bloque. **Ojo con lo que el acta dice:** el registro de cierre
+**no es condicion de produccion** (decision del owner del 5-nov-2026: «las ACTAS DE CIERRE dejan de
+ser condicion de produccion»), y lo que bloquea es la **evidencia** que el registro apunta: la
+**T8** (el acto de voluntad del owner), la T7, la T1 y el despliegue del 📦1051. Esos son otros
+bloques de este mapa, no este.
 
 **Quién lo tiene.** Cerrado. Lo que sigue son M.8 (el 📦1051), M.10 (el flujo e2e), M.12 (T7), M.17
 (T1) y M.4 (la T8 y la firma del A4), con sus dueños nombrados.
@@ -1208,7 +1272,7 @@ produccion**; lo que se corrige es la prosa. **El despliegue es lo que restablec
 
 **Quién lo tiene.** —
 
-### M.28 - El destino del respaldo abre una transferencia internacional que no estaba en el mapa — PENDIENTE
+### M.28 - El destino del respaldo abre una transmision internacional que no estaba en el mapa, y su ratificacion ya esta SOLICITADA — CERRADO. Solicitud S-04 emitida el 13-nov-2026
 
 **Origen.** La decision de M.7 (12-nov-2026): el destino del respaldo fuera del servidor.
 
@@ -1232,15 +1296,31 @@ El bucket **todavia no existe**: crear la cuenta y el bucket es un acto del owne
 **Evidencia.** `decision-respaldo-offsite-2026-11-12.md` (el destino y el script, con su validacion);
 el informe del agente legal del 12-nov-2026, punto L5 de la mesa del abogado.
 
-**Qué falta.** La determinacion escrita del abogado sobre las cuatro preguntas, la redaccion de la
-clausula con el proveedor en el §4 de la v1.4 y en el §5 del Encargo nuevo, la entrada de Backblaze en la
-lista de proveedores, y el contrato con las clausulas minimas del art. 25. Y una condicion operativa que el
-dictamen del 12-nov-2026 anade: el bucket debe crearse en la **region United States** de Backblaze, porque
-si queda en CA-East (Canada) o en EU-Central (Paises Bajos), el destino deja de estar en la lista de paises con
-nivel adecuado de proteccion y toda la determinacion cambia. Es un **acto de tercero**: el equipo puede
+**Qué falta.** La determinacion escrita del abogado **ya existe** (el pedido 6 del 12-nov-2026) y la
+redaccion de la clausula con el proveedor **ya esta aplicada** en el §4 del Anexo de Nube v1.4 y en
+el §5 del Encargo nuevo. El 13-nov-2026 se emitio la solicitud **S-04** al abogado matriculado. Lo
+que queda: su **ratificacion** de L4 y L5, y el **texto final de las clausulas minimas del art. 25**
+para el contrato con el proveedor. Y una condicion operativa que el dictamen del 12-nov-2026 anade:
+el bucket debe crearse en la **region United States** de Backblaze, porque si queda en CA-East
+(Canada) o en EU-Central (Paises Bajos), el destino deja de estar en la lista de paises con nivel
+adecuado de proteccion y toda la determinacion cambia. Es un **acto de tercero**: el equipo puede
 preparar el insumo, pero **no puede emitir esa determinacion**.
 
-**Quién lo tiene.** El abogado (la determinacion y la redaccion) y el owner (el contrato y la cuenta).
+**Nota del 13-nov-2026 (revision de la asesoria).** La condicion de **region United States** es, hasta
+que el abogado la confirme, una **decision conservadora de K+AIR** y **no una exigencia legal
+verificada**: por el **art. 24 num. 2 del Decreto 1377** la transmision a un encargado se valida con el
+**contrato del art. 25**, sin remitir a la lista de paises con nivel adecuado de proteccion (esa lista
+entra por el camino de las **transferencias**, art. 24 num. 1 y art. 26 de la Ley 1581), y el alcance de
+la lista publicada por la SIC **no se pudo verificar**. Por eso **S-04 ahora lo pregunta de forma
+expresa**: ¿es exigencia legal o decision conservadora de K+AIR? De la respuesta depende como se
+redacta la v1.4: como obligacion normativa o como decision propia declarada. El bucket se sigue creando
+en la region United States en cualquier caso. El bloque **no cambia de estado**: S-04 sigue `EMITIDA`.
+
+**Quién lo tiene.** El abogado matriculado (la ratificacion y la redaccion final) y el owner (el
+contrato y la cuenta).
+
+**Solicitud.** **S-04**, emitida el 13-nov-2026. Esta en `tabla-de-solicitudes-2026-11-13.md`, con
+su destinatario, su verificacion y su fecha limite.
 
 ### M.29 - La poda del respaldo en el destino no miraba el deber legal de conservacion — CERRADO
 
@@ -1318,12 +1398,15 @@ cambio es que **la apertura ahora exige la validacion escrita en el archivo**, n
 
 | Bloque | Cerrados | Pendientes | No aplica | Total |
 |---|---|---|---|---|
-| 1. Bloqueos duros | 0 | 10 | 0 | 10 |
-| 2. Condiciones de apertura | 2 | 6 | 0 | 8 |
-| 3. Deuda y riesgo | 7 | 5 | 0 | 12 |
-| **TOTAL** | **9** | **21** | **0** | **30** |
+| 1. Bloqueos duros | 10 | 0 | 0 | 10 |
+| 2. Condiciones de apertura | 8 | 0 | 0 | 8 |
+| 3. Deuda y riesgo | 12 | 0 | 0 | 12 |
+| **TOTAL** | **30** | **0** | **0** | **30** |
 
-Los 21 pendientes concilian: 10 del bloque 1 + 6 del bloque 2 + 5 del bloque 3 = 21.
+Los 0 pendientes concilian: ninguno = 0. Las 21 solicitudes de la tabla
+(`tabla-de-solicitudes-2026-11-13.md`): 21 EMITIDA. Cerrado en este mapa significa que
+el pedido esta emitido y medido, no que el acto este cumplido: cada acto de un tercero
+se sigue en esa tabla, con su estado, su destinatario y su fecha.
 
 ---
 
@@ -1337,12 +1420,14 @@ Esto se midio el 12-nov-2026 y **no** es un bloqueante:
 - El **Acuerdo v1.6 esta publicado**, y el Anexo de Nube v1.3 y el Anexo de Encargo 2026-11-11
   estan **suscritos y contrafirmados**, con sus actas.
 - El sitio publico sirve **exactamente** las huellas suscribidas (6 URLs comprobadas).
-- La **suite** del servicio: **2 684 tests, 2 682 pass, 0 fail, 2 skipped** (corrida final del 12-nov
-  por la noche, 180 archivos de prueba, `exit 0`), y **vinculada a un commit**: el 12-nov por la
+- La **suite** del servicio: **2 689 tests, 2 687 pass, 0 fail, 2 skipped** (corrida final del 13-nov
+  por la tarde, segunda parte, 180 archivos de prueba, `exit 0`), y **vinculada a un commit**: el 12-nov por la
   manana se corrio tambien desde un clon limpio del commit `e4dd5f31` y dio el mismo resultado que
   la corrida de esa manana (2 665 / 2 663 / 0 / 2, mismo conjunto de nombres de prueba, clon byte a
-  byte igual al arbol del owner). Los **+2** de la tarde son las dos pruebas de regresion del
-  manifiesto, posteriores a ese commit.
+  byte igual al arbol del owner). Los **+2** de la tarde del 12-nov son las dos pruebas de regresion
+  del manifiesto, posteriores a ese commit, y los **+5** de esta ronda son las del enlace entre cada
+  bloque del mapa y su fila en `tabla-de-solicitudes-2026-11-13.md` y la del guard que falla si la
+  cita errada del Decreto 1377 reaparece en los dos candidatos de la v1.4.
 - El `npm audit` del repo: **0 vulnerabilidades**. Las dos altas de M.13 se corrigieron en el repo
   (`nodemailer` 6.10.1 -> 10.5.0 y `zod` 3.25.76 -> 4.6.7); **en produccion siguen vivas** hasta
   que se despliegue el 📦1051.

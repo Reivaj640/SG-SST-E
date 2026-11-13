@@ -368,6 +368,15 @@ acto del tercero:** la ratificacion, la redaccion final de la v1.4 y la firma.
 textos publicados siguen siendo los mismos), el cuadro canonico (77 cerrados / 19 pendientes de 96) y los
 textos ya suscritos. El mapa paso a **30 bloques: 9 cerrados y 21 pendientes**, y los dos bloques nuevos
 los **cerro el equipo** en la misma ronda.
+
+> **Actualizacion del 13-nov-2026 (lo que esta seccion midio no cambia).** El owner **cambio el criterio de
+> cierre del mapa**: un bloque cierra cuando **el pedido esta emitido y medido**, y los actos de un tercero
+> (firma, credencial, ventana, respuesta) **no** cierran un bloque: se siguen en
+> `tabla-de-solicitudes-2026-11-13.md`. Con ese criterio el mapa queda en **30 bloques: 30 cerrados / 0
+> pendientes**, con **21 solicitudes EMITIDA y 0 respondidas**, y **no afirma que el servicio pueda abrirse
+> a empresas reales**: los hechos de cada bloque (que no hay empresa real suscrita, que la compuerta sigue
+> apagada, que los permisos siguen en 777, que no hay respaldo fuera del servidor) siguen ciertos. La cifra
+> de arriba (**9 cerrados / 21 pendientes**) es la que se midio el 12-nov-2026, con el criterio anterior.
 **Pendiente de limpieza, sin efecto sobre el servicio.** Por la politica de borrado de esta sesion no
 se pudieron eliminar los archivos temporales de la medicion: en el servidor quedan
 `/tmp/kair-gate-verify` (copia de la base de produccion, con permisos `700` puestos) y los scripts
