@@ -1487,6 +1487,38 @@ guard de identidad byte a byte comparó el candidato con el dictamen.
    cambiaron** de huella (`ba664e6f…` y `d4df187a…`): lo que cambió fue **de dónde salía** el texto. Una
    corrección invisible en el resultado visible es la más fácil de perder.
 
+### 5.47 🔴 El estado del remoto se mide, no se recuerda: `git ls-remote`, y la anotación de un commit no puede citar su propio hash
+
+**El caso real (13-nov-2026), la ronda 22.** Al cerrar la ronda se escribió, en el `Historial.md` y en el
+`sgsst-electron-app/CONTEXT.md`, que «`origin/Dev` sigue en `d8e59dcc`». Ese dato venía del resumen de la
+sesión anterior, pero **el remoto ya estaba en `72a06dda`**: el 📦1062 se había pusheado. La anotación salió
+con un hash viejo, y el error quedó además **en el cuerpo de dos commits** —el mensaje de un commit no se
+reescribe—: solo pudo quedar registrado en el commit siguiente.
+
+**Reglas:**
+
+1. **El estado del remoto se mide, no se recuerda.** Antes de escribir en cualquier documento (o en el cuerpo
+   de un commit) dónde está `origin/Dev`, se mide: `git ls-remote origin Dev`. La referencia local
+   (`origin/Dev`) y su `reflog` dicen **lo que pusheaste vos**, no lo que hay en el remoto ahora.
+2. **Un resumen de sesión es una pista, no una fuente.** Si el dato viene de un resumen o de memoria, se
+   **mide** antes de escribirlo. Es §5.43 aplicada al estado del repo: lo que no se mide en el momento puede
+   estar viejo, y lo que se escribe en un commit ya no se corrige.
+3. **La anotación de un commit no cita el hash del commit que la contiene.** Un `--amend` cambia el hash y
+   deja la referencia circular apuntando a algo que ya no existe. La anotación nombra **el commit al que
+   anota** (el 📦1063) y dice que la anotación va en otro commit, sin nombrarlo.
+4. **Un commit ya pusheado no se `--amend`ea** (§5.31): se corrige en un commit nuevo. Uno **local** sí se
+   puede enmendar, y enmendar es la forma limpia de corregir un mensaje que acaba de salir mal.
+5. **Este archivo es el índice, no la cola.** **Qué está en curso** vive en
+   `sgsst-electron-app/CONTEXT.md` y el **estado de cierre** en `Historial.md`. Aquí va la regla.
+
+**Estado al cierre de la ronda 22 (13-nov-2026).** `origin/Dev` quedó en **`316fd0e2`** (📦1063 `8294e973`
+con el escrito del abogado archivado, la v1.4 redactada y el guard corregido; 📦1064 con la anotación del
+commit), verificado con `git ls-remote`. La cola del owner: **enviar las 5 solicitudes** al abogado (S-01 a
+S-04 y S-23; cuatro vencen 2026-11-20 y la S-23 el 2026-11-27), **pedir el escrito formal** (nombre, fecha de
+suscripción y SHA-256) para cerrar la **S-02**, **firmar el procedimiento** (S-24), **suscribir y publicar la
+v1.4** con huella real (M.18) con el manifiesto al día, y los **17 actos de ejecución** de producción. El
+detalle, en el CONTEXT y en el Historial.
+
 ### 6.1 Backend — bridges
 
 Sufijo **`-bridge.js`** (no `bridge-*.js`). Hay 30 en `main/`.
@@ -2292,6 +2324,8 @@ Caso real (31-oct-2026): al corregir el único rojo de la suite del `firma-servi
 | 167 | 🔴 **Un texto que se firma no puede afirmar lo que nadie verificó: la norma no verificada se cita como marco de referencia, y el hecho no verificado se declara pendiente de confirmación** | `sgsst-electron-app/docs/gestion-humana/firma-electronica/dictamen-legal-l1-2026-11-12.md` (los bloques A.1, A.2.2, A.4, A.5, B.1, B.2, B.3 y B.8), `sgsst-electron-app/docs/gestion-humana/firma-electronica/candidatos-v1.4/anexo-nube-v1.4.html`, `sgsst-electron-app/docs/gestion-humana/firma-electronica/respuesta-del-abogado-2026-11-13.md` | Caso real (13-nov-2026), la ronda 22: la v1.4 candidata afirmaba, en ocho lugares distintos, que «Estados Unidos es país con nivel adecuado de protección» y que la **región US del bucket** era «condición de esta declaración» —todo ello sobre el **numeral 3.2 del Título V de la Circular Única**, que el abogado matriculado declaró por escrito **no verificado**. Un documento que se firma afirmando una norma no verificada es un documento que miente (art. 4 literal d de la Ley 1581) y que además **atribuye al cliente un riesgo que él no eligió**. Reglas: (1) **lo no verificado se dice no verificado, en el texto que se firma**: «marco sectorial de referencia, no como fundamento» y «no fue verificado el 13-nov-2026»; (2) **una condición que no es legal no se presenta como legal**: la región US pasó a ser **decisión conservadora de K+AIR**, con su fundamento (el art. 24 num. 2 y el art. 25 **no condicionan el país**); (3) **una cita normativa que sale de la lista de referencias es una contradicción interna**: la viñeta del Título V se había comido un rango mal acotado y el cuerpo la citaba sin que la lista la nombrara; (4) **el guard vigila el texto, no solo el conteo**: el test comprueba que el candidato dice «marco sectorial de referencia», «no fueron verificados», «decisión conservadora de K+AIR» y «supuesto (ii)» |
 
 | 168 | 🔴 **Un fragmento de sustitución cuyo destino cae dentro de un rango reescribe el literal nuevo: el texto que se firma deja de ser el texto que se aprobó, y el generador no se queja** | `sgsst-electron-app/firma-service/scripts/determinaciones-v1.4.js` (los fragmentos y los rangos), `sgsst-electron-app/docs/gestion-humana/firma-electronica/dictamen-legal-l1-2026-11-12.md` (el literal B.8.5 y la fila 535 de B.6.4), `sgsst-electron-app/firma-service/tests/scripts/generar-candidatos-v1.4.test.js` (el guard de identidad byte a byte y el guard estructural) | Caso real (13-nov-2026), la ronda 22 (tarde): el rango `L1-B85` sustituía el párrafo entero «Lo que queda pendiente» del Anexo de Encargo y su literal **B.8.5** copiaba del texto base la línea «…esta versión **2026-11-11** del Anexo de Encargo…», mientras el motor resolvía la fecha con un fragmento aparte (`B6.4-535`) que sustituía `2026-11-11` por `2026-11-12`. Al insertar el literal, **el fragmento cayó dentro del rango** y pasó a reescribirlo: el candidato salió con `2026-11-12` y **el dictamen decía `2026-11-11`**. El texto que se iba a firmar no era el texto que estaba escrito, y **el generador no se quejó** —el ancla casaba exactamente una vez—. Reglas: (1) **el literal es lo que se firma**: el guard `el texto del candidato es byte a byte el de la determinacion` tiene que pasar, y si falla, **el literal se corrige en el dictamen** (fecha `2026-11-12`) y el fragmento **se elimina**; (2) **un fragmento no puede tocar el literal de una determinación**: guard estructural que compara cada ancla de cada fragmento contra todos los literales del dictamen y del pedido; (3) **el mutante tiene que ser el defecto completo** —el dictamen con la fecha vieja **más** el fragmento—: un mutante a medias falla por otra razón y no prueba nada; (4) **una corrección que no cambia los bytes se anota igual**: aquí las huellas de los candidatos no se movieron (`ba664e6f…` y `d4df187a…`) y lo que cambió fue **de dónde salía** el texto; (5) **la fuente que cambia obliga a re-medir lo que la declara**: el escrito al abogado declaraba huellas que ya no correspondían a los archivos, y se anotó con las vigentes |
+
+| 169 | 🔴 **El estado del remoto se escribe medido, no recordado: un hash viejo en un documento o en el cuerpo de un commit es una afirmación falsa que no se puede reescribir** | `Historial.md` (la línea del commit), `sgsst-electron-app/CONTEXT.md` (lo mismo), `PROMPT.md` (§5.47) | Caso real (13-nov-2026), la ronda 22: al cerrar se escribió en el Historial y en el CONTEXT que «`origin/Dev` sigue en `d8e59dcc`», un dato tomado del resumen de la sesión anterior, cuando **el remoto ya estaba en `72a06dda`** (el 📦1062 se había pusheado). El error quedó además en el **cuerpo de dos commits**, que no se reescriben: solo pudo registrarse en el commit siguiente. Reglas: (1) **el remoto se mide con `git ls-remote origin Dev`** antes de escribir dónde está; (2) **la referencia local `origin/Dev` dice lo que pusheaste vos**, no lo que hay en el remoto ahora; (3) **un resumen de sesión es una pista, no una fuente** (§5.43 aplicada al estado del repo); (4) **la anotación de un commit no cita el hash del commit que la contiene**: un `--amend` lo invalida (§5.47); (5) **un commit ya pusheado no se `--amend`ea** (§5.31): se corrige en otro commit |
 
 **Formato de commit real** (verificá con `git log` antes de cada uno, la convención migró varias veces):
 
