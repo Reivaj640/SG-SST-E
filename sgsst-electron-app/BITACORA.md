@@ -10086,3 +10086,56 @@ región United States.
 8. **Un texto literal para pegar se entrega literal, con su aviso de estilo.** El texto de las tres
    adiciones a la v1.4 va en `pedido-6-backblaze-v1-4-2026-11-12.md`, con entidades con nombre y sin
    tocar los textos suscritos: la v1.4 son copias nuevas.
+
+## 2026-11-12 (noche, 2) — dos corridas en el mismo árbol se arruinan entre ellas, y un marcador de «pendiente» sigue siendo un vacío
+
+**El síntoma.** El worker de código corrió la suite completa con sus cambios y le salió **un** fallo, en un test
+que **pasaba en aislamiento**. Para saber si era suyo, guardó sus cambios con `git stash` y midió una línea
+base. La línea base salió con **26 fallos**: de pruebas que se sabían verdes. El árbol, en esos momentos, tenía
+**dos corridas de la suite a la vez** (la del worker y la del agente general), y encima el `stash` se restauró
+**mientras** la línea base seguía corriendo.
+
+**Por qué se rompió.** La suite escribe y lee archivos del árbol de trabajo (la base de prueba, los fixtures, los
+scripts que se invocan). Dos corridas simultáneas se pisan: una lee a medio escribir lo que la otra está
+escribiendo, y los fallos que aparecen son de la **concurrencia**, no del código. Agravante: el `git stash`
+**mueve el árbol de verdad**, así que una corrida que arrancaba sobre el árbol con cambios terminó sobre el
+árbol limpio, y al revés.
+
+**La regla que sale de ahí.**
+1. **Nunca dos corridas simultáneas en el mismo árbol.** Ni la suite completa ni un subconjunto, ni la tuya y la
+   de otro agente. Si alguien más está trabajando en el mismo árbol, se avisa y se espera.
+2. **Para medir una línea base no se hace `git stash` en el árbol de trabajo.** Se mide en un **clon** (que es lo
+   que ya se hacía con T1: un clon limpio del commit, y se comparaba byte a byte). El `stash` es para trabajo
+   propio y momentáneo, no para medir.
+3. **Un fallo que solo aparece en la suite completa se investiga antes de culpar al cambio**: primero se corre
+   ese test en aislamiento, después se mira si hay **otra corrida** en el árbol. Un test que «pasa solo» y
+   «falla en la suite» es, casi siempre, un problema de aislamiento (ya había una trampa con eso: la 97).
+
+**Cómo se salió de esta.** Se **detuvo** el worker, se comprobó que el `stash` seguía **intacto** (el `stash list`
+lo dijo), se restauró con `git stash pop`, se comprobó que el árbol tenía **exactamente** los diez archivos
+modificados esperados, y se corrió la suite **en solitario**: **2 683 tests, 2 681 pass, 0 fail, 2 skipped**,
+`exit 0`. La cifra que se publica es la de la corrida limpia; las otras dos no se cuentan, y no se corrigen en silencio.
+
+**El segundo defecto, que es de fondo.** La tabla de conservación lleva los campos `validado_por` y
+`validado_at`, y el código exigía que los dos tuvieran contenido. La pregunta era: **¿qué pasa si alguien
+«llena» `validado_por` con un texto de cortesía?** Con la compuerta cerrada, da igual; pero si mañana alguien
+abre la compuerta y solo pone la fecha, el código habría visto un campo «lleno» y **habría aplicado plazos que
+nadie validó**. La solución: el marcador de pendiente («PENDIENTE: lo llena el abogado externo…») **se rechaza
+por nombre** en `_tablaActivada()`, y hay una prueba que lo fija («un marcador de pendiente no es una
+validación escrita»). **Un campo que dice «falta esto» sigue siendo un vacío: el código tiene que distinguir
+«lleno» de «lleno de verdad»**, y esa distinción tiene que estar en el código, no en la buena intención de
+quien lee el archivo.
+
+**Y el tercero, de edición.** La fila de Google del §4 del Anexo de Nube traía **nueve `<td>` para ocho
+columnas**: una novena celda que abría una columna que el encabezado no declara. No es un detalle de maquetación:
+una fila que dice más cosas de las que la tabla puede mostrar es **una afirmación que no se puede auditar**. La
+fila nueva lleva **exactamente ocho**, y el test del generador lo comprueba contando celdas, no leyendo el
+texto.
+
+**Las tres cosas que no se hacen.**
+- **No se mide una línea base con `git stash` en el árbol de trabajo:** se mide en un clon.
+- **No se cuentan las cifras de una corrida contaminada:** se repite la corrida sola y se publica esa.
+- **No se reescribe un texto suscrito:** la v1.4 son copias nuevas, y las afirmaciones del manifiesto que la
+  v1.4 corrige (la entidad de Google, la fecha de efectividad del CDPA) se corrigen **cuando el texto esté
+  firmado**, con su huella real, no antes: un manifiesto que declara un texto que nadie ha suscrito es un gate
+  mintiendo en verde.

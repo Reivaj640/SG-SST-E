@@ -56,12 +56,24 @@ const EMPRESA = '900123456';
 const DIA_MS = 24 * 60 * 60 * 1000;
 const MOTIVO_PLAZO = 'plazo_no_declarado';
 
-// El plazo por defecto de la tabla supletoria para DOCUMENTO_FIRMADO.
+// El plazo por defecto de la tabla supletoria para DOCUMENTO_FIRMADO: diez (10)
+// AÑOS CALENDARIO (C2, 12-nov-2026). `DIAS_TABLA` es la expresión nominal
+// del plazo —la que se congela en la fila—, no el cómputo.
+const ANIOS_TABLA = 10;
 const DIAS_TABLA = 3650;
 const FIRMA_BASE = '2026-01-15T10:00:00.000Z';
-const FECHA_TABLA = new Date(
-  new Date(FIRMA_BASE).getTime() + DIAS_TABLA * DIA_MS
-).toISOString();
+const FECHA_TABLA = (() => {
+  const base = new Date(FIRMA_BASE);
+  return new Date(Date.UTC(
+    base.getUTCFullYear() + ANIOS_TABLA,
+    base.getUTCMonth(),
+    base.getUTCDate(),
+    base.getUTCHours(),
+    base.getUTCMinutes(),
+    base.getUTCSeconds(),
+    base.getUTCMilliseconds(),
+  )).toISOString();
+})();
 
 // La tabla con la COMPUERTA ABIERTA. La que se despacha viene cerrada (los
 // plazos de diez (10) y cinco (5) años no los validó el abogado), y estos
@@ -162,7 +174,10 @@ test('D1: el texto que se le comunica al Trabajador dice el plazo y de donde vie
   });
 
   assert.ok(/10 años/.test(plan.texto), 'el texto dice el plazo que se aplica');
-  assert.ok(/3650 días/.test(plan.texto), 'y dice exactamente cuántos días son');
+  assert.ok(/años calendario/.test(plan.texto),
+    'y dice cómo se computa: en años calendario');
+  assert.ok(!/3650 días/.test(plan.texto),
+    'y NO afirma una equivalencia en días que sería falsa (C2)');
   assert.ok(/tabla de conservación del sistema/.test(plan.texto),
     'y dice de dónde viene: el plazo es del sistema');
   assert.ok(!/pendiente de declaración/.test(plan.texto),

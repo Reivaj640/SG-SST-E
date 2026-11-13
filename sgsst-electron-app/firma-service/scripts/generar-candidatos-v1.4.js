@@ -5,8 +5,17 @@
  * QUE HACE
  * --------
  * Arma los CANDIDATOS de la version nueva del Anexo de Nube (v1.4) y del
- * Anexo de Encargo, aplicando los SIETE reemplazos literales de
- * `docs/gestion-humana/firma-electronica/propuesta-v1.4-anexo-nube-2026-11-12.md`.
+ * Anexo de Encargo, en DOS FASES:
+ *
+ *   FASE 1 - los SIETE reemplazos literales de
+ *   `docs/gestion-humana/firma-electronica/propuesta-v1.4-anexo-nube-2026-11-12.md`
+ *   (C1 a C7).
+ *
+ *   FASE 2 - las DETERMINACIONES LEGALES de la mesa L1 a L7, que estan
+ *   escritas en `determinaciones-v1.4.js` y cuyo texto literal se LEE de
+ *   `dictamen-legal-l1-2026-11-12.md` (L1) y de
+ *   `pedido-6-backblaze-v1-4-2026-11-12.md` (L4 y L5). El texto no se
+ *   transcribe: se aplica tal cual esta escrito en la determinacion.
  *
  * QUE NO HACE (y por que importa)
  * --------------------------------
@@ -236,6 +245,23 @@ function correr(escribir) {
   }
   console.log('Todos los anclas casan exactamente una vez.');
 
+  // FASE 2: las determinaciones legales de la mesa L1 a L7 (L1, L4 y L5).
+  // El texto literal se lee de los propios documentos de determinacion: no
+  // se transcribe. Si una Determinacion no aplica, no se escribe nada.
+  const det = require('./determinaciones-v1.4.js');
+  const d = det.determinaciones(rn.texto, re.texto);
+  const problemasDet = d.nube.problemas.concat(d.encargo.problemas);
+  console.log('Determinaciones L1/L4/L5: Nube ' + d.nube.aplicadas.length
+    + ', Encargo ' + d.encargo.aplicadas.length + '.');
+  if (problemasDet.length) {
+    console.error('\nERROR: una determinacion no se pudo aplicar:');
+    problemasDet.forEach((p) => console.error('  ' + p));
+    console.error('NO SE ESCRIBE NADA.');
+    return 1;
+  }
+  const textoNubeFinal = d.nube.texto;
+  const textoEncargoFinal = d.encargo.texto;
+
   // El texto vigente no se toca: se comprueba antes de escribir nada.
   const bufNube = fs.readFileSync(origenNube);
   const bufEncargo = fs.readFileSync(origenEncargo);
@@ -243,8 +269,8 @@ function correr(escribir) {
 
   const destinoNube = path.join(SALIDA, 'anexo-nube-v1.4.html');
   const destinoEncargo = path.join(SALIDA, 'anexo-encargo-2026-11-12.html');
-  const bufNuevoNube = Buffer.from(rn.texto, 'utf8');
-  const bufNuevoEncargo = Buffer.from(re.texto, 'utf8');
+  const bufNuevoNube = Buffer.from(textoNubeFinal, 'utf8');
+  const bufNuevoEncargo = Buffer.from(textoEncargoFinal, 'utf8');
 
   console.log('');
   console.log('Candidato Anexo de Nube v1.4   : ' + bufNuevoNube.length + ' B, sha256 ' + sha256(bufNuevoNube));

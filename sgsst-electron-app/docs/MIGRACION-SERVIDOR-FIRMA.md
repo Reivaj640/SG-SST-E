@@ -160,6 +160,71 @@ el item `canal_datos` como FALLA, y el texto legal le estaria prometiendo al Tit
 un buzon distinto del que el sistema usa de verdad. Cambiarlo en el `.env` **exige
 reiniciar el servicio**: la configuracion se lee al arrancar, no en caliente.
 
+### La variable inerte `FIRMA_EXIGIR_MEDIO_PERSONAL_OTP` (acto del owner)
+
+**Lo que es.** La variable se lee una sola vez, en `src/config.js`
+(`exigirMedioPersonalOtp`), y **su valor no lo usa ninguna decision**: el rechazo del
+codigo OTP hacia un buzon que la Empresa pueda leer es **INCONDICIONAL** desde la v1.2
+del Acuerdo (27-oct-2026) y esta en `src/services/publicFlow.js`, funcion
+`_controlarMedioCorporativo`: responde `400 MEDIO_OTP_CORPORATIVO` y deja el evento
+`OTP_MEDIO_CORPORATIVO` en `gh_firma_eventos` (append-only). **No es un interruptor y
+no debe citarse como control en ningun documento.**
+
+**Lo que se recomienda (dictamen legal del 12-nov-2026, L7): QUITARLA del `.env`.**
+El argumento para conservarla («para no romper despliegues que ya la tengan
+definida») es vacio: **una variable que no se lee no puede romper un despliegue**. El
+historico queda en el comentario del codigo, que es donde pertenece. Y al revés: el
+`.env` del servidor es `600 root` y el usuario `javier` no lo lee, asi que **esto no lo
+puede hacer el agente**: es un **acto del owner**.
+
+**El comando literal** (para quien tenga el `sudo`):
+
+```bash
+# 1. Respaldo primero (el .env es 600 root; el respaldo queda 600 root).
+sudo cp -p /opt/kair-firma/.env /opt/kair-firma/.env.bak-2026-11-12
+
+# 2. Ver la linea antes de quitarla (debe salir UNA).
+sudo grep -n '^FIRMA_EXIGIR_MEDIO_PERSONAL_OTP' /opt/kair-firma/.env
+
+# 3. Quitar SOLO esa linea: el patron esta anclado al principio de linea.
+sudo sed -i '/^FIRMA_EXIGIR_MEDIO_PERSONAL_OTP=/d' /opt/kair-firma/.env
+
+# 4. Verificar: el grep no debe devolver nada, y el archivo sigue 600 root.
+sudo grep -c '^FIRMA_EXIGIR_MEDIO_PERSONAL_OTP' /opt/kair-firma/.env
+sudo ls -l /opt/kair-firma/.env
+sudo head -n 3 /opt/kair-firma/.env   # el resto del .env sigue bien
+
+# 5. El servicio no cambia de comportamiento (la variable era inerte), pero
+#    si se quiere el proceso con la configuracion tal como quedo en disco:
+sudo systemctl restart kair-firma
+sudo systemctl status kair-firma
+```
+
+**Si el owner decide conservarla**, la linea se reemplaza por este bloque (comentario
+ASCII, del dictamen legal del 12-nov-2026, §4.5), para que el archivo no vuelva a
+presentarla como un interruptor:
+
+```ini
+# FIRMA_EXIGIR_MEDIO_PERSONAL_OTP
+# SIN EFECTO. NO ES UN INTERRUPTOR Y NO CAMBIA NINGUN COMPORTAMIENTO DEL
+# SERVICIO. Se lee una sola vez en src/config.js y su valor no lo usa
+# ninguna decision: el rechazo del codigo OTP hacia un buzon que la Empresa
+# pueda leer es INCONDICIONAL desde la v1.2 del Acuerdo (27-oct-2026).
+# El control real esta en src/services/publicFlow.js, funcion
+# _controlarMedioCorporativo: responde 400 MEDIO_OTP_CORPORATIVO y deja el
+# evento OTP_MEDIO_CORPORATIVO en gh_firma_eventos (append-only).
+# Se conserva la variable solo por compatibilidad con despliegues que ya la
+# tengan definida en su .env. Si esta linea aparece en un .env, su valor se
+# ignora. No debe citarse como control en ningun documento.
+FIRMA_EXIGIR_MEDIO_PERSONAL_OTP=false
+```
+
+> **Lo que NO se corrige con esto.** `src/db/schema/031_medio_otp.sql` sigue con el
+> comentario de cabecera que dice que el rechazo «sigue APAGADO», y eso es
+> **deliberado**: el archivo es una **migracion ya aplicada en produccion** y las
+> migraciones no se reescriben (su contenido es la evidencia de lo que se ejecuto). La
+> correccion vive en el codigo y en el expediente, no en la migracion.
+
 Generar llaves nuevas:
 
 ```bash
@@ -1111,20 +1176,20 @@ La medicion vigente es la del **2026-11-12** (corrida final sobre el arbol de tr
 ronda, ya con el arbol de dependencias nuevo y los 41 tests nuevos que trajo):
 
 ```
-tests 2670 | pass 2668 | fail 0 | skipped 2
+tests 2683 | pass 2681 | fail 0 | skipped 2
 ```
 
 Medido con **Node 22.23.4** (ABI 127) en el PC de trabajo, con `better-sqlite3` 11.10.0
 recompilado para ese ABI: 317 s. Los 2 `skipped` son los que ya estaban asi el 11-nov.
-**Actualizada el 12-nov-2026 (tarde):** la corrida dio **2 670 / 2 668 / 0 / 2** (360 s, 179
-archivos, `exit 0`). Los **+2** son las dos pruebas de regresion del manifiesto que se
-agregaron con la correccion del defecto que empujaba la firma del texto vigente a
-`versiones_firmadas` (ver §7.1).
+**Actualizada el 12-nov-2026 (noche):** la corrida dio **2 683 / 2 681 / 0 / 2** (310 s, 180
+archivos, `exit 0`). Los **+13** sobre la corrida de la tarde son las pruebas de la
+compuerta de conservacion con las condiciones C1 a C4, las del marcador de pendiente y las
+del generador de los candidatos de la v1.4 (que hasta ahora no tenia test).
 
 La medicion anterior (12-nov-2026, antes del cambio de dependencias) fue
 `tests 2606 | pass 2604 | fail 0 | skipped 2`, en 415 s; la de antes (11-nov-2026) fue
 `tests 2574 | pass 2572 | fail 0 | skipped 2`, en 220 s. **La diferencia son 61 pruebas nuevas**
-(2 670 - 2 606), todas en verde; el numero de la seccion 7 se queda
+(2 683 - 2 606), todas en verde; el numero de la seccion 7 se queda
 atrasado si no se actualiza, y una cifra vencida leida como vigente es un verde falso.
 
 > La reproduccion desde **clon limpio** esta medida y registrada en
@@ -1135,7 +1200,7 @@ atrasado si no se actualiza, y una cifra vencida leida como vigente es un verde 
 > los 2 665 nombres de prueba identico** al de la corrida de ese momento. El clon quedo **byte a byte**
 > igual al arbol del owner (4 810 archivos, 0 diferentes). El 6.11 del cuadro canonico quedo
 > **CERRADO** por esto. **Ojo con las dos cifras:** la del clon es la de `e4dd5f31`, que es
-> **anterior** a las dos pruebas de regresion del manifiesto; el arbol de hoy da **2 670 / 2 668**.
+> **anterior** a las dos pruebas de regresion del manifiesto; el arbol de hoy da **2 683 / 2 681**.
 > Compararlas como si fueran la misma corrida seria un error de lectura.
 
 > **El EOL de este archivo esta fijado por su test.** Si lo abres en un editor que normalice a

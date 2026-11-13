@@ -178,14 +178,14 @@ test('sin plazo declarado la firma toma el plazo de la tabla supletoria', () => 
     firmaId, EMPRESA, '2026-01-01T00:00:00.000Z',
     { tabla_conservacion: TABLA_ACTIVADA }
   );
-  assert.equal(fecha, '2035-12-30T00:00:00.000Z',
-    'el plazo por defecto de la tabla supletoria (3650 días desde la firma)');
+  assert.equal(fecha, '2036-01-01T00:00:00.000Z',
+    'el plazo por defecto de la tabla supletoria (diez (10) años calendario desde la firma)');
   const fila = db.prepare(
     'SELECT fecha_conservacion, hold_legal, motivo_hold, '
     + 'plazo_conservacion_dias, plazo_conservacion_fuente '
     + 'FROM gh_firmas_electronicas WHERE id = ?'
   ).get(firmaId);
-  assert.equal(fila.fecha_conservacion, '2035-12-30T00:00:00.000Z');
+  assert.equal(fila.fecha_conservacion, '2036-01-01T00:00:00.000Z');
   assert.equal(fila.hold_legal, 0, 'y no queda retenida');
   assert.equal(fila.motivo_hold, null);
   assert.equal(fila.plazo_conservacion_fuente, 'tabla_supletoria');

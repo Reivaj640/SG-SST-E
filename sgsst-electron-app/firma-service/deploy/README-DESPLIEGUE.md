@@ -152,6 +152,71 @@ Pega el contenido de `deploy/.env.production.example` y completa:
   cambia en la ventana de mantenimiento del plan (P5), con copia del `.env`
   antes.
 
+### La variable inerte `FIRMA_EXIGIR_MEDIO_PERSONAL_OTP` (acto del owner)
+
+**Qué es.** La variable existe en `src/config.js` (`exigirMedioPersonalOtp`) y
+**su valor no lo consume ninguna decisión**: el rechazo del código OTP hacia un
+buzón que la Empresa pueda leer es **incondicional** desde la v1.2 del Acuerdo
+(27-oct-2026) y está en `src/services/publicFlow.js`, función
+`_controlarMedioCorporativo`: responde `400 MEDIO_OTP_CORPORATIVO` y deja el
+evento `OTP_MEDIO_CORPORATIVO` en `gh_firma_eventos` (append-only). **La
+variable no es un interruptor y no debe citarse como control en ningún
+documento.**
+
+`deploy/.env.production.example` **no la trae**: un despliegue nuevo no la
+tiene. Si aparece en el `.env` del servidor es porque quedó de una instalación
+anterior.
+
+**Recomendación (dictamen legal del 12-nov-2026, L7): QUITARLA del `.env`.**
+El argumento para conservarla («para no romper despliegues que ya la tengan
+definida») es vacío: **una variable que no se lee no puede romper un
+despliegue**. El histórico queda en el comentario del código, que es donde
+pertenece.
+
+**Es un acto del owner**: el `.env` de producción es `600 root` y el usuario de
+despliegue no lo lee. El comando queda escrito, listo para que lo ejecute quien
+tenga el `sudo`:
+
+```bash
+# 1. Respaldo primero (el .env es 600 root; el respaldo queda 600 root).
+sudo cp -p /opt/kair-firma/.env /opt/kair-firma/.env.bak-2026-11-12
+
+# 2. Ver la línea antes de quitarla (debe salir UNA).
+sudo grep -n '^FIRMA_EXIGIR_MEDIO_PERSONAL_OTP' /opt/kair-firma/.env
+
+# 3. Quitar SOLO esa línea: el patrón está anclado al principio de línea.
+sudo sed -i '/^FIRMA_EXIGIR_MEDIO_PERSONAL_OTP=/d' /opt/kair-firma/.env
+
+# 4. Verificar: el grep no debe devolver nada, y el archivo sigue 600 root.
+sudo grep -c '^FIRMA_EXIGIR_MEDIO_PERSONAL_OTP' /opt/kair-firma/.env
+sudo ls -l /opt/kair-firma/.env
+sudo head -n 3 /opt/kair-firma/.env   # el resto del .env sigue bien
+
+# 5. El servicio no cambia de comportamiento (la variable era inerte), pero
+#    si se quiere el proceso con la configuración tal como quedó en disco:
+sudo systemctl restart kair-firma
+sudo systemctl status kair-firma
+```
+
+**Si el owner decide conservarla**, la línea se reemplaza por este bloque
+(comentario ASCII, del dictamen legal del 12-nov-2026, §4.5), para que el
+archivo no vuelva a presentarla como un interruptor:
+
+```ini
+# FIRMA_EXIGIR_MEDIO_PERSONAL_OTP
+# SIN EFECTO. NO ES UN INTERRUPTOR Y NO CAMBIA NINGUN COMPORTAMIENTO DEL
+# SERVICIO. Se lee una sola vez en src/config.js y su valor no lo usa
+# ninguna decision: el rechazo del codigo OTP hacia un buzon que la Empresa
+# pueda leer es INCONDICIONAL desde la v1.2 del Acuerdo (27-oct-2026).
+# El control real esta en src/services/publicFlow.js, funcion
+# _controlarMedioCorporativo: responde 400 MEDIO_OTP_CORPORATIVO y deja el
+# evento OTP_MEDIO_CORPORATIVO en gh_firma_eventos (append-only).
+# Se conserva la variable solo por compatibilidad con despliegues que ya la
+# tengan definida en su .env. Si esta linea aparece en un .env, su valor se
+# ignora. No debe citarse como control en ningun documento.
+FIRMA_EXIGIR_MEDIO_PERSONAL_OTP=false
+```
+
 ## Paso 7 — Dependencias + servicio + HTTPS
 
 ```bash

@@ -2,7 +2,7 @@
 
 > **Qué es este documento.** La pregunta que lo motivó fue «¿está lista para producción?». La
 > respuesta corta es: **lista para operar, no abierta**. Lo que separa una cosa de la otra son
-> veintiocho puntos concretos, y este documento los lista **con su estado, su evidencia y quién lo
+> treinta puntos concretos, y este documento los lista **con su estado, su evidencia y quién lo
 > tiene**.
 >
 > **Cómo se lee.** Cada bloque dice una cosa, con la evidencia que lo sostiene. El estado va en la
@@ -14,7 +14,7 @@
 >
 > **Medido el 2026-11-12**, contra el servicio desplegado, no contra una copia.
 >
-> **Alcance.** Estos veintiocho puntos son los que separan «el servicio funciona» de «una empresa real
+> **Alcance.** Estos treinta puntos son los que separan «el servicio funciona» de «una empresa real
 > puede firmar». Los que están fuera de este mapa (los 96 requisitos del cuadro de cierre del 30-oct)
 > se verificaron aparte y se dejaron en
 > `docs/gestion-humana/firma-electronica/verificacion-cierre/`.
@@ -180,15 +180,51 @@ de J6 y J7, con los datos que el equipo ya midio: el RNBD cuesta **19,09 UVT** (
 lectura del equipo sobre el RNBD se pide **confirmar o corregir**, no se da por buena. Detalle en
 `decisiones-de-fondo-2026-11-12.md`, bloque M.5.
 
+**LO QUE LA MESA DE DETERMINACIONES RESOLVIO (12-nov-2026).** Los dos puntos de este bloque tienen ya
+**determinacion escrita** del agente legal del repositorio (skill `asesoria-legal-sg-sst`, fuente oficial
+consultada el 12-nov-2026). No son planes: son determinaciones.
+
+1. **L1 — el papel de Google (fila J6).** La entidad contractual es **Google LLC**, determinada por el **perfil
+   de pago** de la cuenta (no por el nombre del subprocesador: Google Ireland Limited figura como
+   subprocesador de centro de datos en Irlanda, no como parte del Acuerdo). Google tiene **dos papeles
+   calificados por operacion**: **Responsable** (art. 3(e) Ley 1581) sobre la cuenta del administrador de
+   Workspace y la telemetria, y **Encargado** (art. 3(d)) sobre los datos del cliente que salen por el canal,
+   donde «Subencargado» es **figura contractual** y no categoria legal. La operacion del canal de correo es una
+   **transmision internacional a un Encargado** (art. 2 num. 5 del Decreto 1377 de 2013), **no una
+   transferencia**: **no se activa el art. 26 de la Ley 1581 de 2012** y rigen el **art. 24 num. 2** y el
+   **art. 25** del Decreto 1377. **P1 esta cerrado**; el CDPA se identifica **por huella SHA-256** (no declara
+   fecha de version) y su fecha de efectividad es el **10-nov-2026** (la aceptacion, por el &sect;2). El derecho
+   de auditoria del **&sect;7.5.2(a) no se activa** (esta condicionado a la Ley Europea); **Estados Unidos es
+   uno** de los paises posibles, no el unico; y el CDPA **no fija plazo de 24 h ni de 48 h** (el de 48 h es
+   compromiso propio de K+AIR). Detalle y texto literal: `dictamen-legal-l1-2026-11-12.md`.
+2. **L2 — la Circular Externa 002 de 2025 y el RNBD (fila J7).** La Circular 002 **no aplica al canal de
+   correo** (alli hay transmision a un Encargado) y **si aplica, por su segundo supuesto, a la transferencia del
+   software a la Empresa**. La inscripcion en el **RNBD es obligacion de la Empresa (Responsable)**, no de K+AIR
+   (Encargado), y se determina por los **activos de cada Empresa**, no por los de Gesstiar S.A.S.: los
+   **19,09 UVT** del expediente son de Gesstiar S.A.S. y son una **declaracion del owner**, no un certificado.
+   Si la Empresa no esta obligada a registrarse, no se le puede exigir la inscripcion. El RNBD se alimenta de las
+   **politicas de tratamiento** (art. 25 de la Ley 1581): el texto de la v1.4 es insumo directo de ese registro.
+   Detalle: `dictamen-legal-2026-11-12-tandas-2-y-3.md`, seccion 1.
+
 **Evidencia.** `10-informe-correcciones-para-asesor-juridico.md`, filas J6 y J7, ambas con
 **PENDIENTE**; `sgsst-electron-app/legal/anexo-nube-v1.3.html`, bloque «Revision profesional» (la
-redaccion que pide la revision juridica profesional).
+redaccion que pide la revision juridica profesional); `dictamen-legal-l1-2026-11-12.md` (L1);
+`dictamen-legal-2026-11-12-tandas-2-y-3.md` (L2).
 
-**Qué falta.** La determinacion escrita del abogado sobre J6 y J7. El bloque no puede decir «cerrado»
-porque el equipo haya escrito la pregunta: el alcance de una circular y el rol contractual de un
-proveedor se determinan por quien puede emitirlos.
+**Que falta.** Ya **no** falta la determinacion: las dos estan escritas. Queda, con nombre y responsable:
+(i) la **ratificacion** del abogado matriculado sobre L1 y L2 (no las suprime: las ratifica o las corrige),
+(ii) los **siete actos del owner** que dependen de L1 (obtener la Order Form o el correo de renovacion de
+Google; registrar la fecha de renovacion del Acuerdo de Google Workspace y re-aceptar el CDPA si el texto
+cambia; adoptar en el manifiesto la correccion de entidad y de clasificacion **despues** de la firma y con la
+huella real; documentar la evidencia de las medidas del paragrafo primero del numeral 3.2; traducir a la Empresa
+el preaviso de 30 dias y el derecho de oponerse del &sect;11 del CDPA; cerrar P3 y P6; suscribir y publicar la
+v1.4 y el Encargo 2026-11-12), y (iii) el **ajuste de los dos textos** que la determinacion dejo señalados: la
+**correccion 0.5** (el &sect;4 del Nube afirmaba «transferencia internacional» y «no existe contrato de
+transmision», en contradiccion con declarar a Google Encargado) y la **correccion 0.6** (el derecho de
+auditoria del &sect;7.5.2(a) esta condicionado a la Ley Europea). Las dos quedan incorporadas en los
+candidatos de la v1.4.
 
-**Quién lo tiene.** El abogado (la determinacion) y el owner (la gestion).
+**Quien lo tiene.** El abogado matriculado (la ratificacion) y el owner (los siete actos y las firmas).
 
 ### M.6 - La tabla supletoria de conservacion sigue sin validar, con su compuerta cerrada a proposito — PARCIALMENTE
 
@@ -232,17 +268,48 @@ escrito.
 sin que nada exigiera la validacion que el propio archivo dice que la precede. Ahora `_tablaActivada()`
 exige los dos campos, con tres pruebas que fijan las tres formas (sin validacion, a medias, completa).
 
+**Y las cuatro condiciones ya estan EN EL CODIGO, no solo escritas (12-nov-2026).** La determinacion de L3
+propuso C1 a C4; el worker las implemento y cada una tiene su prueba:
+
+- **C1** (el registro de operaciones sigue al documento asociado con piso legal o hold sin termino):
+  `retencion.js` -> `plazoRegistroOperaciones()`, con sus tres casos (piso legal, sin termino, resto).
+- **C2** (el computo en **anos calendario**): se corrigio una contradiccion real: el sistema sumaba **dias**
+  (3650) y el texto al Trabajador decia **«10 anos (3650 dias)»**, que es una equivalencia **falsa** (3650 dias
+  son dos o tres dias menos que diez anos calendario), mientras el piso legal ya se computaba en anos. Ahora la
+  fecha se calcula en anos calendario (`sumarAnios`), `plazo_anos` es el plazo que se aplica y el que dice el
+  texto, `plazo_dias` queda como su expresion nominal, y **el texto ya no afirma la equivalencia falsa**: dice
+  los anos y dice que el computo es en anos calendario. Hay una segunda plantilla de texto para las categorias
+  cuya duracion esta en dias (un respaldo de treinta dias).
+- **C3** (el piso legal no puede ser bajado): se aplica el **mayor** entre los anos del catalogo (la norma) y los
+  de la tabla, y la fecha mas lejana cuando la Empresa declara un plazo propio.
+- **C4** (la fecha de cese la informa y valida la Empresa por escrito, y la firma no la sustituye): el
+  planificador no calcula fecha de supresion sin fecha de cese y deja el registro con el hold que lo dice.
+
+**Y la compuerta no se puede abrir con el marcador (12-nov-2026).** El archivo que se despacha trae
+`validado_por` con un **marcador legible** («PENDIENTE: lo llena el abogado externo…») y `validado_at` en
+`null`, mas `validado_por_documento` y `activado_at` en `null`. Para que nadie abra la compuerta creyendo que
+«el campo esta lleno», `_tablaActivada()` **rechaza el marcador** por nombre: un «PENDIENTE…» **no es una
+validacion escrita**, es la ausencia de ella escrita. El nombre del abogado **no se inventa**: lo llena el
+abogado externo.
+
 **Evidencia.** `sgsst-electron-app/firma-service/config/tabla-conservacion.json` ->
 `aplicacion.activada = false`; `10-informe-correcciones-para-asesor-juridico.md`, fila J8 (PENDIENTE:
-el catalogo legado no esta alineado y la compuerta sigue cerrada porque depende de su validacion).
+el catalogo legado no esta alineado y la compuerta sigue cerrada porque depende de su validacion);
+`dictamen-legal-2026-11-12-tandas-2-y-3.md`, seccion 2 (L3).
 
-**Qué falta.** La validacion juridica de la tabla y de los plazos **con las condiciones C1 a C4**, su
-incorporacion a la tabla (con `validado_por`, `validado_at`, `estado` y `condiciones`, y `activada` en
-`false`), la reejecucion de las pruebas y, solo despues, la decision de abrirla. Abrir antes aplicaria
-plazos que nadie ha validado. **Lo que ya no hace falta**: que la maquina separe el acto de la validacion,
-porque desde el 12-nov-2026 la compuerta **no se abre sin la validacion escrita en el archivo** (M.30).
+**Que falta.** Ya **no** falta nada del lado de la maquina: la tabla esta alineada, las cuatro condiciones estan
+en el codigo con sus pruebas, la compuerta esta cerrada por codigo y el marcador no la abre. Queda, con nombre
+y responsable: (i) la **validacion escrita del abogado matriculado** sobre los plazos de diez (10) y cinco (5)
+anos y sobre las condiciones C1 a C4, con `validado_por` (nombre, tarjeta o CC), `validado_at` (fecha de su
+opinion) y `validado_por_documento` (ruta del escrito y su SHA-256); (ii) **despues**, la **apertura** por parte
+del owner, que es un acto **separado y posterior**: cambiar `activada` a `true` y llenar `activado_at`; y
+(iii) la **reejecucion de la suite** entre validacion y apertura, porque abrir la compuerta cambia el
+comportamiento del servicio. **Lo que ya no hace falta**: que la maquina separe el acto de la validacion,
+porque desde el 12-nov-2026 la compuerta **no se abre sin la validacion escrita en el archivo** (M.30), ni que
+alguien redacte los plazos, ni que el equipo separe la validacion de la apertura: el archivo y el codigo ya lo
+hacen.
 
-**Quién lo tiene.** El abogado (valida) y el owner (abre).
+**Quien lo tiene.** El abogado matriculado (valida) y el owner (abre, despues).
 
 ### M.7 - No hay copia de los respaldos fuera del servidor, y los actos del P8 aun no estan en ninguno — PARCIALMENTE
 
@@ -607,16 +674,33 @@ decision se pide **confirmada por escrito al abogado** en el mismo escrito que l
 ratificacion de la v1.4; esa confirmacion no bloquea el cierre, porque no cambia lo que el texto dice.
 Detalle en `decisiones-de-fondo-2026-11-12.md`, bloque M.15.
 
+**LA CONSTANCIA YA EXISTE (L6, 12-nov-2026).** La determinacion legal de L6 esta escrita
+(`dictamen-legal-2026-11-12-tandas-2-y-3.md`, seccion 4) y la **constancia de expediente** que de ella sale
+esta en `nota-expediente-v1-1-2026-11-12.md`. La constancia **corrige en un punto de fondo** el dictamen: la
+afirmacion «bajo la v1.1 no se trato dato alguno» **no se sostiene** — la base de produccion registra una firma
+electronica completada el **6 de noviembre de 2026** (`SIGN-2026-738564`, estado `SIGNED`) y una cancelada el
+mismo dia (`SIGN-2026-016820`), y la v1.1 era en esas fechas la unica version del Anexo de Nube suscrita por la
+Empresa (la v1.3 no se publico hasta el 11 de noviembre). Lo que corresponde, entonces, es **declarar** el
+tratamiento, no negar el hueco: la ausencia de contrafirma califica **el instrumento**, no **el tratamiento** que
+ocurrio mientras tanto. La nota **no contrafirma** la v1.1 retroactivamente (eso seria fabricar un acto que no
+ocurrio) y **no reescribe** ningun texto suscrito: el manifiesto sigue declarando la v1.1 con su huella, su
+fecha y su evidencia, y con `contrafirmado: false`.
+
 **Evidencia.** `gh_firma_anexo_nube_suscripciones` (produccion): id 1 con `version = 1.1`,
 `contrafirmado_at` vacio; id 2 con `version = 1.3`, `contrafirmado_at = 2026-11-12T16:13:54.106Z`,
 `contrafirma_actor = Javier Robles Fontalvo`, `contrafirma_facultad = REPRESENTANTE_LEGAL_ENCARGADO`,
 acta `050f223a3665cf7d`. `legal-readiness.json` -> `anexo_nube.versiones_firmadas[0]`: la v1.1 con su
-evidencia del 5-nov-2026.
+evidencia del 5-nov-2026. `nota-expediente-v1-1-2026-11-12.md` (la constancia de L6).
 
-**Qué falta.** Nada que impida el cierre: la decision esta tomada y escrita, con su fundamento. Lo que
-se pide al abogado es su confirmacion.
+**Que falta.** Nada que impida el cierre: la decision esta tomada y escrita, con su fundamento, y la
+constancia de expediente ya existe. Quedan dos cosas **que no bloquean** y tienen nombre y responsable: (i) la
+**ratificacion** del abogado matriculado sobre L6, que va en el mismo escrito de M.5, y (ii) una **lectura de
+solo lectura** de las cinco filas de firma de produccion (el comando literal esta en la nota) para dejar en el
+expediente que version y huella del Anexo de Nube rigio cada una; el resultado puede **corregir** el numeral 2.3
+de la nota si el dato no coincide. El **manifiesto no se toco**: su huella esta registrada en el expediente.
 
-**Quién lo tiene.** Nadie bloquea; la ratificacion del abogado se pide en el mismo escrito de M.5.
+**Quien lo tiene.** Nadie bloquea; la ratificacion del abogado se pide en el mismo escrito de M.5 y la lectura
+de produccion es del owner.
 
 ### M.16 - El inventario de buzones hay que repetirlo cuando haya solicitudes reales — PENDIENTE
 
@@ -725,10 +809,11 @@ y el Encargo que la remite), con huella propia, firma de nuevo y manifiesto al d
 **Decisión tomada (12-nov-2026).** **Se reemite ahora**, y **no se espera al primer cliente real**: abrir
 a una empresa con un contrato que afirma un estado que el mismo servicio ya supero es **abrir en falso**.
 Los candidatos estan **armados mecanicamente** por el equipo con los literales ya escritos de
-`propuesta-v1.4-anexo-nube-2026-11-12.md` (6 anclas en el Nube, 5 en el Encargo), con un script que **se
-niega a escribir** si una ancla no casa **exactamente una vez** (11 de 11 bien). Quedan en
-`candidatos-v1.4/`, **fuera del paquete de despliegue**, marcados como **no publicados y no firmables**:
-la **redaccion final es del abogado** y la **firma es del owner**. El costo, dicho de frente: hasta que
+`propuesta-v1.4-anexo-nube-2026-11-12.md` (6 anclas en el Nube, 5 en el Encargo) y con el texto literal de
+las determinaciones de L1, L4 y L5, con un script que **se niega a escribir** si una ancla no casa
+**exactamente una vez** (11 de 11 de la primera fase, 45 de 45 de la segunda). Quedan en
+`candidatos-v1.4/`, **fuera del paquete de despliegue**, marcados como **no publicados y no firmables**: la
+**redaccion final es del abogado** y la **firma es del owner**. El costo, dicho de frente: hasta que
 la v1.4 este firmada el gate **baja a 37 items en `ok`** (el mismo estado en que estaba la v1.3 antes del
 12-nov), y la compuerta `FIRMA_EXIGIR_ANEXO_NUBE` no se enciende hasta despues. Detalle en
 `decisiones-de-fondo-2026-11-12.md`, bloque M.18.
@@ -739,14 +824,32 @@ suscrito no se toca) y corregir la tabla de instrumentos»); `verificacion-cierr
 requisitos 5.5 y 5.6 (**PENDIENTE** y **PARCIALMENTE**: ambos exigen «una version nueva del Anexo de
 Nube (v1.4)»); `sgsst-electron-app/legal/anexo-nube-v1.3.html` (los §1 y §5);
 `sgsst-electron-app/legal/anexo-encargo.html` (la remision); `candidatos-v1.4/` (candidato Nube v1.4:
-85 494 B, `895d0d0b...d3fe39`; candidato Encargo 12-nov: 95 118 B, `2afb0e68...f17af1c`; vigentes
+103 390 B, `4f23c605...0ebbd`; candidato Encargo 12-nov: 97 962 B, `fa1a79b2...57a15`; vigentes
 intactos: `fdd10551...b585d` y `6308b1f7...b8948`).
 
-**Qué falta.** La revision y redaccion del abogado, la suscripcion de ASEPLUS, la contrafirma de K+AIR y el
-manifiesto al dia con la huella de la v1.4.
+**LO QUE LA MESA DE DETERMINACIONES LE METIO (12-nov-2026).** El generador de candidatos ahora arma el texto
+en **dos fases**: la primera con C1 a C7, la segunda con las determinaciones de **L1** (Google), **L4** (la
+redaccion) y **L5** (Backblaze), cuyo texto literal **se lee de los propios documentos de determinacion** (no
+se transcribe a mano): 35 cambios en el Nube y 10 en el Encargo. Con eso el candidato **dejo de contradecirse**:
+la fila de Google tiene **ocho celdas** (la novena abria una columna que el encabezado no declara) y dice que
+es **Encargado** por la operacion concreta, que «Subencargado» es **figura contractual** y no categoria legal,
+y que la comunicacion al exterior es una **transmision internacional a un Encargado**, **no una
+transferencia**: **no se activa el art. 26 de la Ley 1581** y rigen el art. 24 num. 2 y el art. 25 del Decreto
+1377. Entro **Backblaze, Inc.** como subencargado con la region del bucket declarada, se reescribio el parrafo
+de **Respaldos** del §3, se declararon los **actos del 12-nov** y que **esta v1.4 no esta suscrita**, y se
+unifico la **version del Encargo en 2026-11-12**. El generador tiene ademas **test propio** (7 pruebas): que en
+modo `--estado` no escribe, que los vigentes y el manifiesto quedan intactos, que el texto del candidato es
+**byte a byte** el de la determinacion, y que **se niega** cuando un ancla no casa exactamente una vez.
+
+**Que falta.** La revision y redaccion del abogado, la suscripcion de ASEPLUS, la contrafirma de K+AIR y el
+manifiesto al dia con la huella de la v1.4. **Lo que ya no hace falta**: que el equipo redacte el texto ni que
+alguien lo escriba a mano; el texto literal de L1, L4 y L5 ya esta aplicado y es reproducible con un comando.
+Queda una correccion **propia del agente general** (nueve identificaciones de version que el dictamen no
+enumeraba y que decian «esta version 1.3» en un documento que **es** la 1.4), marcada `ext` en
+`determinaciones-v1.4.js` y reportada al abogado: si no le parece bien, se quita y se vuelve a armar.
 
 **Quién lo tiene.** El abogado (la redaccion) y el owner (las firmas). El equipo (huellas, manifiesto y
-firmas) ya tiene los candidatos armados.
+firmas) ya tiene los candidatos armados y **verificados**.
 
 ## 3. Riesgos y deuda
 
@@ -794,15 +897,30 @@ que ahora dice que no es un interruptor. Se anadio ademas una **nota de vigencia
 `PLAN-DESPLIEGUE-PRODUCCION-2026-10-20.md`, cuya fila «No encender» describia un interruptor que nunca
 existio. Detalle en `decisiones-de-fondo-2026-11-12.md`, bloque M.20.
 
+**Y LA DETERMINACION DE L7 YA ESTA ESCRITA (12-nov-2026).** La ficha publicada no puede presentar como
+control lo que no es, y eso ya no depende de una opinion pendiente: el codigo **no tiene ningun interruptor**
+para el rechazo del buzon corporativo (es incondicional desde la v1.2), la variable **no la lee ninguna
+decision**, y los tres documentos que la trataban como interruptor **ya estan corregidos**. La determinacion
+(L7) pide una cosa mas, y se hizo: **que la variable no se presente como control en ningun documento**, y que el
+`.env` de produccion deje de traerla o la traiga con el comentario que dice que **no cambia ningun
+comportamiento**. El **comando literal** quedo escrito y listo para ejecutar, con su **respaldo previo** del
+`.env`, en `deploy/README-DESPLIEGUE.md` y en `docs/MIGRACION-SERVIDOR-FIRMA.md`. Es un **acto del owner**
+(el `.env` de produccion es `600 root` y la cuenta de despliegue no lo lee). El codigo y los documentos ya
+estan del lado del agente.
+
 **Evidencia.** `src/config.js:164-177` (el comentario que lo dice y la definicion);
 grep sobre `src/` del identificador `exigirMedioPersonalOtp`: la unica aparicion es la definicion;
 `src/services/publicFlow.js:1496-1557` (el rechazo incondicional); `API.md:214` y `API.md:1058-1064`
-(corregidos el 12-nov-2026); el caso real se produjo el 12-nov-2026 en una copia aislada, evento id 151.
+(corregidos el 12-nov-2026); el caso real se produjo el 12-nov-2026 en una copia aislada, evento id 151;
+`deploy/README-DESPLIEGUE.md` y `docs/MIGRACION-SERVIDOR-FIRMA.md` (el comando del `.env`, escrito);
+`dictamen-legal-2026-11-12-tandas-2-y-3.md`, seccion 5 (L7).
 
-**Qué falta.** Nada que bloquee: la decision esta tomada y escrita en el codigo y en los documentos. Que
-el `.env` de produccion la traiga o no es un detalle de configuracion, no una decision de fondo.
+**Que falta.** Nada que bloquee: la decision esta tomada y escrita en el codigo y en los documentos, y el
+comando para el `.env` esta escrito y a la espera de quien tenga el `sudo`. Que el `.env` de produccion la
+traiga o no es un **acto de configuracion del owner**, no una decision de fondo; y mientras la variable siga
+inerte, las dos opciones son correctas.
 
-**Quién lo tiene.** Nadie.
+**Quien lo tiene.** El owner, para el paso opcional del `.env`. Nadie bloquea.
 
 ### M.21 - El tunel de Cloudflare tuvo un parpadeo y nadie fue avisado — PARCIALMENTE
 
@@ -1219,8 +1337,8 @@ Esto se midio el 12-nov-2026 y **no** es un bloqueante:
 - El **Acuerdo v1.6 esta publicado**, y el Anexo de Nube v1.3 y el Anexo de Encargo 2026-11-11
   estan **suscritos y contrafirmados**, con sus actas.
 - El sitio publico sirve **exactamente** las huellas suscribidas (6 URLs comprobadas).
-- La **suite** del servicio: **2 670 tests, 2 668 pass, 0 fail, 2 skipped** (corrida final del 12-nov
-  por la tarde, 179 archivos de prueba, `exit 0`), y **vinculada a un commit**: el 12-nov por la
+- La **suite** del servicio: **2 683 tests, 2 681 pass, 0 fail, 2 skipped** (corrida final del 12-nov
+  por la noche, 180 archivos de prueba, `exit 0`), y **vinculada a un commit**: el 12-nov por la
   manana se corrio tambien desde un clon limpio del commit `e4dd5f31` y dio el mismo resultado que
   la corrida de esa manana (2 665 / 2 663 / 0 / 2, mismo conjunto de nombres de prueba, clon byte a
   byte igual al arbol del owner). Los **+2** de la tarde son las dos pruebas de regresion del

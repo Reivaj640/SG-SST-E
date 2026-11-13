@@ -66,7 +66,7 @@ byte** igual al arbol del owner: **4 810 archivos identicos, 0 diferentes, 0 aus
 
 **Ojo con las dos cifras:** la del clon es la del commit `e4dd5f31`, **anterior** a las dos pruebas
 de regresion del manifiesto que se agregaron el 12-nov por la tarde; el arbol de hoy da
-**2 670 / 2 668 / 0 / 2**.
+**2 683 / 2 681 / 0 / 2**.
 
 **Un hallazgo que hay que dejar escrito.** El primer clon se hizo con la configuracion del sistema
 (`core.autocrlf = true`) y **no reproducia el arbol del owner**: materializo 2 697 de los 4 781
@@ -81,8 +81,8 @@ de `npm audit` resueltas) y los tests nuevos de esta ronda, la suite completa se
 sobre el arbol de trabajo del owner:
 
 ```
-tests 2670 | pass 2668 | fail 0 | cancelled 0 | skipped 2 | todo 0
-duration_ms 362425
+tests 2683 | pass 2681 | fail 0 | cancelled 0 | skipped 2 | todo 0
+duration_ms 309549
 ```
 
 179 archivos de prueba, `exit 0`, sin bloques `not ok`. **Esta es la cifra que publica ahora la
@@ -552,7 +552,7 @@ para la validacion de la compuerta de conservacion (J8) y la ratificacion extern
 
 | ID | Requisito | Estado | Que falta, en una linea |
 |---|---|---|---|
-| 6.11 | Ejecutar la bateria completa de pruebas del servicio | **CERRADO** | Nada: la suite esta vinculada al commit `e4dd5f31` y se reprodujo desde un clon limpio de ese commit (2 665 / 2 663 / 0 / 2, exit 0, conjunto de nombres de prueba identico y clon byte a byte igual al arbol del owner). La corrida del 12-nov por la noche da **2 670 / 2 668 / 0 / 2**: los +3 son las pruebas de la compuerta de conservacion, posteriores a ese commit. |
+| 6.11 | Ejecutar la bateria completa de pruebas del servicio | **CERRADO** | Nada: la suite esta vinculada al commit `e4dd5f31` y se reprodujo desde un clon limpio de ese commit (2 665 / 2 663 / 0 / 2, exit 0, conjunto de nombres de prueba identico y clon byte a byte igual al arbol del owner). La corrida del 12-nov por la noche da **2 683 / 2 681 / 0 / 2**: los +13 posteriores a ese commit son las pruebas de la compuerta de conservacion (C1 a C4 y el marcador de pendiente) y las del generador de los candidatos de la v1.4. |
 | 7.1 | Confirmar la version exacta del codigo que se va a desplegar | **PARCIALMENTE** | El arbol desplegado se puede identificar por hash, pero es mixto (codigo de la punta, dependencias previas al 1051) y no hay commit candidato fijado para el proximo despliegue. |
 | 7.3 | Ejecutar las migraciones de base de datos necesarias | **CERRADO** | Nada: 61 de 61 aplicadas, 1:1 con el repo, incluidas la 060, la 061 y la 062. |
 | 7.4 | Comprobar que las migraciones se aplicaron correctamente | **CERRADO** | Nada: tablas, 15 columnas de contrafirma, 36 disparadores append-only, `integrity_check` ok y rutas 401 y no 404. |

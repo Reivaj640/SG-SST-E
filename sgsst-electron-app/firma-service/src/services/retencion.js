@@ -86,6 +86,24 @@
  * (`conservacion.recalcularPlazosDeclarados`, que se llama desde
  * `empresa.update` con actor y motivo).
  *
+ * LAS CUATRO CONDICIONES DE LA VALIDACIÓN (C1 a C4, 12-nov-2026)
+ * --------------------------------------------------------------
+ * El dictamen legal del 12-nov-2026 (L3) propone cuatro condiciones que la
+ * validación del abogado externo tiene que cubrir. Cada una está en el código,
+ * en un solo lugar, y tiene su prueba:
+ *
+ *   C1  el plazo del REGISTRO DE OPERACIONES sigue al del documento asociado
+ *       cuando este tiene piso legal o hold sin término
+ *       (`plazoRegistroOperaciones`).
+ *   C2  el CÓMPUTO de los plazos por defecto es en AÑOS CALENDARIO, y el texto
+ *       al Trabajador lo dice sin afirmar una equivalencia falsa en días
+ *       (`TEXTO_PLAZO_SISTEMA_ANIOS`).
+ *   C3  el PISO LEGAL no puede ser bajado: se aplica la fecha más lejana
+ *       (`_fechaMasLejana`), y los años del piso son el mayor entre el catálogo
+ *       y la tabla (`_pisoDeLaCategoria`).
+ *   C4  la fecha de CESE la informa y valida la Empresa por escrito; la fecha
+ *       de la firma no la sustituye (`_puntoInicio`).
+ *
  * HISTORIA DE ESTA REGLA
  * ----------------------
  * Hasta la v1.2 el sistema aplicaba por defecto 20 años de custodia contados
@@ -182,10 +200,30 @@ const TEXTO_PLAZO_PENDIENTE = 'El plazo de conservación aplicable está pendien
  * HONESTO: no puede prometer un plazo que la Empresa no declaró, y no puede
  * callar que el plazo es del sistema. Por eso lo dice.
  *
- * Los marcadores: {anios} (los años redondeados del plazo aplicado), {dias} (el
- * plazo exacto, en días) y {inicio} (desde qué fecha corre).
+ * Los marcadores: {anios} (los años del plazo aplicado), {dias} (el plazo
+ * exacto, en días) y {inicio} (desde qué fecha corre).
+ *
+ * LAS DOS FORMAS DEL TEXTO (C2, 12-nov-2026)
+ * ------------------------------------------
+ * El texto NO puede decir dos verdades. El plazo de la tabla se computa en
+ * AÑOS CALENDARIO (es como lo redacta la norma y como lo dice el texto), así
+ * que el texto de los plazos en años NO puede añadir una equivalencia en
+ * días: "10 años (3650 días)" era falso, porque 3650 días son dos o tres días
+ * menos que diez años calendario. Por eso hay dos plantillas y el código
+ * elige la que corresponde al cómputo que hizo:
+ *
+ *   - `TEXTO_PLAZO_SISTEMA_ANIOS`: el plazo se computó en años calendario.
+ *     Dice los años y dice que el cómputo es en años calendario.
+ *   - `TEXTO_PLAZO_SISTEMA`: el plazo se computó en días (una categoría
+ *     cuya duración está en días). Dice los días.
  */
-const TEXTO_PLAZO_SISTEMA = 'Se conserva {anios} años ({dias} días) contados desde {inicio}. '
+const TEXTO_PLAZO_SISTEMA = 'Se conserva durante {dias} días contados desde {inicio}. '
+  + 'Es el plazo de la tabla de conservación del sistema: se aplica porque la Empresa no ha '
+  + 'declarado un plazo propio en su tabla de retención documental.';
+
+/** El mismo texto, para los plazos que se computan en años calendario (C2). */
+const TEXTO_PLAZO_SISTEMA_ANIOS = 'Se conserva durante {anios} años contados desde {inicio} '
+  + '(el plazo se computa en años calendario). '
   + 'Es el plazo de la tabla de conservación del sistema: se aplica porque la Empresa no ha '
   + 'declarado un plazo propio en su tabla de retención documental.';
 
@@ -486,9 +524,12 @@ const _TABLA_RESPALDO = Object.freeze({
     validado_at: null,
   }),
   categorias: [
-    { id: 'DOCUMENTO_FIRMADO', plazo_dias: 3650, punto_inicio: 'fecha_firma', piso_legal: false, hold_siempre: false },
-    { id: 'SST_ESPECIAL', plazo_dias: 7305, punto_inicio: 'fecha_cese', piso_legal: true, hold_siempre: false },
-    { id: 'CONTRATO_SIN_TERMINO', plazo_dias: null, punto_inicio: null, piso_legal: false, hold_siempre: true },
+    // El respaldo declara tambien `plazo_anos` (C2, 12-nov-2026): el cómputo
+    // es en años calendario, igual que en el archivo de configuración. Los
+    // días siguen siendo la expresión nominal del plazo.
+    { id: 'DOCUMENTO_FIRMADO', plazo_anos: 10, plazo_dias: 3650, punto_inicio: 'fecha_firma', piso_legal: false, hold_siempre: false },
+    { id: 'SST_ESPECIAL', plazo_anos: 20, plazo_dias: 7305, punto_inicio: 'fecha_cese', piso_legal: true, hold_siempre: false },
+    { id: 'CONTRATO_SIN_TERMINO', plazo_anos: null, plazo_dias: null, punto_inicio: null, piso_legal: false, hold_siempre: true },
   ],
   mapeo_codigo: {
     SST_PERFIL_Y_CONCEPTOS_MEDICOS: 'SST_ESPECIAL',
@@ -604,6 +645,16 @@ function tablaActivada(opts = {}) {
  * validacion aplica el retencion por defecto de categorias que nadie ha
  * validado.
  *
+ * Y ADEMAS, EL MARCADOR DE PENDIENTE NO CUENTA COMO VALIDACION (12-nov-2026).
+ * ---------------------------------------------------------------------
+ * La tabla que se despacha trae `validado_por` con un MARCADOR legible
+ * ("PENDIENTE: lo llena el abogado externo..."), para que quede a la vista que
+ * la validacion falta, y `validado_at` en null. Un texto de esos no es una
+ * validacion: es la ausencia de ella escrita. Si el owner abriera la compuerta
+ * sin reemplazar el marcador, el codigo tendria que seguir tratandola como
+ * cerrada: por eso el marcador se rechaza por nombre y no solo por estar
+ * vacio.
+ *
  * @param {object|null} tabla - la tabla supletoria
  * @returns {boolean}
  */
@@ -612,7 +663,11 @@ function _tablaActivada(tabla) {
   if (!aplicacion || aplicacion.activada !== true) return false;
   const validadoPor = typeof aplicacion.validado_por === 'string' ? aplicacion.validado_por.trim() : '';
   const validadoAt = typeof aplicacion.validado_at === 'string' ? aplicacion.validado_at.trim() : '';
-  return validadoPor !== '' && validadoAt !== '';
+  if (validadoPor === '' || validadoAt === '') return false;
+  // El marcador de "lo falta el abogado externo" no es una validacion: es la
+  // ausencia de ella escrita. La compuerta sigue cerrada.
+  if (/^PENDIENTE\b/i.test(validadoPor)) return false;
+  return true;
 }
 
 /**
@@ -825,6 +880,14 @@ function _aniosDeDias(dias) {
  * día del cambio de año bisiesto: la fila guarda la regla (7305 días), no una
  * cuenta que se puede rehacer.
  *
+ * C3 · EL PISO NO SE BAJA (12-nov-2026)
+ * -------------------------------------
+ * Los años del piso los declaran DOS lados: el catálogo (la norma, en
+ * `regla.piso.anios`) y la tabla (en `plazo_anos`). Se aplica el MAYOR de los
+ * dos: el piso es un piso, y ni la tabla de la Empresa ni esta tabla pueden
+ * bajarlo. Lo que NO puede pasar es lo contrario: si la tabla declarara menos
+ * años que la norma, el piso sigue siendo el de la norma.
+ *
  * @param {object} regla - la regla del catálogo
  * @param {object|null} def - la categoría de la tabla
  * @returns {{anios: number|null, dias: number|null}|null}
@@ -834,7 +897,15 @@ function _pisoDeLaCategoria(regla, def) {
   const porTabla = Boolean(def && def.piso_legal);
   if (!porRegla && !porTabla) return null;
 
-  const anios = (regla && regla.piso && Number(regla.piso.anios)) || null;
+  const aniosRegla = (regla && regla.piso && Number(regla.piso.anios)) || null;
+  const aniosDeclarados = def ? Number(def.plazo_anos) : null;
+  const aniosTabla = (Number.isInteger(aniosDeclarados) && aniosDeclarados > 0)
+    ? aniosDeclarados
+    : null;
+  const anios = (aniosRegla && aniosTabla)
+    ? Math.max(aniosRegla, aniosTabla)
+    : (aniosRegla || aniosTabla);
+
   const diasTabla = Number(def && def.plazo_dias);
   const dias = (Number.isInteger(diasTabla) && diasTabla > 0)
     ? diasTabla
@@ -885,6 +956,139 @@ function _fechaMasLejana(a, b) {
   if (!a) return b || null;
   if (!b) return a;
   return new Date(a).getTime() >= new Date(b).getTime() ? a : b;
+}
+
+/**
+ * La categoría de la tabla supletoria con ese id (o null).
+ *
+ * @param {object|null} tabla - la tabla supletoria
+ * @param {string} id - el id de la categoría
+ * @returns {object|null}
+ */
+function _categoriaPorId(tabla, id) {
+  const categorias = (tabla && Array.isArray(tabla.categorias)) ? tabla.categorias : [];
+  const encontrada = categorias.find((c) => c && c.id === id);
+  return encontrada || null;
+}
+
+/**
+ * C1 · EL PLAZO DEL REGISTRO DE OPERACIONES SIGUE AL DOCUMENTO ASOCIADO.
+ *
+ * QUÉ ES EL REGISTRO DE OPERACIONES
+ * ---------------------------------
+ * Los eventos de la firma (`gh_firma_eventos`): los que dicen QUIÉN firmó,
+ * con qué medio y desde dónde. Son el MEDIO DE PRUEBA de la autenticidad del
+ * documento conservado, y por eso no pueden morir antes que el documento que
+ * acreditan: un documento conservado sin el asiento que prueba quién lo firmó
+ * es un documento que nadie puede auditar.
+ *
+ * LA REGLA (C1, 12-nov-2026)
+ * -------------------------
+ *   (a) El documento se conserva SIN TÉRMINO (el contrato): su registro de
+ *       operaciones tampoco tiene término.
+ *   (b) El documento tiene PISO LEGAL (los registros del SG-SST): su registro
+ *       sigue al PISO (veinte años desde el cese) y NO al plazo de cinco (5)
+ *       años de la categoría del registro de operaciones.
+ *   (c) Los demás: el registro sigue al documento asociado, y en todo caso no
+ *       puede ser menor que él. El plazo de cinco (5) años de la categoría
+ *       REGISTRO_OPERACIONES es el del registro que no cuelga de un documento
+ *       conservado.
+ *
+ * POR QUÉ ESTÁ EN UN SOLO LUGAR
+ * -----------------------------
+ * Los eventos se suprimen CON la firma (ver `conservacion.js`: la capa de
+ * auditoría borra los eventos de las firmas del lote, y el lote solo incluye
+ * las vencidas y sin hold). El plazo efectivo del registro ya sigue al
+ * documento. Esta función deja DICHA la regla en un solo lugar —la que la
+ * tabla declara en `aplicacion.condiciones`— y la que se puede auditar: es
+ * la que permite demostrar que el registro de operaciones de un documento con
+ * piso legal no se purga a los cinco (5) años.
+ *
+ * @param {object} [opts]
+ * @param {object|null} [opts.def] - la categoría de la tabla del documento
+ * @param {object|null} [opts.plan] - el plan del documento (su fecha y su plazo)
+ * @param {string} [opts.fecha_registro] - la fecha del registro de operaciones
+ * @param {object} [opts.tabla] - la tabla supletoria
+ * @returns {{fecha: string|null, dias: number|null, fuente: string, sigue_al_documento: boolean}}
+ */
+function plazoRegistroOperaciones(opts = {}) {
+  const def = opts.def || null;
+  const plan = opts.plan || null;
+  const tabla = opts.tabla || null;
+  const fechaRegistro = normalizarFecha(opts.fecha_registro);
+  const fechaDocumento = (plan && plan.fecha_conservacion) || null;
+  const diasDocumento = (plan && plan.plazo_conservacion_dias !== undefined
+    && plan.plazo_conservacion_dias !== null)
+    ? plan.plazo_conservacion_dias
+    : null;
+
+  // (a) El documento se conserva SIN TÉRMINO: su registro tampoco vence.
+  if (def && def.hold_siempre) {
+    return {
+      fecha: null,
+      dias: null,
+      fuente: 'documento_sin_termino',
+      sigue_al_documento: true,
+    };
+  }
+
+  // (b) C1: el documento tiene PISO LEGAL. Su registro sigue al piso (veinte
+  // años desde el cese), no al plazo de cinco (5) años de la categoría del
+  // registro de operaciones.
+  if (def && def.piso_legal) {
+    return {
+      fecha: fechaDocumento,
+      dias: diasDocumento,
+      fuente: 'piso_legal',
+      sigue_al_documento: true,
+    };
+  }
+
+  // Y con la compuerta cerrada no hay plazo que aplicar: el registro de
+  // operaciones tampoco puede tener un plazo propio.
+  if (plan && plan.fuente === 'tabla_supletoria_pendiente') {
+    return {
+      fecha: null,
+      dias: null,
+      fuente: 'tabla_supletoria_pendiente',
+      sigue_al_documento: false,
+    };
+  }
+
+  // (c) Los demás. El plazo del documento manda: el registro no puede morir
+  // antes que el documento que acredita.
+  if (fechaDocumento) {
+    return {
+      fecha: fechaDocumento,
+      dias: diasDocumento,
+      fuente: 'documento_asociado',
+      sigue_al_documento: true,
+    };
+  }
+
+  // Y si el documento no tiene plazo (la compuerta cerrada, o una firma sin
+  // término propio), el plazo del registro es el de su categoría.
+  const defRegistro = _categoriaPorId(tabla, 'REGISTRO_OPERACIONES');
+  const aniosRegistro = defRegistro ? Number(defRegistro.plazo_anos) : NaN;
+  const diasRegistro = defRegistro ? Number(defRegistro.plazo_dias) : NaN;
+  const inicio = fechaRegistro || null;
+  let fecha = null;
+  let dias = null;
+  if (inicio && Number.isInteger(aniosRegistro) && aniosRegistro > 0) {
+    fecha = sumarAnios(inicio, aniosRegistro);
+    dias = (Number.isInteger(diasRegistro) && diasRegistro > 0)
+      ? diasRegistro
+      : Math.round(aniosRegistro * 365.25);
+  } else if (inicio && Number.isInteger(diasRegistro) && diasRegistro > 0) {
+    fecha = _sumarDias(inicio, diasRegistro);
+    dias = diasRegistro;
+  }
+  return {
+    fecha,
+    dias,
+    fuente: 'tabla_supletoria',
+    sigue_al_documento: false,
+  };
 }
 
 /**
@@ -991,6 +1195,12 @@ function planificar({
   let fecha = null;
   let diasAplicados = null;
   let fuente = null;
+  // Como se computo el plazo: 'anos_calendario' o 'dias'. Decide que texto ve
+  // el Trabajador (C2): el texto tiene que decir lo mismo que la fecha.
+  let computo = null;
+  // Los años DECLARADOS por la categoría (no el redondeo de la diferencia):
+  // es el número que dice el texto.
+  let aniosDeclarados = null;
 
   const cesePendiente = Boolean(piso && !inicio);
   if (cesePendiente) {
@@ -1028,11 +1238,37 @@ function planificar({
       // (d) LA TABLA SUPLETORIA: el plazo por defecto de la categoría. Se
       // aplica porque la Empresa no declaró uno, y por eso el texto que se le
       // comunica al Trabajador lo dice de forma honesta (TEXTO_PLAZO_SISTEMA).
+      //
+      // C2 (12-nov-2026): EL COMPUTO ES EN AÑOS CALENDARIO.
+      // -------------------------------------------------------------------
+      // Antes se sumaban DIAS: la categoría traía `plazo_dias` (3650 por diez
+      // años) y la fecha salía de ahí. Con eso el texto al Trabajador decía
+      // «10 años (3650 días)», que es una equivalencia FALSA: 3650 días son
+      // dos o tres días menos que diez años calendario, y el piso legal ya se
+      // computaba en años. No puede quedar dos verdades en el mismo mensaje.
+      //
+      // Ahora, cuando la categoría declara `plazo_anos`, la fecha se calcula
+      // en años calendario desde el punto de inicio (igual que el piso), y el
+      // texto dice los años. `plazo_dias` queda como la EXPRESIÓN NOMINAL del
+      // plazo y es lo que se congela en la fila: la fila guarda la regla, no
+      // una cuenta de días que se pueda rehacer (misma convención del piso).
+      const aniosTabla = Number(defCat && defCat.plazo_anos);
       const diasTabla = Number(defCat && defCat.plazo_dias);
-      if (Number.isInteger(diasTabla) && diasTabla > 0) {
+      if (Number.isInteger(aniosTabla) && aniosTabla > 0) {
+        fecha = sumarAnios(inicio, aniosTabla);
+        diasAplicados = (Number.isInteger(diasTabla) && diasTabla > 0)
+          ? diasTabla
+          : Math.round(aniosTabla * 365.25);
+        fuente = 'tabla_supletoria';
+        computo = 'anos_calendario';
+        aniosDeclarados = aniosTabla;
+      } else if (Number.isInteger(diasTabla) && diasTabla > 0) {
+        // Una categoría cuya duración está en días (un respaldo de treinta
+        // días): aquí sí se suman días, y el texto los dice.
         fecha = _sumarDias(inicio, diasTabla);
         diasAplicados = diasTabla;
         fuente = 'tabla_supletoria';
+        computo = 'dias';
       }
       // Si la categoría de la tabla no trae un plazo computable, la fecha
       // queda nula: es la última defensa (aviso RETAIN_SIN_PLAZO) y NO es el
@@ -1129,8 +1365,16 @@ function planificar({
     // El contrato: se conserva sin término, con su fundamento.
     texto = _textoRegla(regla, aniosAplicados, punto.nombre);
   } else if (fuente === 'tabla_supletoria') {
-    texto = TEXTO_PLAZO_SISTEMA
-      .replace('{anios}', String(aniosAplicados))
+    // La plantilla la decide el CÓMPUTO (C2): si el plazo se calculó en años
+    // calendario, el texto dice años calendario y NO añade una equivalencia
+    // en días, que sería falsa («10 años (3650 días)» no es lo mismo que
+    // diez años calendario). Los años que dice el texto son los DECLARADOS
+    // por la categoría, no un redondeo de la diferencia.
+    const plantilla = computo === 'anos_calendario'
+      ? TEXTO_PLAZO_SISTEMA_ANIOS
+      : TEXTO_PLAZO_SISTEMA;
+    texto = plantilla
+      .replace('{anios}', String(aniosDeclarados !== null ? aniosDeclarados : aniosAplicados))
       .replace('{dias}', String(diasAplicados))
       .replace('{inicio}', punto.nombre)
       + (regla.notaSistema ? ' ' + regla.notaSistema : '');
@@ -1169,6 +1413,21 @@ function planificar({
     aviso = 'RETAIN_SIN_PLAZO';
   }
 
+  // C1 · El plazo del REGISTRO DE OPERACIONES (los eventos de la firma) sigue
+  // al del documento asociado. Se deja DICHO aquí, en un solo lugar: es lo que
+  // la tabla declara en `aplicacion.condiciones` y lo que se puede auditar.
+  const plazoRegistro = plazoRegistroOperaciones({
+    def: defCat,
+    plan: {
+      fecha_conservacion: fecha,
+      plazo_conservacion_dias: diasAplicados,
+      fecha_inicio_conservacion: inicioAplicado,
+      fuente,
+    },
+    fecha_registro: inicioAplicado,
+    tabla,
+  });
+
   return {
     categoria: categoriaId,
     regla: reglaId,
@@ -1185,6 +1444,8 @@ function planificar({
     plazo_conservacion_dias: diasAplicados,
     plazo_conservacion_fuente: fuente,
     fecha_inicio_conservacion: diasAplicados === null ? null : inicioAplicado,
+    // C1 · El plazo del registro de operaciones de esta firma.
+    plazo_registro_operaciones: plazoRegistro,
   };
 }
 
@@ -1195,6 +1456,7 @@ module.exports = {
   ANIOS_CUSTODIA,
   TEXTO_PLAZO_PENDIENTE,
   TEXTO_PLAZO_SISTEMA,
+  TEXTO_PLAZO_SISTEMA_ANIOS,
   NOMBRE_INICIO_FIRMA,
   NORMA_SST,
   NORMA_CONTRATO,
@@ -1209,5 +1471,6 @@ module.exports = {
   tablaConservacion,
   recargarTablaConservacion,
   tablaActivada,
+  plazoRegistroOperaciones,
   planificar,
 };

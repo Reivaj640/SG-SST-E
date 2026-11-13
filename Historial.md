@@ -9376,3 +9376,96 @@ No se commiteo ni se pusheo nada mas alla del commit de la ronda. No se desplego
 encendio ninguna compuerta. No se firmo nada. No se toco `legal/` ni `sitio/`: los textos publicados
 siguen siendo los mismos, y el texto para la v1.4 se entrega como **copia nueva** en el pedido 6. No se
 tocaron los textos ya suscritos. Y no se borro nada del servidor.
+
+## Ronda 15 — 12-nov-2026 (noche): la mesa L1 a L7 cerrada por determinación, y la v1.4 armada con ese texto
+
+### 1. Qué se pidió
+
+El owner: «el agente legal debe cerrar las decisiones pendiente L1…L7, no generar planes, debe cerrarlas; el
+agente worker cumple el trabajo que el agente legal propone, y el agente general las valida». Los siete
+puntos L1 a L7 y los siete bloques M.5, M.6, M.7, M.14, M.15, M.18 y M.20.
+
+### 2. Qué hizo el agente legal
+
+Entrego **determinaciones**, no planes, en tres tandas:
+
+- **L1 (J6, papel de Google)**: entidad contractual **Google LLC** (por perfil de pago, no por la lista de
+  subprocesadores); Google es **Responsable** sobre la cuenta del administrador y la telemetría, y
+  **Encargado** sobre los datos del cliente del canal, donde «Subencargado» es figura contractual y no
+  categoría legal; la operación es **transmisión internacional a un Encargado** (art. 2 num. 5 del Decreto
+  1377 de 2013), **no transferencia**, por lo que **no se activa el art. 26 de la Ley 1581 de 2012** y rigen
+  el art. 24 num. 2 y el art. 25; **P1 cerrado**; el CDPA se identifica **por huella SHA-256** (no declara
+  fecha de versión) y su fecha de efectividad es el **10-nov-2026** (la aceptación, por el &sect;2); el
+  derecho de auditoría del **&sect;7.5.2(a) no se activa** (condicionado a la Ley Europea); Estados Unidos
+  es **uno** de los países posibles, no el único; y el CDPA **no fija plazo de 24 h ni de 48 h** (el de 48 h
+  es compromiso propio de K+AIR). Le hizo **doce correcciones** al encargo, entre ellas que el §11 del
+  Anexo de Nube es «Referencias normativas» (la ficha de proveedores es el §4) y que la fila de Google
+  traía **nueve `<td>` para ocho columnas**.
+- **L2, L3, L6 y L7**: la Circular 002 de 2025 **no aplica al canal de correo** (sí al segundo supuesto, la
+  transferencia del software) y el **RNBD es obligación de la Empresa**, por sus propios activos (los 19,09
+  UVT del expediente son de Gesstiar S.A.S. y son una declaración, no un certificado); los plazos de la tabla
+  supletoria **se validan con cuatro condiciones** (C1 a C4) y la tabla tiene **ocho** categorías, no cinco; la
+  v1.1 **no se contrafirma** pero **«bajo la v1.1 no se trató dato alguno» no se sostiene** (hubo una firma
+  completada el 6-nov); y la variable del `.env` **no es un interruptor** y no puede presentarse como control.
+- **L4 y L5**: el respaldo en Backblaze B2 es **transmisión internacional**, no transferencia (el art. 26 no
+  se activa; el art. 24 num. 2 exonera de informar y de consentir al Titular), Backblaze **es subencargado**
+  y entra en el **§4** del Nube y el **§5** del Encargo, y el bucket **debe crearse en la región US**.
+
+Todo quedó en el repositorio: `dictamen-legal-l1-2026-11-12.md` (L1),
+`dictamen-legal-2026-11-12-tandas-2-y-3.md` (L2, L3, L6, L7) y
+`pedido-6-backblaze-v1-4-2026-11-12.md` (L4, L5), más el acta
+`acta-cierre-mesa-l1-l7-2026-11-12.md`.
+
+### 3. Lo que hizo el worker de código, y cómo se midió
+
+- **C1 a C4 en el código** (`retencion.js`): el registro de operaciones sigue al documento con piso legal o
+  hold sin término; el cómputo pasó a **años calendario** y el texto **ya no afirma la equivalencia falsa**
+  «10 años (3650 días)» (3650 días son dos o tres días menos que diez años calendario, y el piso legal ya se
+  computaba en años); el piso legal no puede ser bajado por la tabla de la Empresa; la fecha de cese la
+  informa y valida la Empresa y la firma no la sustituye. **Seis pruebas nuevas**, y las de conservación
+  **24/24**.
+- **La compuerta no se abre con el marcador**: `validado_por` trae un «PENDIENTE…» legible y
+  `validado_at` en `null`, y `_tablaActivada()` **rechaza el marcador por nombre**; un marcador no es una
+  validación escrita. `aplicacion.activada` sigue en `false` y el nombre del abogado **no se inventa**.
+- **La constancia de la v1.1** (`nota-expediente-v1-1-2026-11-12.md`), con la premisa corregida y el
+  comando literal de la lectura de solo lectura de producción.
+- **La variable inerte**: el comentario de `src/config.js` dice que no es un interruptor, el bloque obsoleto de
+  `publicFlow.js` quedó corregido («SIEMPRE ACTIVO») y el comando para quitar la línea del `.env` está
+  escrito, con respaldo previo, en `deploy/README-DESPLIEGUE.md` y en `docs/MIGRACION-SERVIDOR-FIRMA.md`.
+- **La v1.4 y el Encargo 2026-11-12** se armaron por el generador, con las anclas literales de L1 y de L5/L4,
+  y se le **añadió el test que el generador no tenía** (anclas que casan exactamente una vez, los textos
+  vigentes y el manifiesto intactos byte a byte, idempotencia, y las ocho celdas de la fila de Google).
+
+### 4. El incidente de concurrencia que casi arruinó la medición
+
+El worker de código hizo `git stash` de sus cambios para medir una línea base **mientras** corría la suite en
+el mismo árbol. Las dos corridas se cruzaron: la línea base salió con **26 fallos** que no existen (eran ruido
+de concurrencia) y la corrida con los cambios con **un fallo**. Se detecto porque un test que pasaba en
+aislamiento fallaba en la suite completa, y se **detubo el worker**, se **restauro** el `stash` (que estaba
+intacto) y se **volvio a correr la suite sola**: **2 683 tests, 2 681 pass, 0 fail, 2 skipped**, `exit 0`.
+Regla que sale de ahí: **en este árbol, una sola corrida a la vez**, y si hay que medir una línea base, se
+mide con el árbol quieto y **nadie más corriendo nada**.
+
+### 5. Estado al cierre de la ronda
+
+- **Mapa de la meta: 30 bloques, 9 cerrados / 21 pendientes** (tabla regenerada por script). El conteo **no
+  cambia** y el motivo es la regla, no la inacción: un bloque cierra cuando lo que su texto dice que falta
+  está **hecho y medido**; si lo que falta es **firma, credencial, ventana o respuesta de un tercero**, el
+  bloque es **PARCIALMENTE**. Lo que sí cambió es el **«qué falta»** de M.5, M.6, M.15, M.18 y M.20: ya no dice
+  «falta la determinación» sino el **acto concreto, con su responsable**.
+- **Cuadro canonico: 77 cerrados / 19 pendientes** de 96 (sin cambios). **Paquete del abogado: 14 de 14**.
+- **Manifiesto**: el del repositorio `d9b59699…c9097b`, el de produccion `191c08b8…a4013f` (dos notas). **No
+  se toco** el manifiesto legal: sus afirmaciones pendientes se corrigen **al armar y firmar la v1.4**.
+- **Suite oficial: 2 683 tests · 2 681 pass · 0 fail · 0 cancelled · 2 skipped** (180 archivos, `exit 0`,
+  310 s, Node 22, corrida **en solitario**). Los **+13** sobre la ronda 14 son las seis pruebas de C1 a C4 y
+  de la compuerta con marcador, y las siete del generador de los candidatos de la v1.4.
+- **La cabecera del mapa decía «veintiocho puntos»** y el mapa tiene treinta: corregido.
+
+### 6. Lo que NO se hizo en esta ronda
+
+No se commiteo nada mas alla del commit de la ronda. No se desplego: no hay `sudo`. No se encendio ninguna
+compuerta. No se firmo nada. No se toco `legal/` ni `sitio/`: los textos publicados siguen siendo los mismos, y
+la v1.4 se entrega como **copia nueva** en `candidatos-v1.4/`, marcada **no firmable**. No se toco
+`legal-readiness.json` (su huella esta registrada en el expediente) ni la migracion 031 (ya aplicada en
+produccion). No se rearmo el paquete del abogado con `armar-paquete-abogado.js`: ese script **sobrescribe los
+adjuntos** con sus origenes. Y no se borro nada del servidor.

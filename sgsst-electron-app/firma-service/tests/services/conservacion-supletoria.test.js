@@ -41,11 +41,28 @@ const EMPRESA = '901987654';
 const DIA_MS = 24 * 60 * 60 * 1000;
 const FIRMA_BASE = '2026-01-15T10:00:00.000Z';
 
-// El plazo por defecto de la tabla supletoria para DOCUMENTO_FIRMADO.
+// El plazo por defecto de la tabla supletoria para DOCUMENTO_FIRMADO: diez (10)
+// AÑOS CALENDARIO (C2, 12-nov-2026).
+//
+// `DIAS_TABLA` es la EXPRESIÓN NOMINAL del plazo —la que se congela en la fila
+// (misma convención que el piso legal)— y NO el cómputo: la fecha se calcula
+// en años calendario. Antes se sumaban días (3650) y la fecha salía dos o
+// tres días antes que los diez años que dice el texto: la contradicción que
+// C2 cierra.
+const ANIOS_TABLA = 10;
 const DIAS_TABLA = 3650;
-const FECHA_TABLA = new Date(
-  new Date(FIRMA_BASE).getTime() + DIAS_TABLA * DIA_MS
-).toISOString();
+const FECHA_TABLA = (() => {
+  const base = new Date(FIRMA_BASE);
+  return new Date(Date.UTC(
+    base.getUTCFullYear() + ANIOS_TABLA,
+    base.getUTCMonth(),
+    base.getUTCDate(),
+    base.getUTCHours(),
+    base.getUTCMinutes(),
+    base.getUTCSeconds(),
+    base.getUTCMilliseconds(),
+  )).toISOString();
+})();
 
 // El catálogo legado (veinte (20) años DESDE LA FIRMA) se RETIRÓ por orden del
 // abogado (30-oct-2026, J8 y J9): con la compuerta cerrada no aplica para nada.
@@ -155,6 +172,8 @@ test('la tabla supletoria es la fuente del plazo por defecto y se puede releer',
   const documento = tabla.categorias.find((c) => c.id === 'DOCUMENTO_FIRMADO');
   assert.ok(documento, 'la tabla declara la categoría base');
   assert.equal(documento.plazo_dias, DIAS_TABLA);
+  assert.equal(documento.plazo_anos, ANIOS_TABLA,
+    'C2: el plazo se declara y se computa en años calendario');
   assert.equal(documento.punto_inicio, 'fecha_firma');
   assert.equal(documento.hold_siempre, false);
 
@@ -706,4 +725,221 @@ test('el respaldo congelado también arranca con la compuerta cerrada', () => {
   assert.equal(plan.plazo_conservacion_dias, null);
   assert.equal(plan.aviso, 'RETAIN_TABLA_PENDIENTE');
   assert.equal(plan.hold.motivo, 'tabla_supletoria_pendiente_validacion');
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// LAS CUATRO CONDICIONES DE LA VALIDACIÓN (C1 a C4).
+//
+// El dictamen legal del 12-nov-2026 (L3) propone cuatro condiciones que la
+// validación del abogado externo tiene que cubrir. Lo que se prueba aquí es
+// que la tabla que se entrega al abogado es la que el CÓDIGO ejecuta: cada
+// condición tiene su prueba, y la compuerta sigue CERRADA.
+//
+//   C1  el registro de operaciones sigue al documento asociado cuando este
+//       tiene piso legal o hold sin término.
+//   C2  el cómputo es en años calendario (o el texto se corrige).
+//   C3  el piso legal no puede ser bajado por la tabla de la Empresa.
+//   C4  la fecha de cese la informa y valida la Empresa por escrito.
+// ─────────────────────────────────────────────────────────────────────────────
+
+test('la tabla que se despacha está PREPARADA para la validación, y CERRADA', () => {
+  const tabla = retencion.tablaConservacion();
+  const aplicacion = tabla.aplicacion;
+
+  assert.equal(aplicacion.activada, false, 'la compuerta sigue CERRADA');
+  assert.equal(aplicacion.estado, 'PROPUESTA',
+    'preparada no es validada: su estado sigue siendo PROPUESTA');
+  assert.equal(aplicacion.validado_at, null,
+    'no hay fecha de validación: el abogado todavía no ha firmado');
+  assert.match(aplicacion.validado_por, /^PENDIENTE/,
+    'el campo de validación es un MARCADOR: no se inventa el nombre de un abogado');
+  assert.equal(aplicacion.validado_por_documento, null,
+    'el escrito del abogado (y su huella) todavía no existen');
+  assert.equal(aplicacion.activado_at, null,
+    'la apertura es un acto POSTERIOR y separado: su fecha aún no existe');
+
+  // Las cuatro condiciones están declaradas en la tabla.
+  assert.ok(Array.isArray(aplicacion.condiciones));
+  assert.equal(aplicacion.condiciones.length, 4);
+  for (const condicion of ['C1', 'C2', 'C3', 'C4']) {
+    assert.ok(
+      aplicacion.condiciones.some((c) => c.startsWith(condicion + ' ')),
+      `la tabla no declara la condición ${condicion}`
+    );
+  }
+
+  // Y el alcance que se somete a validación son las OCHO categorías, no cinco.
+  assert.equal(tabla.categorias.length, 8);
+  assert.equal(aplicacion.alcance_validado.length, 8);
+});
+
+test('el marcador de "PENDIENTE" no abre la compuerta aunque se ponga la fecha', () => {
+  // El archivo que se despacha trae `validado_por` con un marcador y
+  // `validado_at` en null. Si alguien abriera la compuerta sin reemplazar el
+  // marcador, el código tiene que seguir tratándola como cerrada: el
+  // marcador es la ausencia de validación escrita, no una validación.
+  const tabla = retencion.tablaConservacion();
+  const conFecha = Object.assign({}, tabla, {
+    aplicacion: Object.assign({}, tabla.aplicacion, {
+      activada: true,
+      validado_at: '2026-11-12T19:20:00-05:00',
+    }),
+  });
+  assert.equal(retencion.tablaActivada({ tabla: conFecha }), false,
+    'un marcador de pendiente no es una validación escrita');
+
+  // Con la validación de verdad (los dos campos con contenido), se abre.
+  const conValidacion = Object.assign({}, tabla, {
+    aplicacion: Object.assign({}, tabla.aplicacion, {
+      activada: true,
+      validado_por: 'Abogado externo (ficticio, para la prueba)',
+      validado_at: '2026-11-12T19:20:00-05:00',
+    }),
+  });
+  assert.equal(retencion.tablaActivada({ tabla: conValidacion }), true);
+});
+
+test('C2: el plazo por defecto se computa en años calendario y el texto lo dice', () => {
+  const plan = retencion.planificar({
+    categoria_retencion: 'TABLA_EMPRESA',
+    fecha_creacion: FIRMA_BASE,
+    empresa: EMPRESA_SIN_PLAZO,
+    tabla_conservacion: TABLA_ACTIVADA,
+  });
+
+  // La fecha es la de DIEZ AÑOS CALENDARIO. La de 3650 días caía dos días
+  // antes (el 13-ene-2036 en vez del 15-ene-2036): esa era la contradicción.
+  assert.equal(plan.fecha_conservacion, FECHA_TABLA);
+  assert.notEqual(
+    new Date(plan.fecha_conservacion).getTime(),
+    new Date(FIRMA_BASE).getTime() + DIAS_TABLA * DIA_MS,
+    'la fecha NO es la de 3650 días: el cómputo es en años calendario'
+  );
+
+  // El texto no dice dos verdades: dice los años, dice cómo se computan y NO
+  // afirma una equivalencia en días que es falsa.
+  assert.match(plan.texto, /10 años/);
+  assert.match(plan.texto, /años calendario/);
+  assert.doesNotMatch(plan.texto, /3650 días/,
+    'el texto no puede afirmar «10 años (3650 días)»: no es lo mismo');
+  assert.match(plan.texto, /tabla de conservación del sistema/);
+});
+
+test('C1: el registro de operaciones sigue al documento con piso legal o hold sin término', () => {
+  // (a) El documento con PISO LEGAL (los registros del SG-SST): su registro de
+  // operaciones sigue al piso de veinte (20) años desde el cese, NO al plazo
+  // de cinco (5) años de la categoría REGISTRO_OPERACIONES.
+  const sst = retencion.planificar({
+    categoria_retencion: 'SST_CAPACITACION',
+    fecha_creacion: FIRMA_BASE,
+    fecha_terminacion: '2027-06-30T10:00:00.000Z',
+    empresa: EMPRESA_SIN_PLAZO,
+    tabla_conservacion: TABLA_ACTIVADA,
+  });
+  assert.equal(sst.plazo_registro_operaciones.fuente, 'piso_legal');
+  assert.equal(sst.plazo_registro_operaciones.sigue_al_documento, true);
+  assert.equal(sst.plazo_registro_operaciones.fecha, sst.fecha_conservacion,
+    'el registro se conserva hasta la fecha del piso');
+  const cincoAnosDesdeElCese = new Date(
+    new Date('2027-06-30T10:00:00.000Z').getTime() + 1825 * DIA_MS
+  ).toISOString();
+  assert.notEqual(sst.plazo_registro_operaciones.fecha, cincoAnosDesdeElCese,
+    'el registro del documento con piso legal NO se purga a los cinco (5) años');
+
+  // (b) El documento SIN TÉRMINO (el contrato): su registro tampoco vence.
+  const contrato = retencion.planificar({
+    categoria_retencion: 'CONTRATO_TRABAJO',
+    fecha_creacion: FIRMA_BASE,
+    empresa: EMPRESA_SIN_PLAZO,
+    tabla_conservacion: TABLA_ACTIVADA,
+  });
+  assert.equal(contrato.plazo_registro_operaciones.fuente, 'documento_sin_termino');
+  assert.equal(contrato.plazo_registro_operaciones.fecha, null,
+    'sin término en el documento, no hay término en su registro');
+  assert.equal(contrato.plazo_registro_operaciones.sigue_al_documento, true);
+
+  // (c) Los demás: el registro sigue al documento y no puede ser menor.
+  const comun = retencion.planificar({
+    categoria_retencion: 'TABLA_EMPRESA',
+    fecha_creacion: FIRMA_BASE,
+    empresa: EMPRESA_SIN_PLAZO,
+    tabla_conservacion: TABLA_ACTIVADA,
+  });
+  assert.equal(comun.plazo_registro_operaciones.fuente, 'documento_asociado');
+  assert.equal(comun.plazo_registro_operaciones.fecha, comun.fecha_conservacion);
+});
+
+test('C3: el piso legal no puede ser bajado por la tabla de la Empresa', () => {
+  const CESE = '2027-06-30T10:00:00.000Z';
+  const FECHA_PISO = '2047-06-30T10:00:00.000Z';
+
+  // El piso: veinte (20) años desde el CESE (no desde la firma).
+  const piso = retencion.planificar({
+    categoria_retencion: 'SST_CAPACITACION',
+    fecha_creacion: FIRMA_BASE,
+    fecha_terminacion: CESE,
+    empresa: EMPRESA_SIN_PLAZO,
+    tabla_conservacion: TABLA_ACTIVADA,
+  });
+  assert.equal(piso.fecha_conservacion, FECHA_PISO);
+  assert.equal(piso.plazo_conservacion_fuente, 'piso_legal');
+
+  // La Empresa declara un plazo MENOR (un año): NO baja el piso.
+  const empresaCorta = retencion.planificar({
+    categoria_retencion: 'SST_CAPACITACION',
+    fecha_creacion: FIRMA_BASE,
+    fecha_terminacion: CESE,
+    empresa: Object.assign({}, EMPRESA_CON_PLAZO, { plazo_retencion_dias: 365 }),
+    tabla_conservacion: TABLA_ACTIVADA,
+  });
+  assert.equal(empresaCorta.fecha_conservacion, FECHA_PISO,
+    'un plazo de la Empresa más corto NO baja el piso legal');
+  assert.equal(empresaCorta.plazo_conservacion_fuente, 'piso_legal');
+
+  // Y si declara uno MAYOR, se aplica el más lejano (el 8.6(a)).
+  const empresaLarga = retencion.planificar({
+    categoria_retencion: 'SST_CAPACITACION',
+    fecha_creacion: FIRMA_BASE,
+    fecha_terminacion: CESE,
+    empresa: Object.assign({}, EMPRESA_CON_PLAZO, { plazo_retencion_dias: 30 * 365 }),
+    tabla_conservacion: TABLA_ACTIVADA,
+  });
+  assert.equal(empresaLarga.plazo_conservacion_fuente, 'empresa');
+  assert.ok(
+    new Date(empresaLarga.fecha_conservacion).getTime()
+      > new Date(FECHA_PISO).getTime(),
+    'con un plazo mayor de la Empresa se aplica la fecha más lejana'
+  );
+});
+
+test('C4: la fecha de cese la informa y valida la Empresa, y la firma no la sustituye', () => {
+  // SIN fecha de cese: no se calcula fecha de supresión y el registro queda
+  // pendiente de que la Empresa informe y valide esa fecha.
+  const sinCese = retencion.planificar({
+    categoria_retencion: 'SST_CAPACITACION',
+    fecha_creacion: FIRMA_BASE,
+    empresa: EMPRESA_SIN_PLAZO,
+    tabla_conservacion: TABLA_ACTIVADA,
+  });
+  assert.equal(sinCese.fecha_conservacion, null,
+    'la fecha de la firma NO sustituye a la fecha real de cese');
+  assert.equal(sinCese.aviso, 'RETAIN_PENDIENTE_CESE');
+  assert.equal(sinCese.hold.motivo, 'fecha_cese_pendiente');
+  assert.match(sinCese.hold.alcance, /informe y valide la fecha real de cese/,
+    'el hold dice QUIÉN tiene que informar y validar la fecha');
+  assert.match(sinCese.texto, /La Empresa debe informar y validar esa fecha/);
+
+  // CON fecha de cese: el plazo corre desde el cese, no desde la firma.
+  const conCese = retencion.planificar({
+    categoria_retencion: 'SST_CAPACITACION',
+    fecha_creacion: FIRMA_BASE,
+    fecha_terminacion: '2027-06-30T10:00:00.000Z',
+    empresa: EMPRESA_SIN_PLAZO,
+    tabla_conservacion: TABLA_ACTIVADA,
+  });
+  assert.equal(conCese.fecha_inicio_conservacion, '2027-06-30T10:00:00.000Z',
+    'el punto de inicio del cómputo es el cese');
+  assert.equal(conCese.fecha_conservacion, '2047-06-30T10:00:00.000Z');
+  assert.notEqual(conCese.fecha_inicio_conservacion, FIRMA_BASE,
+    'y no la fecha de la firma');
 });

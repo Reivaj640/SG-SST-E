@@ -171,8 +171,19 @@ const config = {
   // el texto del Acuerdo prometía un registro protegido que no existía: por
   // eso la v1.2 cierra esa promesa con el código y no con una configuración.
   //
-  // Se conserva la variable (y su valor) para que los despliegues que ya la
-  // tengan definida no se rompan. El valor ya no cambia ningún comportamiento.
+  // Se conserva la variable en el CÓDIGO (y su valor se lee aquí), pero su
+  // valor no lo usa ninguna decisión: el control real es el rechazo
+  // incondicional de `publicFlow.js` (`_controlarMedioCorporativo`), que
+  // responde 400 MEDIO_OTP_CORPORATIVO y deja el asiento
+  // OTP_MEDIO_CORPORATIVO en `gh_firma_eventos`.
+  //
+  // NO es un interruptor y no debe citarse como control en ningún documento
+  // (dictamen legal del 12-nov-2026, L7). Lo que se recomienda es QUITARLA del
+  // `.env`: el argumento para conservarla («para no romper despliegues que ya la
+  // tengan definida») es vacío, porque una variable que no se lee no puede
+  // romper un despliegue. La decisión sobre el `.env` es un acto del owner
+  // (el `.env` de producción es 600 root); el comando literal esta en
+  // `deploy/README-DESPLIEGUE.md` y en `docs/MIGRACION-SERVIDOR-FIRMA.md`.
   exigirMedioPersonalOtp:
     process.env.FIRMA_EXIGIR_MEDIO_PERSONAL_OTP === 'true',
   // La COMPUERTA DEL ANEXO DE NUBE (C-1 del abogado, 30-oct-2026).

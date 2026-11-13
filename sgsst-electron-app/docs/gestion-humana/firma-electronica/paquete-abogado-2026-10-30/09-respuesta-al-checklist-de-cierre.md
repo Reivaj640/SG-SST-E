@@ -1579,7 +1579,7 @@ byte** igual al arbol del owner: **4 810 archivos identicos, 0 diferentes, 0 aus
 
 **Ojo con las dos cifras:** la del clon es la del commit `e4dd5f31`, **anterior** a las dos pruebas
 de regresion del manifiesto que se agregaron el 12-nov por la tarde; el arbol de hoy da
-**2 670 / 2 668 / 0 / 2**.
+**2 683 / 2 681 / 0 / 2**.
 
 **Un hallazgo que hay que dejar escrito.** El primer clon se hizo con la configuracion del sistema
 (`core.autocrlf = true`) y **no reproducia el arbol del owner**: materializo 2 697 de los 4 781
@@ -1594,8 +1594,8 @@ de `npm audit` resueltas) y los tests nuevos de esta ronda, la suite completa se
 sobre el arbol de trabajo del owner:
 
 ```
-tests 2670 | pass 2668 | fail 0 | cancelled 0 | skipped 2 | todo 0
-duration_ms 362425
+tests 2683 | pass 2681 | fail 0 | cancelled 0 | skipped 2 | todo 0
+duration_ms 309549
 ```
 
 179 archivos de prueba, `exit 0`, sin bloques `not ok`. **Esta es la cifra que publica ahora la
@@ -2273,7 +2273,7 @@ manda es el estado medido.
 - SSH, 12-nov: `systemctl is-active kair-firma` → `active`; `is-enabled` → `enabled`; `GET http://127.0.0.1:3001/health` → `{"status":"ok","db":"ok","smtp":"configured","uptime_seconds":14629}`.
 - SSH, 12-nov: `sha256sum` en disco → `acuerdo-v1.6.txt` `08e1eb8b...f13e`, `legal/anexo-nube-v1.3.html` `fdd10551...b585d`, `legal/anexo-encargo.html` `6308b1f7...b8948`. Coinciden con `legal-readiness.json:7`, `:145` y `:129`.
 - SSH, 12-nov: `sha256sum /opt/kair-firma/app/legal-readiness.json` → `191c08b837b41069de4e2d25d7158fd90a7c3ce5f93b22696d2d7050f8a4013f`, byte a byte igual al del repositorio (medido tambien en el PC). `sha256sum /opt/kair-firma/legal/constancia-aprobacion-acuerdo.html` → `aaf68b4e7df5e2757d5885840056218d97a0cbb1c9fa624bf7861962c8d0b413`.
-- Suite, registrada en el expediente: `sgsst-electron-app/docs/MIGRACION-SERVIDOR-FIRMA.md` §7 (12-nov por la noche: **2 670 pruebas, 2 668 verdes, 0 rojas, 2 omitidas**; el 12-nov por la manana, sobre el commit `e4dd5f31`, 2 665 / 2 663) y `verificacion-cierre/t1-corrida-desde-clon-limpio.md` (tres corridas desde clon limpio, 0 fallos).
+- Suite, registrada en el expediente: `sgsst-electron-app/docs/MIGRACION-SERVIDOR-FIRMA.md` §7 (12-nov por la noche: **2 683 pruebas, 2 681 verdes, 0 rojas, 2 omitidas**; el 12-nov por la manana, sobre el commit `e4dd5f31`, 2 665 / 2 663) y `verificacion-cierre/t1-corrida-desde-clon-limpio.md` (tres corridas desde clon limpio, 0 fallos).
 
 **Que falta.** Cuatro cosas, todas con dueño, y ninguna es un problema del texto publicado. **Lo que se
 resolvio el 12-nov-2026** esta al final; lo que sigue abierto, antes:

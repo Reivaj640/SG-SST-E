@@ -1510,19 +1510,19 @@ function _destinoBruto(signRequest, medioDeclarado, correoBase) {
  * que no es un registro de operaciones) y el código SE ENVIABA igual. El
  * 3.4(e) de la v1.1 promete que el caso queda "en el registro de operaciones
  * del servicio": eso solo es cierto si el aviso entra en `gh_firma_eventos`,
- * que es append-only (la migración 020 impide UPDATE y DELETE). Con el 📦978
- * el aviso es un EVENTO y el rechazo es siempre.
+ * que es append-only (la migración 020 impide UPDATE y DELETE). Con el
+ * interruptor apagado el aviso es un EVENTO y el rechazo es siempre.
  *
- * LO QUE EL AVISO NO ES (la v1.2 loCorrige)
+ * LO QUE EL AVISO NO ES (la v1.2 lo corrige)
  * ------------------------------------------
  * El aviso NO puede corregirse ni alterarse: `gh_firma_eventos` es de solo
  * anexado. Pero SÍ se suprime: conforme al 8.6, dentro de la ventana de purga,
  * y su supresión deja la lápida y el recibo del 3.6(g). Decir que "no se puede
- * suprimir" sería untrue: lo que no se puede es CORREGIRLO ni ALTERARLO. La
+ * suprimir" sería falso: lo que no se puede es CORREGIRLO ni ALTERARLO. La
  * v1.2 lo dice así: "Ese registro no puede corregirse ni alterarse; se suprime
  * conforme al 8.6, dentro de la ventana de purga, y su supresión deja la
  * lápida y el recibo del 3.6(g)".
- * * `riesgo_47_4` queda SIEMPRE en false: el control es incondicional, así que
+ * `riesgo_47_4` queda SIEMPRE en false: el control es incondicional, así que
  * el sistema nunca llega a dejar salir un código a un buzón que la Empresa
  * pueda leer. El campo se conserva porque es parte de la forma de la
  * respuesta y de su documentación.
