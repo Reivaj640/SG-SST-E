@@ -573,6 +573,58 @@ function construirTabla(tabla) {
     return salida;
   }
 
+  // EL ESTADO DE LA COMPUERTA lo declara la FUENTE, no el texto: el bloque
+  // 'aplicacion', con 'activada' y la fecha del acto que la abrio
+  // ('activado_at').
+  //
+  // POR QUE EL PARRAFO DE PRECEDENCIA TIENE DOS FORMAS
+  // ---------------------------------------------------
+  // El 13-nov-2026 el owner ABRIO la compuerta de la tabla supletoria con un
+  // acto expreso y fechado (la S-25). Un parrafo que dice "mientras la
+  // compuerta de activacion siga cerrada el plazo supletorio no se aplica"
+  // deja de ser cierto el dia de la apertura, y el manifiesto firma la huella
+  // de un texto que describe un mundo que ya no es. La validacion escrita de
+  // un tercero NO es requisito: la compuerta la abre K+AIR, con su acto y su
+  // fecha.
+  //
+  // El texto que el owner firmo el 12-nov-2026 (la version 2026-11-11) sigue
+  // diciendo lo que decia, porque un texto suscrito no se corrige: se
+  // sustituye. Esa sustitucion es la v1.4, y por eso las dos formas conviven
+  // en este codigo y la FUENTE decide cual se escribe.
+  const aplicacion = tabla.aplicacion || {};
+  const compuertaAbierta = aplicacion.activada === true;
+  const fechaApertura = String(
+    aplicacion.activado_at || tabla.regla_de_apertura_actualizada_at || '',
+  );
+  if (compuertaAbierta && !/^\d{4}-\d{2}-\d{2}$/.test(fechaApertura)) {
+    fallar('tabla-conservacion.json declara la compuerta abierta ("aplicacion.activada": true) '
+      + 'pero no trae "aplicacion.activado_at" con la fecha ISO del acto que la abrio.');
+  }
+
+  // La parte del parrafo que depende del estado: como se dice que la tabla
+  // esta activa y que pasa con los registros que quedaron con el hold.
+  const fraseCompuerta = compuertaAbierta
+    ? 'activada por K+AIR con la fecha de su acto, siempre existe: <strong>no hay '
+      + 'retenci&oacute;n indefinida</strong> ni <em>hold</em> por plazo no declarado. <strong>Desde la '
+      + 'activaci&oacute;n de la tabla el '
+      + `${html(fechaLegible(fechaApertura))} el plazo supletorio se aplica</strong>: el registro se `
+      + 'conserva con su fecha de supresi&oacute;n calculada, y los documentos abiertos antes de esa '
+      + 'fecha conservan el <em>hold</em> <code>tabla_supletoria_pendiente_validacion</code> hasta el '
+      + 'rec&aacute;lculo que les aplica el plazo supletorio'
+    : 'validada y activada, siempre existe: <strong>no hay retenci&oacute;n indefinida</strong> ni '
+      + '<em>hold</em> por plazo no declarado. <strong>Mientras la compuerta de activaci&oacute;n siga '
+      + 'cerrada el plazo supletorio no se aplica</strong>: el registro queda retenido, sin fecha de '
+      + 'supresi&oacute;n, con el <em>hold</em> <code>tabla_supletoria_pendiente_validacion</code>';
+
+  // Y la frase sobre la validacion juridica: con la compuerta abierta, la
+  // validacion escrita de un tercero no es requisito y el numeral 8.6(a) se
+  // cumple con el fundamento y el punto de inicio que declara la tabla.
+  const fraseValidacion = compuertaAbierta
+    ? 'no est&aacute;n sujetos a la validaci&oacute;n de un tercero: la apertura de la tabla es un acto '
+      + 'expreso y fechado de K+AIR, y el numeral 8.6(a) del Acuerdo exige que cada regla tenga '
+      + 'fundamento y punto de inicio, que esta tabla declara en sus ocho categor&iacute;as. '
+    : 'est&aacute;n sujetos a la validaci&oacute;n jur&iacute;dica pendiente. ';
+
   lineas.push('<p><strong>Fuente y precedencia de esta tabla.</strong> Esta tabla se genera desde la '
     + 'fuente &uacute;nica de la conservaci&oacute;n del servicio '
     + '(<code>config/tabla-conservacion.json</code>, versi&oacute;n '
@@ -580,15 +632,13 @@ function construirTabla(tabla) {
     + '<strong>Precedencia:</strong> la tabla de retenci&oacute;n documental de la '
     + '<strong>Empresa</strong>, cuando declara un plazo para una categor&iacute;a, tiene precedencia '
     + 'sobre el plazo por defecto de esta tabla supletoria (numeral 8.6(a) del Acuerdo); cuando la '
-    + 'Empresa no declara plazo, se aplica el plazo por defecto de esta tabla, que, una vez validada y '
-    + 'activada, siempre existe: <strong>no hay retenci&oacute;n indefinida</strong> ni <em>hold</em> por plazo no '
-    + 'declarado. <strong>Mientras la compuerta de activaci&oacute;n siga cerrada el plazo supletorio no se '
-    + 'aplica</strong>: el registro queda retenido, sin fecha de supresi&oacute;n, con el <em>hold</em> '
-    + '<code>tabla_supletoria_pendiente_validacion</code>; salvo las excepciones legales que no dependen de '
+    + 'Empresa no declara plazo, se aplica el plazo por defecto de esta tabla, que, una vez '
+    + fraseCompuerta
+    + '; salvo las excepciones legales que no dependen de '
     + 'esta tabla, que son el piso del SG-SST desde el cese y el <em>hold</em> sin t&eacute;rmino del contrato. El '
     + '<strong>piso legal</strong> de los registros del SG-SST no puede ser bajado por la tabla de la '
-    + 'Empresa. Los plazos que esta tabla declara como supletorios est&aacute;n sujetos a la '
-    + 'validaci&oacute;n jur&iacute;dica pendiente. '
+    + 'Empresa. Los plazos que esta tabla declara como supletorios '
+    + fraseValidacion
     + 'Modificar la fuente no altera los registros ya calculados: el plazo aplicado, su fuente y la '
     + 'fecha de inicio quedan congelados en cada documento.</p>');
 

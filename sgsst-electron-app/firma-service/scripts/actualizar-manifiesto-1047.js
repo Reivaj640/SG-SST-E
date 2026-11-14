@@ -58,14 +58,17 @@ const APP_ROOT = path.resolve(SERVICE_ROOT, '..');
 const REPO_ROOT = path.resolve(APP_ROOT, '..');
 const MANIFIESTO = path.join(SERVICE_ROOT, 'legal-readiness.json');
 
-const FECHA = '2026-11-11';
-const VERSION_NUBE = '1.3';
-const VERSION_ENCARGO = '2026-11-11';
+// La fecha del TEXTO VIGENTE de cada anexo (la que el documento declara en su
+// cabecera y en su pie). No es la fecha del manifiesto: cada texto tiene la
+// suya.
+const FECHA = '2026-11-12';
+const VERSION_NUBE = '1.4';
+const VERSION_ENCARGO = '2026-11-12';
 
 // La fecha del MANIFIESTO (la cabecera `version` / `actualizado_at`). No es la
 // fecha de ningun instrumento: los textos que el manifiesto referencia tienen su
 // propia fecha, y esa no se mueve porque el manifiesto se actualice.
-const FECHA_MANIFIESTO = '2026-11-11';
+const FECHA_MANIFIESTO = '2026-11-14';
 
 // La fecha de la CAPTURA del texto del CDPA. La pagina publicada por Google NO
 // declara ninguna fecha de version: se verifico el 10-nov-2026 sobre el texto
@@ -371,27 +374,24 @@ function main(args = process.argv.slice(2)) {
       hash: hashNube,
       bytes: bytesNube,
       actualizado: FECHA,
-      nota: 'Texto vigente del Anexo de Nube: la v' + VERSION_NUBE + '. Corrige el bloque de pendientes '
-        + 'del texto, que declaraba como no cumplidos P1 (la aceptacion del CDPA en la consola de '
-        + 'Workspace), P2 (la cuenta kair@gesstiar.com activa, con verificacion en dos pasos), P4 (SPF, '
-        + 'DKIM y DMARC de gesstiar.com publicados) y P5 (el envio real desde el dominio): los cuatro se '
-        + 'cerraron el 10-nov-2026, y el texto nuevo declara ese envio real con su Message-ID y su '
-        + 'Authentication-Results. Siguen pendientes P3 (los alias del dominio) y P6 (revocar las app '
-        + 'passwords de la cuenta anterior). La v1.2, del 9-nov-2026, nunca llego a suscribirse y queda '
-        + 'como referencia. La v1.1 (suscrita por ASEPLUS el 5-nov-2026) queda en `versiones_firmadas`. '
-        + 'La v1.3 quedo suscrita por ASEPLUS CARIBE S.A.S. (la empresa de prueba del P8) y '
-        + 'contrafirmada por K+AIR el 12-nov-2026, con acta y huellas propias: el item firmado_nube del '
-        + 'gate se cumple con ese par de actos. El papel del proveedor del canal de correo sigue siendo el de Subencargado, con la '
-        + 'formula condicional del dictamen legal del 11-nov-2026.'
-        + ' ERRATA DEL 11-nov-2026, ANTES DE LA SUSCRIPCION: el parrafo 12 de la v1.3 decia '
-        + '"Esta version 1.2 remite" al Anexo de Encargo, dentro de un texto que es la v1.3, y se corrigio '
-        + 'a "Esta version 1.3 remite". Es una correccion de cita: no cambian las partes, el objeto, las '
-        + 'obligaciones ni la distribucion del riesgo, y la frase siguiente del mismo parrafo ya decia que '
-        + 'esta version 1.3 no sustituye ese instrumento. El texto no estaba suscrito ni publicado cuando '
-        + 'se corrigio, y las versiones ya suscritas (la v1.1 del 5-nov-2026) no se tocaron. La huella '
-        + 'anterior de la v1.3 era '
-        + '45500569d02b876e8bc273385db934d77f5464642b75aab2a6b734e8ed3abf9f. Dictamen: '
-        + 'docs/gestion-humana/firma-electronica/dictamen-legal-errata-textos-2026-11-11.md.',
+      nota: 'Texto vigente del Anexo de Nube: la v' + VERSION_NUBE + '. PUBLICADO EL 14-nov-2026, por '
+        + 'acto expreso del owner, y NO SUSCRITO todavia: el manifiesto lo declara no firmado '
+        + '("firmado" en false y "contrafirmado" en false) mientras no ocurran los dos actos (la '
+        + 'suscripcion de la Empresa y la contrafirma del Encargado). Corrige la fila de Google: '
+        + 'Google LLC es el Encargado de la operacion concreta y del vinculo contractual, y '
+        + '"Subencargado" es una figura contractual, no una categoria legal, con el art. 24 num. 2 y '
+        + 'el art. 25 del Decreto 1377 de 2013; la comunicacion al exterior es una TRANSMISION '
+        + 'internacional a un Encargado, no una transferencia, y por eso el art. 26 no se activa. '
+        + 'Declara a Backblaze, Inc. como subencargado, con la region del bucket. Corrige doce '
+        + 'afirmaciones del expediente (las del §0 del dictamen de L1). Declara que los dos '
+        + 'instrumentos anteriores (la v1.3 de este Anexo y el Anexo de Encargo 2026-11-11) ya '
+        + 'quedaron suscritos y contrafirmados el 12-nov-2026, y que esta v1.4 no esta suscrita. '
+        + 'Remite al Anexo de Encargo version 2026-11-12. Los pendientes P3 (los alias del dominio) '
+        + 'y P6 (revocar las app passwords) siguen pendientes, a cargo del owner. La v1.3, suscrita '
+        + 'y contrafirmada el 12-nov-2026, y la v1.1, suscrita el 5-nov-2026, quedan en '
+        + '`versiones_firmadas` con su huella y su evidencia: las versiones ya suscritas NO se '
+        + 'reescriben, la bitacora es append-only. Determinacion: '
+        + 'docs/gestion-humana/firma-electronica/dictamen-legal-l1-2026-11-12.md.',
     },
     versiones_firmadas: firmadoPrevio,
   };
@@ -400,25 +400,47 @@ function main(args = process.argv.slice(2)) {
   // 4 · El Anexo de Encargo: la version vigente y la que esta suscrita
   // ---------------------------------------------------------------------------
   const encargoPrevio = m.anexo_encargo || {};
-  const encargoFirmados = encargoPrevio.versiones_firmadas && encargoPrevio.versiones_firmadas.length
-    ? encargoPrevio.versiones_firmadas
-    : [{
+
+  // La suscripcion anterior NO se reescribe: si NO describe el texto que se
+  // esta publicando, pasa al historial (`versiones_firmadas`).
+  //
+  // DEFECTO CORREGIDO EL 14-NOV-2026: el bloque del Anexo de Encargo no
+  // empujaba la suscripcion anterior al historial, a diferencia del del Anexo
+  // de Nube (que se corrigio el 12-nov-2026 por el mismo defecto). Al
+  // publicar la version 2026-11-12, la suscripcion del 2026-11-11 (la que
+  // ASEPLUS suscribio y K+AIR contrafirmo el 12-nov-2026) se perdia del
+  // manifiesto: `versiones_firmadas` conservaba la del 2026-11-06 y la del
+  // 2026-11-11 desaparecia. Un instrumento ejecutado no puede desaparecer
+  // del expediente. La bitacora es append-only.
+  const encargoFirmadosPrevias = Array.isArray(encargoPrevio.versiones_firmadas)
+    ? encargoPrevio.versiones_firmadas.slice()
+    : [];
+  const laFirmaDescribeElVigente = encargoPrevio.estado === 'firmado'
+    && String(encargoPrevio.version || '') === VERSION_ENCARGO
+    && String(encargoPrevio.hash || '').toLowerCase() === hashEncargo;
+  if (!laFirmaDescribeElVigente && encargoPrevio.estado === 'firmado' && encargoPrevio.version
+    && !encargoFirmadosPrevias.some((x) => x && x.version === encargoPrevio.version
+      && String(x.hash || '').toLowerCase() === String(encargoPrevio.hash || '').toLowerCase())) {
+    encargoFirmadosPrevias.push({
       version: encargoPrevio.version,
       hash: encargoPrevio.hash,
       fecha: encargoPrevio.fecha,
       evidencia: encargoPrevio.evidencia,
       estado: encargoPrevio.estado,
-    }].filter((x) => x && x.version);
+      contrafirma_facultad: encargoPrevio.contrafirma_facultad || null,
+    });
+  }
+  const encargoFirmados = encargoFirmadosPrevias;
 
   // El estado de firma NO lo inventa este script: lo escribe el que lee la
   // base (`actualizar-manifiesto-anexo-encargo.js`). Este solo lo CONSERVA
-  // cuando la firma es del MISMO texto vigente; si la version cambio, el
-  // estado anterior no describe este texto y se escribe no_firmado. Antes se
-  // ponia no_firmado siempre, y eso borraba del manifiesto una firma ya hecha
-  // cada vez que se regeneraba (el bloque decia "no firmado" con la nota
-  // diciendo que si lo estaba).
-  const encargoVigenteFirmado = encargoPrevio.version === VERSION_ENCARGO
-    && encargoPrevio.estado === 'firmado'
+  // cuando la firma es del MISMO texto vigente: la version Y la huella. Con
+  // la version sola no alcanza: si un texto cambiara de bytes sin que su
+  // version se moviera, el manifiesto diria "firmado" sobre un texto que
+  // nadie firmo. Antes se ponia no_firmado siempre, y eso borraba del
+  // manifiesto una firma ya hecha cada vez que se regeneraba (el bloque decia
+  // "no firmado" con la nota diciendo que si lo estaba).
+  const encargoVigenteFirmado = laFirmaDescribeElVigente
     && Boolean(encargoPrevio.fecha)
     && Boolean(encargoPrevio.evidencia);
 
@@ -432,35 +454,31 @@ function main(args = process.argv.slice(2)) {
     contrafirma_facultad: encargoVigenteFirmado ? (encargoPrevio.contrafirma_facultad || null) : null,
     version: VERSION_ENCARGO,
     hash: hashEncargo,
-    nota: 'Texto vigente del Anexo de Encargo: la version ' + VERSION_ENCARGO + '. Corrige el parrafo '
-      + '"Lo que queda pendiente" de la seccion 5, que declaraba como no cumplidos P5 (la aceptacion '
-      + 'del CDPA en la consola de Workspace) y P6 (la cuenta empresarial activa, con la credencial del '
-      + 'servidor migrada y comprobada con un envio real), los dos cerrados el 10-nov-2026: el texto '
-      + 'nuevo declara los pasos cumplidos con su evidencia y deja los que siguen abiertos con su '
-      + 'responsable. El paso (viii), la confirmacion escrita sobre el instrumento bilateral, la '
-      + 'contrafirma, el alcance de los canales y el papel de Google para los datos de cuenta y la '
-      + 'telemetria, quedo respondido el 11-nov-2026 en el dictamen legal del expediente. Mantiene las '
-      + 'secciones 4 y 5 (el vinculo con el proveedor de correo), la 3.4 y la 12 (devolucion, supresion '
-      + 'y auditoria conforme al CDPA) y la clausula de prevalencia del instrumento bilateral mas '
-      + 'reciente, y remite ahora al Anexo de Nube v1.3. El texto vigente quedo suscrito por ASEPLUS '
-      + 'CARIBE S.A.S. (la empresa de prueba del P8) y contrafirmado por K+AIR el 12-nov-2026, con '
-      + 'acta, huellas y facultad acreditada: el item estado_encargo del gate se cumple con ese par de '
-      + 'actos. La version que ASEPLUS suscribio el 7-nov-2026 (la 2026-11-06) queda en '
-      + '`versiones_firmadas` como instrumento anterior. La suscripcion anterior NO se reescribe: la '
-      + 'bitacora es append-only.'
-      + ' ERRATA DEL 11-nov-2026, ANTES DE LA SUSCRIPCION: el menu, la seccion 1 (Partes), la seccion 5 '
-      + '(Proveedores externos y subencargados) y la seccion 9 remitian al Anexo de Nube v1.2, un texto '
-      + 'superado cuyo bloque de pendientes estaba desactualizado, y los cuatro puntos remiten ahora a la '
-      + 'v1.3, que es el texto vigente y el que la clausula de prevalencia de la seccion 5 ya nombraba. '
-      + 'No es un detalle de redaccion: la seccion 5 dice que el Anexo de Nube "forma parte integral de '
-      + 'este documento", y eso es una incorporacion por remision (articulo 44 de la Ley 527 de 1999): lo '
-      + 'que queda incorporado es el texto al que apunta el vinculo, y con el vinculo apuntando a la v1.2 '
-      + 'este Anexo incorporaba un texto que el propio documento declara superado. Es una correccion de '
-      + 'cita: no cambian las partes, el objeto, las obligaciones ni la distribucion del riesgo. El texto '
-      + 'no estaba suscrito ni publicado cuando se corrigio, y la version suscrita por ASEPLUS el '
-      + '7-nov-2026 (la 2026-11-06) no se toco. La huella anterior era '
-      + 'c7c42a1897b44222c09cbdbfc6f8617f29b7250b9c9e0c8b12f1e502770bfd95. Dictamen: '
-      + 'docs/gestion-humana/firma-electronica/dictamen-legal-errata-textos-2026-11-11.md.',
+    nota: 'Texto vigente del Anexo de Encargo: la version ' + VERSION_ENCARGO + '. PUBLICADO EL '
+      + '14-nov-2026, por acto expreso del owner, y NO SUSCRITO todavia: el manifiesto lo declara '
+      + 'no firmado ("estado": "no_firmado") mientras no ocurran los dos actos (la suscripcion de la '
+      + 'Empresa y la contrafirma del Encargado). Es una version NUEVA, no una correccion: el texto que '
+      + 'la Empresa suscribio y K+AIR contrafirmo el 12-nov-2026 (la 2026-11-11, huella '
+      + '6308b1f7a51007cb1e973de0210d1e5659d3b3ceb8e3e3b7a3ee52a7275b8948) queda INTACTO y pasa a '
+      + '`versiones_firmadas` como instrumento anterior, con su evidencia y su contrafirma; la '
+      + 'suscripcion anterior NO se reescribe, la bitacora es append-only. Lo que cambia en esta '
+      + 'version: (a) el §8 corrige la REGLA DE LA COMPUERTA de la tabla supletoria: la validacion '
+      + 'escrita de un tercero deja de ser requisito para abrirla, porque la abre K+AIR con un acto '
+      + 'expreso y fechado (la S-25, del 13-nov-2026), y el plazo supletorio se aplica desde esa '
+      + 'fecha, con los documentos abiertos antes conservando el hold '
+      + '"tabla_supletoria_pendiente_validacion" hasta el recalculo que les aplica el plazo; el §8 '
+      + 'sigue publicando la fecha de la TABLA (31 de octubre de 2026), que no cambio, porque los '
+      + 'plazos no cambiaron. (b) Remite al Anexo de Nube v1.4 (la v1.4 del Anexo de Nube y esta '
+      + 'version se publican juntas). (c) Declara que los dos instrumentos anteriores (la v1.3 del '
+      + 'Anexo de Nube y el Anexo de Encargo 2026-11-11) ya quedaron suscritos y contrafirmados el '
+      + '12-nov-2026, con sus actas y sus huellas. (d) Lleva la version 2026-11-12 unificada en los '
+      + 'cuatro lugares que la declaran (el encabezado, la linea de fecha, el pie y la constancia del '
+      + '§12), y la etiqueta la escribe el generador desde config/matriz-finalidades.json: el texto '
+      + 'publicado es el candidato con esa etiqueta normalizada, y su unica diferencia con el '
+      + 'candidato es la fecha del pie. (e) Corrige la determinacion de la tabla de retencion '
+      + 'documental de la Empresa (numeral 8.6(a)) conforme al Acuerdo vigente, la v1.6, publicada y '
+      + 'activa desde el 11-nov-2026. Determinacion: '
+      + 'docs/gestion-humana/firma-electronica/dictamen-legal-l1-2026-11-12.md.',
     versiones_firmadas: encargoFirmados,
   };
 
@@ -469,7 +487,7 @@ function main(args = process.argv.slice(2)) {
   // ---------------------------------------------------------------------------
   // El manifiesto declara la huella de la matriz, y el test del manifiesto la
   // contrasta contra el archivo real. La matriz cambio (la instruccion apunta
-  // a la version 2026-11-11 del Anexo de Encargo), asi que su huella cambio
+  // a la version 2026-11-12 del Anexo de Encargo), asi que su huella cambio
   // con ella: declarar la vieja seria una huella que no describe el archivo.
   m.matriz_finalidades = Object.assign({}, m.matriz_finalidades, {
     archivo: 'config/matriz-finalidades.json',
@@ -479,10 +497,11 @@ function main(args = process.argv.slice(2)) {
     nota: 'Fuente unica de la matriz de finalidades (Anexo de Encargo, seccion 2). La version y la '
       + 'huella son las que el servicio pone a disposicion del Firmante antes de habilitar la casilla '
       + 'de aceptacion, y las que la aceptacion registra junto con la version y la huella de los dos '
-      + 'anexos. El 11-nov-2026 se actualizo la referencia a la version del Anexo de Encargo (bloque '
+      + 'anexos. El 14-nov-2026 se actualizo la referencia a la version del Anexo de Encargo (bloque '
       + 'instruccion) a la ' + VERSION_ENCARGO + ', sin cambiar ninguna finalidad, ninguna base '
       + 'juridica ni ningun estado de habilitacion: la huella cambio porque cambio el documento que '
-      + 'esa instruccion identifica.',
+      + 'esa instruccion identifica. La fecha de la matriz (updated_at) NO se movio: es la fecha de la '
+      + 'matriz, y el §8 del Anexo publica la fecha de la tabla, que tampoco se movio.',
   });
 
   // ---------------------------------------------------------------------------

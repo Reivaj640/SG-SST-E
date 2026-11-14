@@ -413,6 +413,28 @@ const NUBE_TEXTOS = [
     despues: 'Versi&oacute;n 1.4, del 12 de noviembre de 2026, versi&oacute;n susceptible de suscripci&oacute;n',
   },
   {
+    // LAS DOS ETIQUETAS DE LA CABECERA (14-nov-2026). El titulo, la meta y el
+    // pie ya decian 1.4, pero el SUBTITULO de la cabecera y la linea de fecha
+    // de la pagina seguian diciendo 1.3 y 11-nov-2026: el documento se
+    // contradecia en su propia cara, y una Empresa que lee "Version 1.3" en la
+    // cabecera de un texto que el manifiesto declara como v1.4 firma un texto
+    // que el manifiesto no describe. La fecha es la del pie, que el agente
+    // general si habia actualizado: 12 de noviembre de 2026.
+    id: 'EXT-15', ext: true,
+    antes: 'Versi&oacute;n 1.3 del Anexo de Nube &middot; anexo al Anexo de Encargo de',
+    despues: 'Versi&oacute;n 1.4 del Anexo de Nube &middot; anexo al Anexo de Encargo de',
+  },
+  {
+    id: 'EXT-17', ext: true,
+    antes: '    &middot; 11 de noviembre de 2026</p>',
+    despues: '    &middot; 12 de noviembre de 2026</p>',
+  },
+  {
+    id: 'EXT-35', ext: true,
+    antes: '  <p class="fecha">Versi&oacute;n 1.3 &middot; 11 de noviembre de 2026</p>',
+    despues: '  <p class="fecha">Versi&oacute;n 1.4 &middot; 12 de noviembre de 2026</p>',
+  },
+  {
     id: 'EXT-38', ext: true,
     antes: '  1.3 del Anexo de Nube: es la que la Empresa suscribe y la que el servicio registra con su huella SHA-256. La',
     despues: '  1.4 del Anexo de Nube: es la que la Empresa suscribe y la que el servicio registra con su huella SHA-256. La',

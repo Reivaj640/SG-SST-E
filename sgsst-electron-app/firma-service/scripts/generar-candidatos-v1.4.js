@@ -32,19 +32,31 @@
  *
  * QUE NO HACE (y por que importa)
  * --------------------------------
- * - No modifica `legal/anexo-nube-v1.3.html` ni `legal/anexo-encargo.html`: son
- *   textos SUSCRITOS y un texto suscrito no se corrige, se sustituye.
+ * - No modifica `legal/anexo-nube-v1.3.html` ni `legal/anexo-encargo-2026-11-11.html`:
+ *   son textos SUSCRITOS y un texto suscrito no se corrige, se sustituye. Son
+ *   los ORIGENES de este programa: de ahi se leen las anclas.
  * - No toca `sitio/` (las copias publicas) ni `legal-readiness.json`: el manifiesto
  *   del repositorio tiene que quedar byte a byte igual que el de produccion, y
  *   publicar un texto que nadie ha firmado haria que el gate dijera "firmado"
  *   sobre un texto que no lo esta.
  * - No publica nada, no enciende ninguna compuerta y no firma nada.
  *
+ * QUE PASO CON ESTOS CANDIDATOS
+ * -----------------------------
+ * El 14-nov-2026 el owner decidio publicar los dos: el Anexo de Nube v1.4 y el
+ * Anexo de Encargo 2026-11-12. Los candidatos de esta carpeta son el texto
+ * que se publico, y la carpeta queda como el registro de COMO se armaron.
+ * El texto que quedo vigente es el candidato con la ETIQUETA DE VERSION
+ * normalizada por `scripts/generar-anexo-encargo.js` (que escribe el
+ * encabezado, la linea de fecha y el pie desde `config/matriz-finalidades.json`):
+ * la unica diferencia con el candidato es la fecha del pie, que en el
+ * candidato quedo en 11-nov-2026 y en el texto vigente es 12-nov-2026.
+ *
  * DONDE ESCRIBE
  * -------------
  * En `docs/gestion-humana/firma-electronica/candidatos-v1.4/`, que NO viaja en el
- * paquete de despliegue. Son candidatos:-serving para que el abogado revise el
- * TEXTO, no una version publicable.
+ * paquete de despliegue. Desde el 14-nov-2026 son el registro de como se
+ * armaron los textos publicados, no una version por publicar.
  *
  * EL GUARD
  * --------
@@ -372,10 +384,19 @@ function sha256(buf) {
 
 function correr(escribir) {
   const origenNube = path.join(LEGAL, 'anexo-nube-v1.3.html');
-  const origenEncargo = path.join(LEGAL, 'anexo-encargo.html');
+  // El Anexo de Encargo v1.4 se armo sobre la version 2026-11-11 (la que
+  // estaba vigente el 12-nov-2026, la que la Empresa suscribio y K+AIR
+  // contrafirmo). Ese texto ya no es el vigente: desde el 14-nov-2026 lo es
+  // el v1.4, que se publico como `legal/anexo-encargo.html`. El texto de
+  // partida queda en `legal/anexo-encargo-2026-11-11.html`, con su huella
+  // (6308b1f7...), y es de ahi de donde se leen las anclas: un texto suscrito
+  // no se corrige, se sustituye, y el programa tiene que seguir produciendo
+  // el mismo candidato a partir del mismo texto, sin importar cual sea hoy
+  // el vigente.
+  const origenEncargo = path.join(LEGAL, 'anexo-encargo-2026-11-11.html');
   for (const p of [origenNube, origenEncargo]) {
     if (!fs.existsSync(p)) {
-      console.error('No existe el texto vigente: ' + p);
+      console.error('No existe el texto de partida: ' + p);
       return 2;
     }
   }

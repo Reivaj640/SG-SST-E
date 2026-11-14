@@ -1,25 +1,36 @@
-# Candidatos v1.4 — NO PUBLICADOS, NO FIRMABLES
+# Candidatos v1.4 — PUBLICADOS el 14-nov-2026
 
-> **Lo que hay en esta carpeta son candidatos.** No son el texto vigente, no estan publicados en `legal/` ni
-> en `sitio/`, no los sirve el servicio y **no se pueden firmar**. Un texto se firma sobre lo que esta
-> publicado; publicar estos candidatos es un acto que no se ha dado.
+> **Lo que hay en esta carpeta son los candidatos que se publicaron.** El 14-nov-2026 el owner dio el acto
+> expreso de publicarlos: el Anexo de Nube v1.4 y el Anexo de Encargo 2026-11-12 quedaron vigentes en
+> `legal/` y en `sitio/`. La carpeta queda como el **registro de cómo se armaron**. **Todavía no están
+> firmados**: los dos actos (la suscripción de la Empresa y la contrafirma de K+AIR) son pendientes, y el
+> manifiesto los declara no firmados, como es.
 
 ## Que hay aqui
 
 | Archivo | Bytes | SHA-256 | Que es |
 |---|---|---|---|
-| `anexo-nube-v1.4.html` | 111 462 | `ba664e6f1ad130c968b6224ab71ed66a52017e96ac578b8b0e740fd55f9e3b47` | Candidato del Anexo de Nube v1.4 (6 anclas de C1 a C7 + 39 determinaciones de L1, L4 y L5) |
+| `anexo-nube-v1.4.html` | 111 462 | `57983e54ffd2caa835060c58c89fcde226bc4d84df17eacadd55f1d0f6c392a4` | Texto vigente del Anexo de Nube v1.4 (6 anclas de C1 a C7 + 39 determinaciones de L1, L4 y L5 + la etiqueta de versión de la cabecera) |
 | `anexo-encargo-2026-11-12.html` | 100 787 | `55a58967b3bb081bcee5f72d15b50b4b3141691418a9b8338df9db738b646fc9` | Candidato del Anexo de Encargo del 12-nov-2026 (5 anclas de C1 a C7 + 11 determinaciones de L1, L4 y L5 + 3 anclas de la regla de la compuerta + 2 anclas del acto de apertura) |
+
+**El texto vigente del Anexo de Encargo no es byte a byte este candidato.** Es el candidato con la
+**etiqueta de versión normalizada** por `scripts/generar-anexo-encargo.js`, que la escribe desde
+`config/matriz-finalidades.json` (el encabezado, la línea de fecha y el pie): el pie del candidato quedó en
+11-nov-2026 y el del texto vigente es 12-nov-2026. **Esa es la única diferencia**, y hay un guard que la
+mide entera (`generar-candidatos-v1.4.test.js`): el texto vigente es
+`a3014202ed812f532d9dada5b4ea99d954a146c898ba94e29db739209f96aa50` (100 787 B).
 
 ## Que NO se toco
 
 | Documento | Bytes | SHA-256 |
 |---|---|---|
-| Anexo de Nube v1.3 (vigente, suscrito y contrafirmado el 12-nov-2026) | 85 143 | `fdd10551c2106e186d62a2b70922530ff9494a8538fc67816f6f5ad5ca2b585d` |
-| Anexo de Encargo 2026-11-11 (vigente, suscrito y contrafirmado el 12-nov-2026) | 94 923 | `6308b1f7a51007cb1e973de0210d1e5659d3b3ceb8e3e3b7a3ee52a7275b8948` |
+| Anexo de Nube v1.3 (suscrito y contrafirmado el 12-nov-2026) | 85 143 | `fdd10551c2106e186d62a2b70922530ff9494a8538fc67816f6f5ad5ca2b585d` |
+| Anexo de Encargo 2026-11-11 (suscrito y contrafirmado el 12-nov-2026) | 94 923 | `6308b1f7a51007cb1e973de0210d1e5659d3b3ceb8e3e3b7a3ee52a7275b8948` |
 
-Los dos textos vigentes quedan **intactos**: un texto suscrito no se toca. El manifiesto **no** se modifico con
-estos candidatos.
+Los dos textos ya suscritos quedan **intactos**: un texto suscrito no se toca. El que era vigente (la
+2026-11-11) se conservó aparte, en `legal/anexo-encargo-2026-11-11.html` y en `sitio/`, con su huella. El
+manifiesto los declara en `versiones_firmadas`, con su evidencia y su contrafirma: la bitácora es
+append-only.
 
 ## Como se armaron
 
@@ -76,6 +87,14 @@ enumeraba (el titulo, la meta, el §1, el pie y cuatro remisiones que decian «e
 documento **es** la 1.4). Van marcadas como `ext` en `determinaciones-v1.4.js` y se reportan al abogado: si
 alguna no le parece bien, se quita y se vuelve a armar.
 
+**El 14-nov-2026 se corrigieron tres mas (`EXT-15`, `EXT-17` y `EXT-35`), y el motivo es que el documento se
+contradecia en su propia cara:** el titulo, la meta y el pie de la v1.4 decian 1.4 y 12-nov-2026, pero el
+subtitulo de la cabecera y la linea de fecha de la pagina seguian diciendo **1.3** y **11-nov-2026**. Una
+Empresa que lee «Version 1.3» en la cabecera de un texto que el manifiesto declara como v1.4 firma un texto
+que el manifiesto no describe. La fecha que se puso es la del pie (12-nov-2026), que el agente general si
+habia actualizado. Con esas tres, la huella del Anexo de Nube v1.4 paso de
+`ba664e6f…e3b47` a `57983e54…392a4`.
+
 **Lo que cambio el 13-nov-2026 (escrito del abogado matriculado).** La seccion **B.8** del dictamen de L1
 aplico al texto lo que el abogado escribio (que es **no formal**: sin nombre, sin fecha de suscripcion y sin
 huella): el Titulo V y la lista de paises con nivel adecuado **dejan de ser fundamento** (son marco sectorial
@@ -103,15 +122,18 @@ determinacion: si el motor reescribiera el literal por su cuenta, el texto que s
 que se aprobo. Hay dos guards que lo vigilan (`generar-candidatos-v1.4.test.js`): el de identidad byte a
 byte y el que prohibe que un fragmento toque el literal de una determinacion.
 
-## Que falta para que exista una v1.4 de verdad
+## Que falta ahora
 
-1. **El abogado revisa y redacta el texto final.** El equipo armo candidatos mecanicos para que el abogado
-   revise un texto, no un diff. La redaccion final es del abogado.
-2. **El owner decide y suscribe** (ASEPLUS) y **contrafirma** (K+AIR).
-3. **El manifiesto se actualiza** con la huella de la v1.4 ya firmada.
-4. **La compuerta `FIRMA_EXIGIR_ANEXO_NUBE` se enciende** al final, no antes.
+1. **La Empresa se suscribe** al texto v1.4 (ASEPLUS) y **K+AIR contrafirma**. El manifiesto ya declara la
+   huella nueva y los dos textos como no firmados, que es lo que corresponde mientras los dos actos no
+   ocurran.
+2. **El manifiesto se actualiza** con la evidencia de esos dos actos (lo escriben los scripts que leen la
+   base).
+3. **La compuerta `FIRMA_EXIGIR_ANEXO_NUBE` sigue encendida**: ya lo estaba desde el 13-nov-2026 y este
+   acto no la apaga.
 
-Mientras tanto, el gate **baja a 37 items en `ok`**: es el mismo estado en que estaba la v1.3 antes del
-12-nov-2026.
+El owner dio el acto expreso de publicar (14-nov-2026) y el texto que se firma es el de esta carpeta, con la
+etiqueta de versión normalizada por el generador. La revisión jurídica del expediente ya está en el
+dictamen de L1 y en el pedido 6; la redacción final la hizo K+AIR con la autorización del owner.
 
 La determinacion completa esta en `../decisiones-de-fondo-2026-11-12.md`, bloque M.18.

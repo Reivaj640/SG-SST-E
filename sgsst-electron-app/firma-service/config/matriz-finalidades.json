@@ -5,8 +5,8 @@
   "nota": "Fuente unica de la matriz de finalidades del Anexo de Encargo (seccion 2). De este archivo sale el bloque generado por scripts/generar-anexo-encargo.js. La matriz no se edita a mano en el HTML: se edita aca y se regenera. Convencion de escritura: este archivo va en UTF-8 con tildes y el generador las convierte en entidades HTML; config/tabla-conservacion.json va en ASCII y el generador le restituye las tildes antes de convertirlas. Las dos fuentes nunca se editan a mano en el Anexo.",
   "instruccion": {
     "documento": "este Anexo de Encargo de Tratamiento de Datos Personales del servicio de firma electronica K+AIR",
-    "version": "2026-11-11",
-    "fecha": "11 de noviembre de 2026",
+    "version": "2026-11-12",
+    "fecha": "12 de noviembre de 2026",
     "responsable": "la Empresa (Responsable del tratamiento)",
     "encargado": "Gesstiar S.A.S. (K+AIR), en calidad de Encargado",
     "soporte": "La version y la huella SHA-256 de ambos quedan registradas con la solicitud (numerales 3.6(b), 3.8 y 12.7 del Acuerdo)."

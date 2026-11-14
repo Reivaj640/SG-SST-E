@@ -53,12 +53,24 @@ const REPO_ROOT = path.resolve(__dirname, '..', '..', '..');
  * completar el bloque de pendientes. La v1.1 fue la primera susceptible de
  * suscripción (la suscribió ASEPLUS el 5-nov-2026). La v1.2 no llegó a
  * suscribirse: declaraba como pendientes P1, P2, P4 y P5, que se cerraron el
- * 10-nov-2026. La v1.3 es la vigente: corrige ese bloque de pendientes,
- * declara el envío real con el dominio @gesstiar.com que ya existe, remite
- * al Anexo de Encargo versión 2026-11-11 y conserva el papel de Subencargado
- * del proveedor del canal de correo.
+ * 10-nov-2026. La v1.3 fue la vigente del 12 al 14-nov-2026: corrige ese
+ * bloque de pendientes, declara el envío real con el dominio @gesstiar.com
+ * que ya existe, remite al Anexo de Encargo versión 2026-11-11 y conserva el
+ * papel de Subencargado del proveedor del canal de correo.
+ *
+ * La v1.4 es la vigente desde el 14-nov-2026. Corrige la fila de Google:
+ * Google LLC es el Encargado de la operación concreta y del vínculo
+ * contractual, y "Subencargado" es una figura contractual, no una categoría
+ * legal; declara a Backblaze, Inc. como subencargado, con la región del
+ * bucket; corrige doce afirmaciones del expediente (las del §0 del dictamen
+ * de L1); declara que los dos instrumentos anteriores (la v1.3 del Anexo de
+ * Nube y el Anexo de Encargo 2026-11-11) ya quedaron suscritos y
+ * contrafirmados el 12-nov-2026, y que esta v1.4 todavía no está suscrita;
+ * y remite al Anexo de Encargo versión 2026-11-12. Los pendientes P3 (los
+ * alias del dominio) y P6 (revocar las app passwords) siguen pendientes, a
+ * cargo del owner.
  */
-const VERSION_MODELO = '1.3';
+const VERSION_MODELO = '1.4';
 
 /**
  * El archivo del texto vigente. El nombre lleva la versión: las versiones

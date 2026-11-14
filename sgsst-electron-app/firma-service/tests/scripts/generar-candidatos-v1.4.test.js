@@ -48,6 +48,7 @@ const GENERADOR = path.join(SERVICIO, 'scripts', 'generar-candidatos-v1.4.js');
 const DETERMINACIONES = path.join(SERVICIO, 'scripts', 'determinaciones-v1.4.js');
 const CANDIDATOS = path.join(APP, 'docs', 'gestion-humana', 'firma-electronica', 'candidatos-v1.4');
 const LEGAL = path.join(APP, 'legal');
+const SITIO = path.resolve(APP, '..', 'sitio');
 
 const NUBE_CANDIDATO = path.join(CANDIDATOS, 'anexo-nube-v1.4.html');
 const ENCARGO_CANDIDATO = path.join(CANDIDATOS, 'anexo-encargo-2026-11-12.html');
@@ -245,8 +246,8 @@ test('el candidato del Encargo dice la regla de la compuerta (13-nov-2026)', () 
   // Anexo de Encargo, que es donde esta la tabla del seccion 8.
   assert.equal(
     sha256(NUBE_CANDIDATO),
-    'ba664e6f1ad130c968b6224ab71ed66a52017e96ac578b8b0e740fd55f9e3b47',
-    'el candidato del Anexo de Nube v1.4 sigue byte a byte el que estaba'
+    '57983e54ffd2caa835060c58c89fcde226bc4d84df17eacadd55f1d0f6c392a4',
+    'el candidato del Anexo de Nube v1.4 sigue byte a byte el que esta'
   );
 });
 
@@ -285,8 +286,11 @@ test('el candidato del Encargo dice el ACTO de apertura de la compuerta (13-nov-
   assert.equal(planoEncargo.includes('Mientras la compuerta de activaci&oacute;n siga cerrada'), false,
     'ni la del seccion 8 que describe el estado anterior');
 
-  // Y el TEXTO FIRMADO los conserva: no se corrige un texto suscrito.
-  const firmado = plano(fs.readFileSync(path.join(LEGAL, 'anexo-encargo.html'), 'utf8'));
+  // Y el TEXTO FIRMADO los conserva: no se corrige un texto suscrito. El texto
+  // que la Empresa suscribio el 12-nov-2026 (la version 2026-11-11) ya no es
+  // el vigente desde el 14-nov-2026: lo es la v1.4, que es un texto NUEVO. El
+  // suscrito queda intacto, con su huella, en `legal/anexo-encargo-2026-11-11.html`.
+  const firmado = plano(fs.readFileSync(path.join(LEGAL, 'anexo-encargo-2026-11-11.html'), 'utf8'));
   assert.ok(firmado.includes('la compuerta de la tabla est&aacute; cerrada'),
     'el texto firmado sigue diciendo lo que decia: lo que cambia es el texto NUEVO');
   assert.ok(firmado.includes('Mientras la compuerta de activaci&oacute;n siga cerrada'),
@@ -408,18 +412,73 @@ test('el generador se niega cuando una ancla no casa exactamente una vez', () =>
   assert.equal(porRango.texto, repetido, 'no cambia el texto');
 });
 
-test('los textos vigentes y el manifiesto siguen intactos', () => {
+test('los textos ya suscritos siguen intactos y los vigentes son los nuevos', () => {
+  // El 14-nov-2026 el owner publico los dos textos de la v1.4: el Anexo de
+  // Nube v1.4 y el Anexo de Encargo 2026-11-12. Los textos que la Empresa ya
+  // suscribio NO se tocan: conservan su huella. El que era vigente (la
+  // 2026-11-11) queda aparte, en `legal/anexo-encargo-2026-11-11.html`, y el
+  // vigente es el nuevo.
   const v13 = fs.readFileSync(path.join(LEGAL, 'anexo-nube-v1.3.html'));
-  const encargo = fs.readFileSync(path.join(LEGAL, 'anexo-encargo.html'));
+  const encargoSuscrito = fs.readFileSync(path.join(LEGAL, 'anexo-encargo-2026-11-11.html'));
+  const encargoVigente = fs.readFileSync(path.join(LEGAL, 'anexo-encargo.html'));
+  const nubeVigente = fs.readFileSync(path.join(LEGAL, 'anexo-nube-v1.4.html'));
+  const sha = (buf) => require('crypto').createHash('sha256').update(buf).digest('hex');
+
   assert.equal(
-    require('crypto').createHash('sha256').update(v13).digest('hex'),
+    sha(v13),
     'fdd10551c2106e186d62a2b70922530ff9494a8538fc67816f6f5ad5ca2b585d',
     'el Anexo de Nube v1.3 es el que estaba, byte a byte'
   );
   assert.equal(
-    require('crypto').createHash('sha256').update(encargo).digest('hex'),
+    sha(encargoSuscrito),
     '6308b1f7a51007cb1e973de0210d1e5659d3b3ceb8e3e3b7a3ee52a7275b8948',
-    'el Anexo de Encargo vigente es el que estaba, byte a byte'
+    'el Anexo de Encargo que la Empresa suscribio el 12-nov-2026 sigue intacto, byte a byte'
+  );
+  assert.equal(
+    sha(encargoVigente),
+    'a3014202ed812f532d9dada5b4ea99d954a146c898ba94e29db739209f96aa50',
+    'el Anexo de Encargo vigente es la v1.4 (2026-11-12)'
+  );
+  assert.equal(
+    sha(nubeVigente),
+    '57983e54ffd2caa835060c58c89fcde226bc4d84df17eacadd55f1d0f6c392a4',
+    'el Anexo de Nube vigente es la v1.4'
+  );
+});
+
+test('el Anexo de Encargo publicado es el candidato con la etiqueta de version normalizada', () => {
+  // El generador escribe la ETIQUETA DE VERSION (el encabezado, la linea de
+  // fecha y el pie) desde `config/matriz-finalidades.json`. El candidato se
+  // armo con anclas literales y su pie quedo con la fecha de la version
+  // anterior (11-nov-2026); el texto publicado lleva la del generador
+  // (12-nov-2026), que es la que el encabezado y la linea de fecha ya
+  // declaraban.
+  //
+  // La UNICA diferencia entre el candidato y el texto vigente es esa linea.
+  // Si el generador cambiara algo mas, el texto que firma la Empresa no seria
+  // el que el owner aprobo, y eso no se veria en la diff: por eso el guard
+  // compara el texto entero, no una frase.
+  const candidato = fs.readFileSync(ENCARGO_CANDIDATO, 'utf8');
+  const vigente = fs.readFileSync(path.join(LEGAL, 'anexo-encargo.html'), 'utf8');
+  const esperado = candidato.replace(
+    'Documento actualizado el 11 de noviembre de 2026',
+    'Documento actualizado el 12 de noviembre de 2026',
+  );
+  assert.notEqual(esperado, candidato,
+    'el candidato trae la fecha vieja en el pie (si no, el guard pasaria solo)');
+  assert.equal(vigente, esperado,
+    'el texto vigente es el candidato con la etiqueta de version normalizada');
+
+  // Y la copia publica es byte a byte el texto vigente.
+  assert.equal(
+    fs.readFileSync(path.join(SITIO, 'anexo-encargo.html'), 'utf8'),
+    vigente,
+    'la copia publica es byte a byte el texto vigente',
+  );
+  assert.equal(
+    fs.readFileSync(path.join(SITIO, 'anexo-nube-v1.4.html'), 'utf8'),
+    fs.readFileSync(path.join(LEGAL, 'anexo-nube-v1.4.html'), 'utf8'),
+    'la copia publica del Anexo de Nube v1.4 es byte a byte el vigente',
   );
 });
 
