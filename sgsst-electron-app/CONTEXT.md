@@ -33,7 +33,9 @@
 > 
 > **Las reglas nuevas.** `PROMPT.md` recibió la **§5.49** y las **trampas 172 y 173**: el EOL se mide con los bytes y un test del mecanismo no puede depender del archivo que se despacha.
 > 
-> **Lo que sigue.** El **reinicio con sudo** (hasta entonces la compuerta está en el archivo pero no corre), el **push** del 📦1068 (`ba767bb5`, 26 archivos), que espera «pushea», la **ventana de Node 22** para el resto del código, la **firma de la v1.4** (dos párrafos los redactó el agente) y la decisión sobre `FIRMA_EXIGIR_ANEXO_NUBE`. Cifras: **25 solicitudes = 18 `EMITIDA` / 0 `RESPONDIDA` / 7 `CERRADA`**.
+> **El commit y el push.** Esta ronda queda en el **📦1068** (`ba767bb5`, 26 archivos, +604 / −221) y en el **📦1069** (`5d1ad2a5`, 3 archivos), que anota el commit. Los dos quedaron **pusheados** a `origin/Dev` el 14-nov-2026: el remoto está en **`5d1ad2a5`**, verificado con `git ls-remote origin Dev`. Esta anotación viaja en el **📦1070**, que se pushea encima.
+> 
+> **Lo que sigue.** El **reinicio con sudo** (hasta entonces la compuerta está en el archivo pero no corre), el **push** del 📦1070 (esta anotación), que espera el «pushea» del owner, la **ventana de Node 22** para el resto del código, la **firma de la v1.4** (dos párrafos los redactó el agente) y la decisión sobre `FIRMA_EXIGIR_ANEXO_NUBE`. Cifras: **25 solicitudes = 18 `EMITIDA` / 0 `RESPONDIDA` / 7 `CERRADA`**.
 > 
 > **🆕 13-nov-2026 (tarde, novena parte) — CAMBIÓ LA REGLA DE LA COMPUERTA DE LA TABLA SUPLETORIA: EL ESCRITO FORMAL DEL ABOGADO DEJA DE SER REQUISITO, LA S-02 SE CERRÓ POR RESOLUCIÓN Y LA TABLA PASÓ A 25 SOLICITUDES (19 `EMITIDA`, 0 `RESPONDIDA`, 6 `CERRADA`).**
 > 
