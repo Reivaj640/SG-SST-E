@@ -49,7 +49,11 @@
 > 
 > **Lo medido para el bloque 2.** El Anexo de Nube vigente en el servidor es la **v1.3** (`fdd10551…b585d`, la misma huella del manifiesto y la que ASEPLUS suscribió y contrafirmó): encender `FIRMA_EXIGIR_ANEXO_NUBE` **no bloquea** a ASEPLUS. El preflight real da **exit 0** en los dos estados.
 > 
-> **Lo que sigue.** Encender la compuerta del Anexo de Nube (script en el servidor), la ventana de Node 22, el resto de la ronda 23, y **firmar la v1.4** (`55a58967…46fc9`): revisar antes la facultad de quien contrafirma (`FIRMA_ADMIN_ACTOR` sin definir, 0 poderes vigentes).
+> **El bloque 2, cerrado.** La compuerta `FIRMA_EXIGIR_ANEXO_NUBE` **ya estaba encendida** en el `.env` del servidor (`=true`); el servicio se reinició (PID 592109, `NRestarts = 0`, `/health` 200 local y por la URL pública) y la variable quedó verificada **en el proceso vivo**. Al correr el script, el shell avisó que la línea 81 del `.env` tiene un valor **con espacios sin comillas**: bash lo parte y trata de ejecutar la segunda palabra, systemd no (no hace parsing de shell) — por eso el servicio nunca lo notó. La **trampa 176** queda escrita.
+>
+> **La facultad de quien contrafirma.** Para la v1.4 basta con que el actor de la contrafirma sea el **representante legal de Gesstiar** (hoy *Javier Robles Fontalvo*): no tiene que acreditar nada más. Los 0 poderes vigentes solo afectan a quien contrafirme en nombre de otra persona.
+>
+> **Lo que sigue.** La ventana de Node 22 (bloque 3), el resto de la ronda 23 (bloque 4) y **firmar la v1.4** (`55a58967…46fc9`) en el bloque 5.
 > **🆕 13-nov-2026 (tarde, novena parte) — CAMBIÓ LA REGLA DE LA COMPUERTA DE LA TABLA SUPLETORIA: EL ESCRITO FORMAL DEL ABOGADO DEJA DE SER REQUISITO, LA S-02 SE CERRÓ POR RESOLUCIÓN Y LA TABLA PASÓ A 25 SOLICITUDES (19 `EMITIDA`, 0 `RESPONDIDA`, 6 `CERRADA`).**
 > 
 > **Qué decidió el owner.** La compuerta de la tabla supletoria de conservación **no exige** la validación escrita de un tercero: la abre un **acto expreso y fechado** del owner (`aplicacion.activada` en `true` más `activado_at` con fecha). Y el Anexo de Encargo **v1.4** (aún sin firmar) tiene que decir esa regla, porque se va a firmar.
