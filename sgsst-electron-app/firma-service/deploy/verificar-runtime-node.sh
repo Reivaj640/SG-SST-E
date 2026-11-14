@@ -11,7 +11,8 @@
 #   3. Version declarada del modulo y huella SHA-256 del binario nativo.
 #   4. CARGA el modulo con el node del servicio y ejecuta un SELECT 1 real
 #      sobre una base EN MEMORIA: no abre ni escribe la base de produccion.
-#   5. Repite la carga con el node del PATH, si es un binario distinto.
+#   5. Repite la carga con el node del PATH, si es un binario distinto. UN
+#      DESAJUSTE AQUI ES UN AVISO, NO UN FALLO: ver la nota del paso 4.
 #   6. /health: codigo HTTP 200 y checks.db == "ok".
 #   7. Estado de systemd: active, MainPID, NRestarts, arranque.
 #
@@ -181,8 +182,28 @@ console.log("SELECT 1 = " + fila.uno);
   CODIGO_PATH=$?
   if [ "$CODIGO_PATH" -eq 0 ]; then
     ok "el node del PATH tambien carga el modulo"
+  elif [ "${CODIGO_CARGA:-1}" -eq 0 ]; then
+    # EL ESTADO ESPERADO DE LA VENTANA (14-nov-2026).
+    #
+    # Este paso SOLO se ejecuta cuando el node del PATH es un binario DISTINTO
+    # del del servicio, es decir, exactamente en el estado que deja la ventana
+    # de Node 22: el servicio corre con su runtime propio (ABI 127) y
+    # /usr/bin/node sigue siendo el Node 20 (ABI 115). El binario nativo es del
+    # runtime del servicio, asi que el node de la consola NO lo puede cargar:
+    # eso no es una incoherencia, es el diseno de la ventana.
+    #
+    # ANTES esto se contaba como FALLO, y el resultado era que la ventana se
+    # abortaba y se hacia rollback de una ventana que FUNCIONABA (14-nov-2026):
+    # el servicio estaba en Node 22 con el modulo ABI 127, /health en 200 y
+    # db=ok, y lo unico que "fallaba" era el nodo de la consola.
+    #
+    # La incoherencia real la sigue detectando el paso 3: si el node DEL
+    # SERVICIO no puede cargar el modulo, ese es un fallo, y ahi sigue siendolo.
+    aviso "el node del PATH ($VERSION_PATH, ABI $ABI_PATH) NO carga el modulo: el binario nativo es para el ABI $ABI_SERV del runtime del servicio ($VERSION_SERV)"
+    aviso "  es el estado que deja la ventana de Node 22 (el servicio usa un runtime propio). Para abrir la base de la app en la consola, usá el node del servicio: $NODE_SERVICIO"
+    printf '%s\n' "$SALIDA_PATH" | head -3 | sed 's/^/        /'
   else
-    fallo "el node del PATH NO carga el modulo (codigo $CODIGO_PATH): el runtime de la consola y el del servicio no son el mismo"
+    fallo "el node del PATH NO carga el modulo (codigo $CODIGO_PATH) y tampoco el node del servicio (codigo ${CODIGO_CARGA:-'?'})"
     printf '%s\n' "$SALIDA_PATH" | sed 's/^/        /'
   fi
   echo
