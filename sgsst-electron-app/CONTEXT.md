@@ -39,6 +39,17 @@
 > 
 > **Lo que sigue.** La liberación por recálculo de la fila que quedó retenida (id 17), el **push** del 📦1072 (esta anotación), que espera el «pushea» del owner, la **ventana de Node 22** para el resto del código, la **firma de la v1.4** (dos párrafos los redactó el agente) y la decisión sobre `FIRMA_EXIGIR_ANEXO_NUBE`. Cifras: **25 solicitudes = 18 `EMITIDA` / 0 `RESPONDIDA` / 7 `CERRADA`**.
 > 
+> **🆕 14-nov-2026 (tarde, undécima parte) — LA FILA RETENIDA QUEDÓ LIBERADA CON SU PLAZO CALCULADO, Y EL INCIDENTE DEL FLAG QUEDÓ CORREGIDO Y CON RASTRO**
+> 
+> **El resultado.** La fila 17 (la única retenida por la compuerta cerrada) quedó con `fecha_conservacion = 2036-11-06T01:05:55.862Z` (3650 días, fuente `tabla_supletoria`, inicio `2026-11-06`) y su *hold* liberado (`gh_firma_holds` id 6, `activo = 0`). Las filas 14, 15, 16 y 18 (deber legal) siguen intactas. El servicio no se reinició (`MainPID` 582798, `NRestarts = 0`).
+> 
+> **El incidente, y la regla que salió de él.** El primer script dejó `conservacion_por_deber_legal` en **SI** en la ficha de ASEPLUS: el cuerpo del `PUT` salió de un `jq` que comparaba el **booleano** que devuelve la API contra `0`, y en `jq` `false != 0` es `true`. Con ese flag el planificador anula la fecha y el recálculo no liberaba nada (`sin_fecha: 1`). Se corrigió con un `PUT` que restaura el flag a **NO** (su valor original) y dispara el recálculo: `con_fecha: 1, liberados: 1`. El rastro conserva los **dos** movimientos (`NO → SI` y `SI → NO`), cada uno con actor y motivo.
+> 
+> **Las reglas nuevas.** `PROMPT.md` recibió la **§5.50** y las **trampas 174 y 175**: el cuerpo de un `PUT` de reemplazo sale del `GET` **sin convertir tipos**, y un `200 OK` no es la verificación (se compara contra la ficha leída y el efecto se comprueba en la fila y en el log).
+> 
+> **Lo medido para el bloque 2.** El Anexo de Nube vigente en el servidor es la **v1.3** (`fdd10551…b585d`, la misma huella del manifiesto y la que ASEPLUS suscribió y contrafirmó): encender `FIRMA_EXIGIR_ANEXO_NUBE` **no bloquea** a ASEPLUS. El preflight real da **exit 0** en los dos estados.
+> 
+> **Lo que sigue.** Encender la compuerta del Anexo de Nube (script en el servidor), la ventana de Node 22, el resto de la ronda 23, y **firmar la v1.4** (`55a58967…46fc9`): revisar antes la facultad de quien contrafirma (`FIRMA_ADMIN_ACTOR` sin definir, 0 poderes vigentes).
 > **🆕 13-nov-2026 (tarde, novena parte) — CAMBIÓ LA REGLA DE LA COMPUERTA DE LA TABLA SUPLETORIA: EL ESCRITO FORMAL DEL ABOGADO DEJA DE SER REQUISITO, LA S-02 SE CERRÓ POR RESOLUCIÓN Y LA TABLA PASÓ A 25 SOLICITUDES (19 `EMITIDA`, 0 `RESPONDIDA`, 6 `CERRADA`).**
 > 
 > **Qué decidió el owner.** La compuerta de la tabla supletoria de conservación **no exige** la validación escrita de un tercero: la abre un **acto expreso y fechado** del owner (`aplicacion.activada` en `true` más `activado_at` con fecha). Y el Anexo de Encargo **v1.4** (aún sin firmar) tiene que decir esa regla, porque se va a firmar.
