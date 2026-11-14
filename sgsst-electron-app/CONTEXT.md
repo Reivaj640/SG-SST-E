@@ -53,7 +53,9 @@
 >
 > **La facultad de quien contrafirma.** Para la v1.4 basta con que el actor de la contrafirma sea el **representante legal de Gesstiar** (hoy *Javier Robles Fontalvo*): no tiene que acreditar nada más. Los 0 poderes vigentes solo afectan a quien contrafirme en nombre de otra persona.
 >
-> **Lo que sigue.** La ventana de Node 22 (bloque 3), el resto de la ronda 23 (bloque 4) y **firmar la v1.4** (`55a58967…46fc9`) en el bloque 5.
+> **El bloque 3, medido: la ventana está lista (y el runbook tenía un rollback peligroso, ya corregido).** El verificador de runtime ya está en el servidor (`/opt/kair-firma/app/deploy/verificar-runtime-node.sh`, idéntico al repo) y su **preflight de solo lectura da exit 0, 0 fallos**: Node 20.20.2 ABI 115, `better-sqlite3` 11.10.0 cargando y respondiendo `SELECT 1`, `/health` 200. Los dos insumos de la ventana se **descargaron y verificaron por SHA-256** (el runtime `v22.23.5 ABI 127` y el prebuild ABI 127, cuyo binario da `d7d9272b…da37`) y quedaron cacheados en `/tmp`. El runbook pedía `systemctl revert` para el rollback, y **la unidad de este servidor es local**: ese comando la habría **borrado**, dejando el servidor sin servicio. Corregido en el repo (el rollback ahora quita el drop-in a mano) y escrito como **trampa 177**.
+>
+> **Lo que sigue.** Abrir la ventana de Node 22 (script en el servidor, con rollback automático), el resto de la ronda 23 (bloque 4) y **firmar la v1.4** (`55a58967…46fc9`) en el bloque 5.
 > **🆕 13-nov-2026 (tarde, novena parte) — CAMBIÓ LA REGLA DE LA COMPUERTA DE LA TABLA SUPLETORIA: EL ESCRITO FORMAL DEL ABOGADO DEJA DE SER REQUISITO, LA S-02 SE CERRÓ POR RESOLUCIÓN Y LA TABLA PASÓ A 25 SOLICITUDES (19 `EMITIDA`, 0 `RESPONDIDA`, 6 `CERRADA`).**
 > 
 > **Qué decidió el owner.** La compuerta de la tabla supletoria de conservación **no exige** la validación escrita de un tercero: la abre un **acto expreso y fechado** del owner (`aplicacion.activada` en `true` más `activado_at` con fecha). Y el Anexo de Encargo **v1.4** (aún sin firmar) tiene que decir esa regla, porque se va a firmar.

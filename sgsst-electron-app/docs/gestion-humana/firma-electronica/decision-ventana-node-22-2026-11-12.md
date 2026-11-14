@@ -119,6 +119,22 @@ sudo systemctl daemon-reload
 sudo systemctl restart kair-firma
 ```
 
+> **Equivalente sin editor (lo que hace el script de la ventana).** `systemctl edit` abre un editor, así que no
+> sirve dentro de un script. Lo que produce exactamente el mismo resultado es escribir el *drop-in* a mano:
+>
+> ```bash
+> sudo mkdir -p /etc/systemd/system/kair-firma.service.d
+> sudo tee /etc/systemd/system/kair-firma.service.d/override.conf >/dev/null <<'EOF'
+> [Service]
+> ExecStart=
+> ExecStart=/opt/kair-firma/node22/bin/node src/server.js
+> EOF
+> sudo systemctl daemon-reload
+> sudo systemctl restart kair-firma
+> ```
+>
+> El `ExecStart=` vacío es lo que **borra** el valor anterior: sin esa línea, los dos `ExecStart` convivirían.
+
 ### 3.5 Verificar (sin `sudo`)
 
 ```bash
@@ -152,7 +168,14 @@ sudo -u kairfirma cp /tmp/better_sqlite3.node.abi115 \
   /opt/kair-firma/app/node_modules/better-sqlite3/build/Release/better_sqlite3.node
 
 # 3. Volver a la unidad original
-sudo systemctl revert kair-firma
+#    OJO: NO se usa `systemctl revert`. La unidad de este servidor es LOCAL
+#    (no la trae ningun paquete: `dpkg -S /etc/systemd/system/kair-firma.service`
+#    no encuentra ninguno, y no hay copia en /usr/lib/systemd/system). `revert`
+#    borra los drop-in Y el archivo de la unidad cuando no hay version de paquete:
+#    el rollback borraria el servicio. Se quita el drop-in a mano, que es lo
+#    mismo sin borrar la unidad.
+sudo rm -f /etc/systemd/system/kair-firma.service.d/override.conf
+sudo rmdir /etc/systemd/system/kair-firma.service.d 2>/dev/null || true
 sudo systemctl daemon-reload
 sudo systemctl restart kair-firma
 
