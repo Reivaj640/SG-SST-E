@@ -315,7 +315,7 @@ en el mapa y en `verificacion-cierre/`):
   (**4 cerrados / 23 pendientes** al cierre de la 12.ª ronda; **9 cerrados / 21 pendientes** el 12-nov;
   **hoy 31 cerrados / 0 pendientes**). Desde el **13-nov-2026** un bloque cierra cuando **el pedido esta
   emitido y medido**, no cuando el acto esta cumplido: las **25 solicitudes** de
-  `tabla-de-solicitudes-2026-11-13.md` son **19 `EMITIDA`, 0 `RESPONDIDA` y 6 `CERRADA`** (la S-02, que el
+  `tabla-de-solicitudes-2026-11-13.md` son **18 `EMITIDA`, 0 `RESPONDIDA` y 7 `CERRADA`** (la S-02, que el
   abogado matriculado respondio el 13-nov-2026 con un escrito **no formal** —sin nombre, sin fecha de
   suscripcion y sin huella— y que el owner **cerro por resolucion** ese mismo dia, al declarar que esa
   validacion **no es requisito**; la S-22, que el owner

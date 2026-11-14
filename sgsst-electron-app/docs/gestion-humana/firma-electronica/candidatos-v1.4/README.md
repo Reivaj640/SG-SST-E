@@ -9,7 +9,7 @@
 | Archivo | Bytes | SHA-256 | Que es |
 |---|---|---|---|
 | `anexo-nube-v1.4.html` | 111 462 | `ba664e6f1ad130c968b6224ab71ed66a52017e96ac578b8b0e740fd55f9e3b47` | Candidato del Anexo de Nube v1.4 (6 anclas de C1 a C7 + 39 determinaciones de L1, L4 y L5) |
-| `anexo-encargo-2026-11-12.html` | 100 396 | `b345ab87a816eddb98bf79c30be6de38d9d1fbe90f2682c89d8e7560bbe3a749` | Candidato del Anexo de Encargo del 12-nov-2026 (5 anclas de C1 a C7 + 11 determinaciones de L1, L4 y L5 + 4 anclas de la regla de la compuerta) |
+| `anexo-encargo-2026-11-12.html` | 100 787 | `55a58967b3bb081bcee5f72d15b50b4b3141691418a9b8338df9db738b646fc9` | Candidato del Anexo de Encargo del 12-nov-2026 (5 anclas de C1 a C7 + 11 determinaciones de L1, L4 y L5 + 3 anclas de la regla de la compuerta + 2 anclas del acto de apertura) |
 
 ## Que NO se toco
 
@@ -23,7 +23,7 @@ estos candidatos.
 
 ## Como se armaron
 
-En **tres fases**, con `firma-service/scripts/generar-candidatos-v1.4.js`:
+En **cuatro fases**, con `firma-service/scripts/generar-candidatos-v1.4.js`:
 
 1. **Fase 1 — las siete divergencias (C1 a C7)**: los literales ya escritos de
    `../propuesta-v1.4-anexo-nube-2026-11-12.md` (6 anclas en el Nube, 5 en el Encargo).
@@ -32,11 +32,16 @@ En **tres fases**, con `firma-service/scripts/generar-candidatos-v1.4.js`:
    `../pedido-6-backblaze-v1-4-2026-11-12.md` para L4 y L5), con el motor de
    `firma-service/scripts/determinaciones-v1.4.js`. **El texto no se transcribe**: lo que esta escrito en la
    determinacion es lo que queda en el candidato, byte a byte. Son 39 cambios en el Nube y 11 en el Encargo.
-3. **Fase 3 — la regla de la compuerta de la tabla supletoria** (decision del owner del 13-nov-2026): cuatro
-   anclas literales en el Anexo de Encargo, que es donde esta la tabla del §8. El Anexo de Nube **no se mueve**.
+3. **Fase 3 — la regla de la compuerta de la tabla supletoria** (decision del owner del 13-nov-2026): tres
+   anclas literales en el Anexo de Encargo, que es donde esta la tabla del §8.
+4. **Fase 4 — el acto de apertura de esa compuerta** (S-25, el 13-nov-2026): dos anclas literales mas en el
+   Anexo de Encargo. Dos frases del texto firmado dejaron de ser ciertas: la una porque la compuerta ya no
+   esta cerrada, y la otra («el Acuerdo que describe este mecanismo no esta aprobado ni publicado») porque
+   el Acuerdo vigente es la v1.6, publicada y activa desde el 11-nov-2026. El texto firmado **no se toca**.
+   El Anexo de Nube **no se mueve** en ninguna de las dos ultimas fases.
 
 El script **se niega a escribir** si una ancla no casa **exactamente una vez**: con las 11 de la fase 1, las
-50 de la fase 2 y las 4 de la fase 3 bien, la salida es reproducible.
+50 de la fase 2, las 3 de la fase 3 y las 2 de la fase 4 bien, la salida es reproducible.
 
 ```powershell
 node firma-service/scripts/generar-candidatos-v1.4.js --estado   # solo mide: imprime hashes

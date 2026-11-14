@@ -41,7 +41,7 @@ decir «cerrado» porque el equipo haya escrito la pregunta.
 pedido está emitido y medido** —con su destinatario, su fecha y su verificación—, y los actos de un tercero
 (firma, credencial, ventana, respuesta) **no** cierran un bloque: se siguen en
 `tabla-de-solicitudes-2026-11-13.md`, con su estado y su fecha. Con la regla nueva el mapa quedó en **31
-cerrados / 0 pendientes**, con **25 solicitudes: 19 `EMITIDA`, 0 `RESPONDIDA` y 6 `CERRADA`** (la S-02,
+cerrados / 0 pendientes**, con **25 solicitudes: 18 `EMITIDA`, 0 `RESPONDIDA` y 7 `CERRADA`** (la S-02,
 respondida el 13-nov-2026 por el abogado matriculado con un escrito **no formal** —sin nombre, sin fecha
 de suscripcion y sin huella— y **cerrada por resolucion** ese mismo dia, al declarar el owner que esa
 validacion **no es requisito**; la S-22, respondida por el

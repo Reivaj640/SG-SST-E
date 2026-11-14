@@ -50,8 +50,8 @@ verificado; lo que falta es que un tercero conteste o ejecute, y eso tiene dueñ
 verificación*. El mapa nunca afirma que el servicio pueda abrirse a empresas reales: eso lo dicen los
 hechos de cada bloque y el estado de esta tabla.
 
-**Estado de hoy: 25 solicitudes — 19 `EMITIDA`, 6 `CERRADA` (S-01, S-02, S-03, S-04, S-22 y S-23), 0 `RESPONDIDA`.**
-Se cierran de dos formas, y las dos quedan escritas en su fila:
+**Estado de hoy: 25 solicitudes — 18 `EMITIDA`, 7 `CERRADA` (S-01, S-02, S-03, S-04, S-22, S-23 y S-25), 0 `RESPONDIDA`.**
+Se cierran de tres formas, y las tres quedan escritas en su fila:
 
 - **Por respuesta aplicada: la S-22.** El owner **respondió el 13-nov-2026**: las cinco decisiones del
   procedimiento del canal de `fecha_terminacion` quedaron escritas en el procedimiento, con su fecha y
@@ -62,8 +62,15 @@ Se cierran de dos formas, y las dos quedan escritas en su fila:
   **sin reabrir la fila** (el detalle de qué resolvió cada una está en «Cierres por resolución», más
   abajo). Lo que estos cinco cierres **no** dicen: que el abogado haya ratificado nada — eso sigue
   pendiente en el mundo, con su bloque y su dueño.
+- **Por acto del owner: la S-25.** El owner **abrió la compuerta** de la tabla supletoria el
+  13-nov-2026 con un acto expreso y **fechado**: `aplicacion.activada` en `true` y
+  `aplicacion.activado_at` con la fecha (`2026-11-13`), en `config/tabla-conservacion.json`, con el
+  acto registrado en `aplicacion.acto_de_apertura` y el estado en `ACTIVADA` (§2.1). Desde esa fecha los
+  plazos por defecto de diez (10) y cinco (5) años **se aplican en producción**. Este cierre **no**
+  ratifica nada del abogado: la ratificación externa de L1, L2 y de las condiciones C1 a C4 sigue
+  pendiente en el mundo (M.5).
 
-Las **19 restantes** están `EMITIDA`: el pedido salió y falta la respuesta o el acto de su
+Las **18 restantes** están `EMITIDA`: el pedido salió y falta la respuesta o el acto de su
 destinatario. **La S-02 pasó de `EMITIDA` a `RESPONDIDA` y de ahí a `CERRADA` el 13-nov-2026**: el abogado
 matriculado **respondió por escrito** (archivado en `respuesta-del-abogado-2026-11-13.md`), y la
 **sustancia quedó validada** —los 10 y 5 años son el «sistema de archivo o retención documental» del
@@ -72,7 +79,7 @@ cerraba con ese escrito**: el propio abogado escribió que **no** sustituye la v
 El owner decidió entonces que **esa validación formal no es requisito**, cambió la regla de la
 compuerta en el código y en la tabla, y la fila se cerró **por resolución** (§2.2). **S-24 sigue
 `EMITIDA`** porque es un acto del owner pendiente: **firmar** el procedimiento del canal (§2.1). Y la
-**S-25** es otro acto del owner pendiente: **abrir la compuerta** de la tabla supletoria (§2.1).
+**S-25** —abrir la compuerta— **quedó `CERRADA` el 13-nov-2026** con el acto del owner (§2.1).
 
 **La S-24: la firma del owner sobre el procedimiento.** El 13-nov-2026 el owner volvió a escribir las
 cinco decisiones del canal (§2.1) y el procedimiento quedó con el estado «**pendiente de firma del
@@ -168,16 +175,18 @@ ratificación queda retroactiva (precedente M.15).
   de un tercero no es requisito** para la compuerta de la tabla supletoria, y la regla cambió en el
   código (`retencion.js`, `_tablaActivada()`: ahora exige `activada: true` **y** `activado_at` con
   fecha, y ya no exige `validado_por` ni `validado_at`) y en `config/tabla-conservacion.json` (que
-  queda con `activada: false` y `activado_at` en `null`: la compuerta **sigue cerrada**). El Anexo de
+  quedó con `activada: false` y `activado_at` en `null`: la compuerta **seguía cerrada** hasta el acto
+  del owner, §2.1). El Anexo de
   Encargo 2026-11-12 se regeneró con el texto que dice esa regla y el §8 del candidato publica la
   fecha real de su fuente. *Sigue pendiente en el mundo:* la **ratificación externa** de L1, L2 y de
-  las condiciones C1 a C4 (M.5), que no se exigen para abrir la compuerta pero siguen sin estar, y el
-  **acto de apertura** del owner (S-25, M.30).
+  las condiciones C1 a C4 (M.5), que no se exigen para abrir la compuerta pero siguen sin estar. El
+  **acto de apertura** del owner se hizo el mismo día: es la **S-25**, y quedó `CERRADA` (§2.1).
 - **S-03.** *Quedó resuelto y verificado:* los dos candidatos de la **v1.4** ya existen con la
   corrección de la cita aplicada por el generador en runtime (`candidatos-v1.4/anexo-nube-v1.4.html`,
-  **111 462 B / `ba664e6f…e3b47`**; `candidatos-v1.4/anexo-encargo-2026-11-12.html`, **100 396 B /
-  `b345ab87…3a749`**, cifras del 13-nov-2026 tras el escrito del abogado y tras el cambio de la regla
-  de la compuerta, §2.2), y el pedido quedó con su insumo y su huella. *Sigue pendiente en el mundo:* la
+  **111 462 B / `ba664e6f…e3b47`**; `candidatos-v1.4/anexo-encargo-2026-11-12.html`, **100 787 B /
+  `55a58967…46fc9`**, cifras del 13-nov-2026 tras el escrito del abogado, tras el cambio de la regla
+  de la compuerta y tras el acto de apertura, §2.2), y el pedido quedó con su insumo y su huella.
+  *Sigue pendiente en el mundo:* la
   **suscripción y publicación** de la v1.4 con huella real (M.18) y la revisión del abogado, si llega.
 - **S-04.** *Quedó resuelto y verificado:* las cláusulas L4 y L5 y las cláusulas mínimas del **art. 25
   del Decreto 1377** quedaron escritas en los candidatos, y la condición de **región US** del bucket
@@ -215,19 +224,32 @@ ratificación queda retroactiva (precedente M.15).
 | S-21 | M.24 | Owner | El despliegue que instale el sello de versión, y su comprobación en el servidor | `cat /opt/kair-firma/app/VERSION` y `generar-sello-version.js --comprobar` | EMITIDA | 2026-11-30 |
 | S-22 | M.31 | Owner | Las **cinco decisiones del procedimiento del canal de `fecha_terminacion`** (`procedimiento-canal-fecha-terminacion-2026-10-31.md`, redactado el 31-oct y aún sin validar): (1) **quién es el operador** —el administrador de K+AIR en nombre de la Empresa, o el sistema de la Empresa llamando al servicio—; (2) **si el llamante es la Empresa o K+AIR**; (3) **qué evidencia se acepta** —el código exige un texto, el Anexo exige «la evidencia de la comunicación»—; (4) el **plazo máximo de espera** que la Empresa se compromete a cumplir; y (5) la **frecuencia de la revisión periódica** | Las cinco decisiones **escritas** en el procedimiento, con su fecha y su responsable; la validación del abogado sobre el procedimiento es de otro dueño y no se espera aquí | CERRADA | 2026-11-27 |
 | S-24 | M.31 | Owner | **Firmar el procedimiento del canal de `fecha_terminacion`** (`procedimiento-canal-fecha-terminacion-2026-10-31.md`, 16 872 B, sha256 `5a817b38…e04e`): el documento ya trae las **cinco decisiones** escritas el 13-nov-2026 y su encabezado dice «pendiente de firma del owner y de la validación del abogado» | El acta de la firma, con la huella del texto que se firma | EMITIDA | 2026-11-20 |
-| S-25 | M.30 | Owner | **Abrir la compuerta de la tabla supletoria de conservación**: poner `aplicacion.activada` en `true` y `aplicacion.activado_at` con la fecha del acto, en `config/tabla-conservacion.json` (la regla del 13-nov-2026: la abre un acto expreso y **fechado** del owner; la validación escrita de un tercero ya no es requisito) | La tabla con `activada: true` y `activado_at` con fecha, y la suite completa en verde antes y después (abrir la compuerta cambia el comportamiento del servicio: los plazos por defecto de diez (10) y cinco (5) años empiezan a aplicar) | EMITIDA | 2026-11-30 |
+| S-25 | M.30 | Owner | **Abrir la compuerta de la tabla supletoria de conservación**: poner `aplicacion.activada` en `true` y `aplicacion.activado_at` con la fecha del acto, en `config/tabla-conservacion.json` (la regla del 13-nov-2026: la abre un acto expreso y **fechado** del owner; la validación escrita de un tercero ya no es requisito) | La tabla con `activada: true` y `activado_at` con fecha, y la suite completa en verde antes y después (abrir la compuerta cambia el comportamiento del servicio: los plazos por defecto de diez (10) y cinco (5) años empiezan a aplicar) — **cerrada por el acto del owner el 13-nov-2026**: `aplicacion.activada: true` y `aplicacion.activado_at: 2026-11-13` en `config/tabla-conservacion.json` (15 993 B / `a7bdb281…56dd0`), con el acto registrado en `aplicacion.acto_de_apertura` y el estado en `ACTIVADA`; desde esa fecha los plazos por defecto **se aplican en producción**, con la suite completa en verde antes y después. Este cierre **no** ratifica nada del abogado: la ratificación externa de L1, L2 y de las condiciones C1 a C4 sigue pendiente en el mundo (M.5) | CERRADA | 2026-11-30 |
 
 ### 2.1 Lo que se respondió el 13-nov-2026
 
-Una sola respuesta, y es la del **owner**: la **S-22**. Se aplicó el mismo día y se verificó, así que
+Dos respuestas del **owner** el mismo día, y las dos se aplicaron y verificaron. La primera, la **S-22**.
+Se aplicó el mismo día y se verificó, así que
 la fila pasó de `EMITIDA` a `CERRADA` —el ciclo completo, con la respuesta aplicada y comprobada,
 no solo registrada—. Ese mismo día se cerraron además **cinco filas de la sección 1 por resolución**
 (S-01, S-02, S-03, S-04 y S-23): no hubo respuesta formal, hubo decisión del owner; el detalle está en
 «Cierres por resolución».
 
+La segunda, la **S-25**: el owner **abrió la compuerta** de la tabla supletoria de conservación. El acto
+es expreso y **fechado** —`aplicacion.activada: true` y `aplicacion.activado_at: 2026-11-13` en
+`config/tabla-conservacion.json` (15 993 B / `a7bdb281…56dd0`), con el acto registrado en
+`aplicacion.acto_de_apertura` y el estado en `ACTIVADA`—. Se aplicó y se verificó: la suite completa
+quedó en verde antes y después, y la regla del código (la compuerta exige `activada` **más**
+`activado_at` con fecha) es la que estaba corriendo cuando se abrió. **Desde esa fecha los plazos por
+defecto de diez (10) y cinco (5) años se aplican en producción** para los documentos que la Empresa no
+declare. Lo que el acto **no** hace: ratificar nada del abogado, ni tocar los plazos ya calculados
+(quedan congelados en cada documento), ni levantar los *holds* que ya tienen las filas anteriores: eso
+exige el **recálculo** expreso, autorizado y auditado, que es una operación aparte.
+
 | Quién respondió | ID | Qué respondió | Dónde quedó escrito | Fecha |
 |---|---|---|---|---|
 | Owner | S-22 | Las **cinco decisiones** del procedimiento del canal de `fecha_terminacion`: (1) el operador es **una persona administradora de K+AIR** nombrada en `X-Admin-Actor`, por cuenta de la Empresa y sobre su instrucción y evidencia; (2) el **origen de la novedad es la Empresa** y la **ejecución es de K+AIR**; (3) la **guía de aceptación de la evidencia**: texto de hasta 1 000 caracteres con cuatro datos mínimos (quién comunica, fecha de la comunicación, soporte identificable, fecha de cese coherente con el soporte); (4) el **plazo máximo de espera es de 30 días calendario** desde el cese (o desde el primer aviso, para las filas anteriores); (5) la **revisión es mensual**, el primer día hábil, con aviso a la Empresa a los 30 días y reporte al representante legal a los 90 | `procedimiento-canal-fecha-terminacion-2026-10-31.md`: §3.1, §3.2, §4, §5a, §5b y el **Anexo A** (guía de aceptación con un ejemplo que se acepta y uno que no) | 13-nov-2026 |
+| Owner | S-25 | **La apertura de la compuerta** de la tabla supletoria de conservación: un acto expreso y fechado, que es lo que la regla del 13-nov-2026 exige (la validación escrita de un tercero **no** es requisito, y por eso no hay abogado en el acto) | `config/tabla-conservacion.json`: `aplicacion.activada: true`, `aplicacion.activado_at: "2026-11-13"`, `aplicacion.estado: "ACTIVADA"` y el bloque `aplicacion.acto_de_apertura` (fecha, actor y solicitud) | 13-nov-2026 |
 
 **Lo que esta respuesta NO cierra.** La **validación del abogado** sobre el procedimiento (§9.2) es
 de otro dueño y sigue pendiente. Y el canal **sigue sin ninguna operación en producción** (medido

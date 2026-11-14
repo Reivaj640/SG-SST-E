@@ -271,15 +271,15 @@ test('todos los bloques declaran su origen', () => {
 
 // ---------------------------------------------------------------- solicitudes
 
-test('la tabla de solicitudes declara 25 filas: 19 EMITIDA y 6 CERRADA, y el mapa las nombra todas', () => {
+test('la tabla de solicitudes declara 25 filas: 18 EMITIDA y 7 CERRADA, y el mapa las nombra todas', () => {
   const texto = fs.readFileSync(RUTA_SOLICITUDES_REAL, 'utf8');
   const ps = _parsearSolicitudes(texto);
   assert.equal(ps.errores.length, 0, 'la tabla de solicitudes no tiene errores: ' + ps.errores.join('; '));
   assert.equal(ps.solicitudes.length, 25, 'hay 25 solicitudes');
   const estados = {};
   for (const s of ps.solicitudes) estados[s.estado] = (estados[s.estado] || 0) + 1;
-  assert.equal(estados.EMITIDA, 19, 'las 19 con la respuesta o el acto del destinatario pendientes estan EMITIDA');
-  assert.equal(estados.CERRADA, 6, 'S-22 por respuesta aplicada; S-01, S-02, S-03, S-04 y S-23 por resolucion');
+  assert.equal(estados.EMITIDA, 18, 'las 18 con la respuesta o el acto del destinatario pendientes estan EMITIDA');
+  assert.equal(estados.CERRADA, 7, 'S-22 por respuesta aplicada; S-01, S-02, S-03, S-04 y S-23 por resolucion; S-25 por el acto de apertura del owner');
   assert.equal(estados.RESPONDIDA || 0, 0,
     'ninguna quedo RESPONDIDA: la S-02 se CERRO por resolucion del owner el 13-nov-2026');
   assert.equal(estados.PREPARADA || 0, 0, 'ninguna quedo PREPARADA: las 25 salieron');
@@ -319,11 +319,21 @@ test('la tabla de solicitudes declara 25 filas: 19 EMITIDA y 6 CERRADA, y el map
   assert.ok(fila02.indexOf('sin ratificaci\u00f3n externa') >= 0,
     'la S-02 no finge una ratificacion externa');
 
-  // La S-25 es el acto de apertura de la compuerta: un EMITIDA mas, con dueño.
+  // La S-25 se CERRO por el ACTO del owner (13-nov-2026): la compuerta de la
+  // tabla supletoria se abrio con un acto expreso y fechado. No es un cierre
+  // por respuesta ni por resolucion sobre un problema de fondo: es un ACTO,
+  // y lo que cierra es la apertura.
   const s25 = ps.solicitudes.filter((x) => x.id === 'S-25')[0];
   assert.ok(s25, 'la tabla tiene la fila S-25');
-  assert.equal(s25.estado, 'EMITIDA', 'la S-25 sigue EMITIDA: el owner no ha abierto la compuerta');
+  assert.equal(s25.estado, 'CERRADA', 'la S-25 se CERRO: el owner abrio la compuerta');
   assert.equal(s25.bloque, 'M.30', 'la S-25 es del bloque M.30');
+  const fila25 = lineas.filter((l) => l.indexOf('| S-25 |') === 0)[0];
+  assert.ok(fila25.indexOf('acto del owner') >= 0,
+    'la fila de la S-25 dice que se cerro por el acto del owner');
+  assert.ok(fila25.indexOf('2026-11-13') >= 0,
+    'y dice la fecha del acto');
+  assert.ok(fila25.indexOf('no') >= 0 && fila25.indexOf('ratifica') >= 0,
+    'y aclara que el cierre no ratifica nada del abogado');
 
   // La S-24 sigue EMITIDA: la firma del owner no esta.
   const s24 = ps.solicitudes.filter((x) => x.id === 'S-24')[0];
@@ -401,10 +411,10 @@ test('la frase de conciliacion nombra las solicitudes y dice que cerrado no es a
     'la frase nombra las solicitudes');
   assert.ok(texto.indexOf('no que el acto este cumplido') >= 0,
     'la frase aclara que cerrado no significa acto cumplido');
-  assert.ok(texto.indexOf('19 EMITIDA') >= 0, 'la frase dice cuantas hay emitidas');
+  assert.ok(texto.indexOf('18 EMITIDA') >= 0, 'la frase dice cuantas hay emitidas');
   assert.equal(texto.indexOf('1 RESPONDIDA') < 0, true,
     'la frase ya no dice que hay una respondida: la S-02 se cerro por resolucion');
-  assert.ok(texto.indexOf('6 CERRADA') >= 0, 'la frase dice cuantas hay cerradas');
+  assert.ok(texto.indexOf('7 CERRADA') >= 0, 'la frase dice cuantas hay cerradas');
 });
 
 test('las cinco decisiones del owner estan escritas en el procedimiento y la S-22 esta CERRADA', () => {

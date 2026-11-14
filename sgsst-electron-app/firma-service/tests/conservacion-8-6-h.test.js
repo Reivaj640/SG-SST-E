@@ -10,10 +10,10 @@
  *    (config/tabla-conservacion.json). Ningún registro queda retenido
  *    indefinidamente por falta de configuración.
  *
- *    La tabla que se despacha viene con la COMPUERTA CERRADA (los plazos de
- *    diez (10) y cinco (5) años no los validó el abogado): el mecanismo se
- *    verifica aquí con la compuerta ABIERTA, y el estado cerrado, en
- *    tests/services/conservacion-supletoria.test.js.
+ *    La tabla que se despacha viene con la COMPUERTA ABIERTA (desde el
+ *    13-nov-2026 la abre el owner con su acto expreso y fechado): el
+ *    mecanismo se verifica aquí con la compuerta ABIERTA, y el estado
+ *    cerrado, en tests/services/conservacion-supletoria.test.js.
  *  - Que el texto que se le comunica al Trabajador (el 8.6(g)) dice el plazo
  *    que se aplica y DE DÓNDE VIENE: no promete un plazo que el sistema no
  *    tiene, y no oculta que el plazo es del del sistema.
@@ -75,10 +75,11 @@ const FECHA_TABLA = (() => {
   )).toISOString();
 })();
 
-// La tabla con la COMPUERTA ABIERTA. La que se despacha viene cerrada (los
-// plazos de diez (10) y cinco (5) años no los validó el abogado), y estos
-// tests verifican el MECANISMO de la tabla: que su plazo por defecto sea el
-// que aplica, con su fuente y su punto de inicio.
+// La tabla con la COMPUERTA ABIERTA. La que se despacha también viene
+// abierta (desde el 13-nov-2026 la abre el owner con su acto expreso y
+// fechado), pero estos tests verifican el MECANISMO de la tabla: que su plazo
+// por defecto sea el que aplica, con su fuente y su punto de inicio. La
+// inyectan para no depender del estado de un archivo.
 const TABLA_ACTIVADA = tablaConservacionActivada();
 
 /**

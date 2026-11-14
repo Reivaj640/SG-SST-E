@@ -102,10 +102,14 @@ const FILAS = [
       { archivo: 'src/services/conservacion.js', ancla: 'function recalcularPlazosDeclarados' },
       { archivo: 'src/services/conservacion.js', ancla: 'fecha_inicio_conservacion' },
       // La COMPUERTA: la tabla declara su propia activacion, y el codigo la
-      // respeta. El mecanismo esta; los plazos de diez (10) y cinco (5) anos
-      // no se activan hasta que el abogado los valide.
+      // respeta. Desde el 13-nov-2026 la abre el owner con un acto expreso y
+      // fechado (la S-25), sin que la validacion escrita de un tercero sea
+      // requisito: el estado vigente es `activada: true` con su `activado_at`.
+      // Si ese estado cambia, esta fila hay que actualizarla: la tabla de
+      // correspondencia no puede mentir en silencio.
       { archivo: 'src/services/retencion.js', ancla: 'function _tablaActivada' },
-      { archivo: 'config/tabla-conservacion.json', ancla: '"activada": false' },
+      { archivo: 'config/tabla-conservacion.json', ancla: '"activada": true' },
+      { archivo: 'config/tabla-conservacion.json', ancla: '"activado_at"' },
       // AUSENCIA: el planificador no crea el hold por plazo no declarado. El
       // mecanismo de liberacion se conserva para las filas que ya lo tienen, pero
       // el alta de una firma nueva no lo pone.
@@ -454,24 +458,27 @@ function main() {
   cuerpo.push('');
   cuerpo.push('## La compuerta de activacion (estado real de los plazos de la tabla)');
   cuerpo.push('');
-  cuerpo.push('El MECANISMO que pide el 8.6 esta construido y probado. Lo que NO esta hecho es su');
-  cuerpo.push('ACTIVACION, y es deliberado:');
+  cuerpo.push('El MECANISMO que pide el 8.6 esta construido y probado, y su ACTIVACION');
+  cuerpo.push('ya esta hecha: el owner la abrio con un acto expreso y fechado el 13-nov-2026');
+  cuerpo.push('(la S-25), sin que la validacion escrita de un tercero sea requisito:');
   cuerpo.push('');
   cuerpo.push('- La tabla supletoria declara su propia activacion en `config/tabla-conservacion.json`');
   cuerpo.push('  (`aplicacion.activada`), y el codigo la lee y la respeta: no hay forma de que el sistema');
   cuerpo.push('  aplique sus plazos sin que esa fuente legal lo autorice.');
-  cuerpo.push('- Con la compuerta CERRADA (que es como viene), el sistema no aplica el plazo por defecto:');
-  cuerpo.push('  el registro queda retenido con el hold tabla_supletoria_pendiente_validacion y no se calcula');
-  cuerpo.push('  fecha de supresion. El catalogo legado de veinte (20) anos desde la firma se retiro.');
-  cuerpo.push('- La fuente que queda registrada en la fila es `tabla_supletoria_pendiente`, no');
-  cuerpo.push('  `catalogo_sistema`: con la compuerta cerrada no hay plazo de catalogo que se aplique.');
-  cuerpo.push('- Las EXCEPCIONES LEGALES no dependen de la tabla y siguen aplicando con la compuerta');
-  cuerpo.push('  cerrada: el piso de veinte (20) anos desde el cese de los registros del 8.6(b), y el hold');
-  cuerpo.push('  sin termino del contrato del 8.6(c).');
-  cuerpo.push('- Abrir la compuerta es un acto expreso y FECHADO del owner: `aplicacion.activada` en true');
-  cuerpo.push('  y `aplicacion.activado_at` con la fecha del acto. Ni el codigo ni una actualizacion');
-  cuerpo.push('  automatica lo hacen. La validacion escrita de un tercero NO es requisito (decision del');
-  cuerpo.push('  owner del 13-nov-2026): el codigo no la exige, y nunca exigio el nombre de un abogado.');
+  cuerpo.push('- Con la compuerta ABIERTA (que es como viene desde el acto del owner del 13-nov-2026),');
+  cuerpo.push('  el sistema aplica el plazo por defecto de la tabla: se calcula la fecha de supresion y la');
+  cuerpo.push('  fuente que queda registrada en la fila es `tabla_supletoria`. El catalogo legado de veinte');
+  cuerpo.push('  (20) anos desde la firma se retiro y no aplica para nada.');
+  cuerpo.push('- La rama CERRADA sigue viva en el codigo: con la compuerta cerrada el sistema NO aplica el');
+  cuerpo.push('  plazo por defecto, el registro queda retenido con el hold tabla_supletoria_pendiente_validacion');
+  cuerpo.push('  y no se calcula fecha de supresion.');
+  cuerpo.push('- Las EXCEPCIONES LEGALES no dependen de la tabla: el piso de veinte (20) anos desde el cese');
+  cuerpo.push('  de los registros del 8.6(b), y el hold sin termino del contrato del 8.6(c).');
+  cuerpo.push('- Abrir la compuerta es (y fue) un acto expreso y FECHADO del owner: `aplicacion.activada` en');
+  cuerpo.push('  true y `aplicacion.activado_at` con la fecha del acto (2026-11-13, la S-25). Ni el codigo ni');
+  cuerpo.push('  una actualizacion automatica lo hacen. La validacion escrita de un tercero NO es requisito');
+  cuerpo.push('  (decision del owner del 13-nov-2026): el codigo no la exige, y nunca exigio el nombre de un');
+  cuerpo.push('  abogado.');
   cuerpo.push('');
   cuerpo.push('El Acuerdo vigente en produccion es la v1.6 (publicada y activa desde el 11-nov-2026) y su');
   cuerpo.push('numeral 8.6(a) SI describe esta tabla: la administra K+AIR, es configurable, cada regla ha de');

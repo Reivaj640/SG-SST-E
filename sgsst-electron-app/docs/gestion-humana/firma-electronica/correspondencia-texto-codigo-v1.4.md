@@ -10,7 +10,7 @@
 | Acuerdo de uso v1.4 | `7298a9435b94c6c6f4f4365c3818fa7e8825524c2ebd524d380c10c2c585490f` |
 | Anexo de Encargo | `6308b1f7a51007cb1e973de0210d1e5659d3b3ceb8e3e3b7a3ee52a7275b8948` |
 
-Generada el 2026-11-13.
+Generada el 2026-11-14.
 
 ## Como leer esta tabla
 
@@ -38,7 +38,7 @@ cada fila lista tambien la presencia del comportamiento que la reemplaza.
 | **8.6(b) y Anexo de Encargo 6 (canal de la fecha de terminacion)** | La Empresa comunica al Encargado la fecha de terminacion de la relacion laboral por el canal habilitado en el servicio, con su evidencia; el Encargado registra la fecha, recalcula el plazo de las filas afectadas y deja registro de la operacion. Mientras la fecha no se reciba, la fila permanece retenida, no se calcula fecha de supresion y se revisa periodicamente. | `src/services/fechaTerminacion.js:104`<br>`src/services/fechaTerminacion.js:22`<br>`src/services/fechaTerminacion.js:311`<br>`src/db/schema/052_fecha_terminacion_canal.sql:26`<br>`src/db/schema/053_fecha_terminacion_append_only.sql:27`<br>`src/routes/admin-empresas.js:38`<br>`src/services/conservacion.js:758` | `tests/fecha-terminacion-canal.test.js` | Implementado |
 | **8.6(c)** | El contrato y sus anexos firmados electronicamente se conservan con autenticidad, integridad y disponibilidad; el sistema les asigna un hold mientras subsista la relacion laboral. | `src/services/conservacion.js:431` | `tests/conservacion-deber-legal.test.js` | Implementado |
 | **8.6(e)** | La supresion procede solo cuando concurren: (i) vencimiento del plazo; (ii) ausencia de deber legal o contractual; (iii) ausencia de solicitud de copia pendiente; y (iv) ausencia de hold vigente. | `src/services/conservacion.js:922`<br>`src/services/conservacion.js:75` | `tests/conservacion-purga.test.js` | Implementado |
-| **8.6(h)** | No hay retencion indefinida: la tabla supletoria fija un plazo por defecto para cada categoria documental, con su fundamento y su punto de inicio; a falta de plazo declarado por la Empresa se aplica ese plazo por defecto, y los plazos legales especiales se aplican por encima del plazo declarado y no se bajan. Un cambio de la tabla no altera los plazos ya calculados: el recalculo exige una operacion expresa, autorizada y auditada. | `src/services/retencion.js:11`<br>`src/services/retencion.js:63`<br>`src/services/conservacion.js:107`<br>`src/services/conservacion.js:765`<br>`src/services/conservacion.js:265`<br>`src/services/retencion.js:686`<br>`config/tabla-conservacion.json:8`<br>`src/services/retencion.js` — correcto: no expone el dato crudo | `tests/conservacion-8-6-h.test.js`<br>`tests/services/conservacion-supletoria.test.js` | Implementado |
+| **8.6(h)** | No hay retencion indefinida: la tabla supletoria fija un plazo por defecto para cada categoria documental, con su fundamento y su punto de inicio; a falta de plazo declarado por la Empresa se aplica ese plazo por defecto, y los plazos legales especiales se aplican por encima del plazo declarado y no se bajan. Un cambio de la tabla no altera los plazos ya calculados: el recalculo exige una operacion expresa, autorizada y auditada. | `src/services/retencion.js:11`<br>`src/services/retencion.js:63`<br>`src/services/conservacion.js:107`<br>`src/services/conservacion.js:765`<br>`src/services/conservacion.js:265`<br>`src/services/retencion.js:686`<br>`config/tabla-conservacion.json:8`<br>`config/tabla-conservacion.json:38`<br>`src/services/retencion.js` — correcto: no expone el dato crudo | `tests/conservacion-8-6-h.test.js`<br>`tests/services/conservacion-supletoria.test.js` | Implementado |
 | **5.1 (deberes del firmante)** | El Firmante ve el Acuerdo que acepta, con su version, y la aceptacion queda registrada contra ese texto. | `web/firma/app.js:843`<br>`src/services/publicFlow.js:2093`<br>`src/services/publicFlow.js:1012` | `tests/readiness-legal.test.js` | Implementado |
 | **5.6 (politicas de seguridad)** | Las politicas de seguridad que regulan el uso del mecanismo solo obligan si fueron informadas y puestas a disposicion antes de su aplicacion: el sistema muestra la version junto con el texto y registra el texto aceptado, su huella SHA-256 y la fecha y hora. Una version nueva no altera las aceptaciones ya registradas. | `web/firma/app.js:866`<br>`src/services/publicFlow.js:252`<br>`src/services/publicFlow.js:2097` | `tests/readiness-legal.test.js` | Implementado |
 | **3.6(b) (matriz de finalidades)** | El ordinal 3 de la Manifestacion de Voluntad delega en la matriz de finalidades el alcance de la autorizacion del Titular. La matriz se pone a disposicion del Firmante ANTES de habilitar la casilla de aceptacion, con su version y su huella SHA-256; si la matriz no llega o no se lee, la casilla no se habilita y no hay forma de aceptar sin ella. | `web/firma/app.js:771`<br>`web/firma/app.js:752`<br>`src/services/publicFlow.js:516`<br>`src/services/matrizFinalidades.js:127` | `tests/services/aceptacion-c2-matriz.test.js`<br>`tests/web/matriz-finalidades.test.js` | Implementado |
@@ -75,24 +75,27 @@ comprueban con controles de AUSENCIA: el ancla prohibida tiene que NO aparecer.
 
 ## La compuerta de activacion (estado real de los plazos de la tabla)
 
-El MECANISMO que pide el 8.6 esta construido y probado. Lo que NO esta hecho es su
-ACTIVACION, y es deliberado:
+El MECANISMO que pide el 8.6 esta construido y probado, y su ACTIVACION
+ya esta hecha: el owner la abrio con un acto expreso y fechado el 13-nov-2026
+(la S-25), sin que la validacion escrita de un tercero sea requisito:
 
 - La tabla supletoria declara su propia activacion en `config/tabla-conservacion.json`
   (`aplicacion.activada`), y el codigo la lee y la respeta: no hay forma de que el sistema
   aplique sus plazos sin que esa fuente legal lo autorice.
-- Con la compuerta CERRADA (que es como viene), el sistema no aplica el plazo por defecto:
-  el registro queda retenido con el hold tabla_supletoria_pendiente_validacion y no se calcula
-  fecha de supresion. El catalogo legado de veinte (20) anos desde la firma se retiro.
-- La fuente que queda registrada en la fila es `tabla_supletoria_pendiente`, no
-  `catalogo_sistema`: con la compuerta cerrada no hay plazo de catalogo que se aplique.
-- Las EXCEPCIONES LEGALES no dependen de la tabla y siguen aplicando con la compuerta
-  cerrada: el piso de veinte (20) anos desde el cese de los registros del 8.6(b), y el hold
-  sin termino del contrato del 8.6(c).
-- Abrir la compuerta es un acto expreso y FECHADO del owner: `aplicacion.activada` en true
-  y `aplicacion.activado_at` con la fecha del acto. Ni el codigo ni una actualizacion
-  automatica lo hacen. La validacion escrita de un tercero NO es requisito (decision del
-  owner del 13-nov-2026): el codigo no la exige, y nunca exigio el nombre de un abogado.
+- Con la compuerta ABIERTA (que es como viene desde el acto del owner del 13-nov-2026),
+  el sistema aplica el plazo por defecto de la tabla: se calcula la fecha de supresion y la
+  fuente que queda registrada en la fila es `tabla_supletoria`. El catalogo legado de veinte
+  (20) anos desde la firma se retiro y no aplica para nada.
+- La rama CERRADA sigue viva en el codigo: con la compuerta cerrada el sistema NO aplica el
+  plazo por defecto, el registro queda retenido con el hold tabla_supletoria_pendiente_validacion
+  y no se calcula fecha de supresion.
+- Las EXCEPCIONES LEGALES no dependen de la tabla: el piso de veinte (20) anos desde el cese
+  de los registros del 8.6(b), y el hold sin termino del contrato del 8.6(c).
+- Abrir la compuerta es (y fue) un acto expreso y FECHADO del owner: `aplicacion.activada` en
+  true y `aplicacion.activado_at` con la fecha del acto (2026-11-13, la S-25). Ni el codigo ni
+  una actualizacion automatica lo hacen. La validacion escrita de un tercero NO es requisito
+  (decision del owner del 13-nov-2026): el codigo no la exige, y nunca exigio el nombre de un
+  abogado.
 
 El Acuerdo vigente en produccion es la v1.6 (publicada y activa desde el 11-nov-2026) y su
 numeral 8.6(a) SI describe esta tabla: la administra K+AIR, es configurable, cada regla ha de

@@ -95,34 +95,44 @@ test('D-03 · sin Anexo de Encargo firmado la solicitud NO se crea', async () =>
   assert.equal(n, 0, 'no queda ninguna fila a medias');
 });
 
-test('D-03 · sin plazo declarado la solicitud SÍ se crea (pero el registro queda retenido)', async () => {
+test('D-03 · sin plazo declarado la solicitud SÍ se crea (y el plazo es el de la tabla supletoria)', async () => {
   // La custodia de 20 años YA NO es del sistema, y con la decisión D1 tampoco
-  // hay retención indefinida: sin plazo declarado, el plazo sería el de la tabla
-  // supletoria de conservación de K+AIR. Pero esa tabla tiene la COMPUERTA
-  // CERRADA (`aplicacion.activada: false`): sus plazos de diez (10) y cinco
-  // (5) años todavía no los validó el abogado.
+  // hay retención indefinida: sin plazo declarado, el plazo es el de la tabla
+  // supletoria de conservación de K+AIR. Esa tabla la abrió el OWNER el
+  // 13-nov-2026 con un acto expreso y fechado (S-25), así que su plazo por
+  // defecto YA SE APLICA.
   //
   // Y el catálogo legado de veinte (20) años desde la firma ya NO se aplica
   // (J8 y J9 del abogado, 30-oct-2026): "la tabla no puede activar los plazos
   // por defecto mientras el sistema conserve el catálogo legado de 20 años
   // desde la firma".
   //
-  // El resultado que el texto exige: la firma se puede hacer, el registro NO
-  // se suprime y NO se le inventa una fecha. Queda retenido hasta que la tabla
-  // se valide y la compuerta se abra.
+  // El resultado que el texto exige: la firma se puede hacer y el registro
+  // conserva la fecha del plazo supletorio, con su fuente y su punto de inicio
+  // congelados en la fila. El hold `tabla_supletoria_pendiente_validacion` ya
+  // no se pone: ese hold era para cuando la compuerta estaba cerrada.
   limpiar();
   registrarEmpresa({ conAnexo: true, conPlazo: false });
 
   const { signRequest } = await createSignRequestWithIdentificacion({ id_empresa: EMPRESA });
   assert.ok(signRequest && signRequest.id_solicitud,
     'una empresa sin plazo declarado firma: no hay nada que ella tenga que declarar');
-  assert.equal(signRequest.fecha_conservacion, null,
-    'mientras la compuerta de la tabla esté cerrada NO hay fecha de conservación: '
-    + 'calcular una sería inventar un plazo');
-  assert.equal(signRequest.hold_legal, 1,
-    'el registro queda retenido, no se suprime');
-  assert.equal(signRequest.motivo_hold, 'tabla_supletoria_pendiente_validacion',
-    'el motivo dice que falta la validación escrita de la tabla');
+  assert.ok(signRequest.fecha_conservacion,
+    'con la compuerta abierta por el acto del owner, el plazo por defecto de la tabla '
+    + 'se aplica: el registro conserva su fecha de supresión');
+  // La fuente del plazo se lee de la FILA: el plan se aplico a la base
+  // despues de crear la solicitud, asi que no esta en el objeto devuelto.
+  const fila = db.prepare(
+    'SELECT plazo_conservacion_fuente, fecha_conservacion FROM gh_firmas_electronicas WHERE id_solicitud = ?'
+  ).get(signRequest.id_solicitud);
+  assert.equal(fila.plazo_conservacion_fuente, 'tabla_supletoria',
+    'la fuente del plazo es la tabla supletoria, y queda congelada en la fila');
+  assert.ok(fila.fecha_conservacion,
+    'y la fecha de conservacion queda escrita en la fila');
+  assert.notEqual(signRequest.hold_legal, 1,
+    'el registro NO queda retenido: ya hay fecha de conservación');
+  assert.notEqual(signRequest.motivo_hold, 'tabla_supletoria_pendiente_validacion',
+    'ese hold era para cuando la compuerta estaba cerrada');
   assert.notEqual(signRequest.motivo_hold, 'plazo_no_declarado',
     'la retención indefinida por falta de plazo declarado ya no existe');
 });

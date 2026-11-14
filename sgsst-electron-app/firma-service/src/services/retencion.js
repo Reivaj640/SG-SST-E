@@ -463,7 +463,7 @@ const ORDEN_BUSQUEDA = Object.freeze([
  * LA COMPUERTA DE ACTIVACIÓN
  * --------------------------
  * La tabla declara su propia activación (`aplicacion.activada`) y el código la
- * respeta. Con la compuerta CERRADA (que es como viene):
+ * respeta. Con la compuerta CERRADA:
  *
  *   - el plazo por defecto de la tabla NO se aplica;
  *   - una Empresa que NO declara plazo NO recibe el plazo legado de veinte

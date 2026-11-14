@@ -16,10 +16,11 @@
 > emitido y medido»**, no «el acto esta cumplido». Los actos de un tercero —una firma, una credencial,
 > una ventana de mantenimiento, una respuesta— **no** cierran un bloque: lo que lo cierra es que el
 > pedido salio, con su destinatario, su fecha y su verificacion. Esos actos se siguen en
-> **`tabla-de-solicitudes-2026-11-13.md`**, que es la tabla de las 25 solicitudes: hoy estan **19
-> `EMITIDA`, 6 `CERRADA`, 0 `RESPONDIDA`** (la S-22 por respuesta aplicada; S-01, S-02, S-03, S-04 y S-23
+> **`tabla-de-solicitudes-2026-11-13.md`**, que es la tabla de las 25 solicitudes: hoy estan **18
+> `EMITIDA`, 7 `CERRADA`, 0 `RESPONDIDA`** (la S-22 por respuesta aplicada; S-01, S-02, S-03, S-04 y S-23
 > por resolucion, todas el 13-nov-2026, con la anotacion «resuelto por decision del owner, sin ratificacion
-> externa»; y la S-25, que es el acto del owner para **abrir la compuerta** de la tabla supletoria).
+> externa»; y la S-25, que es el acto del owner para **abrir la compuerta** de la tabla supletoria, cerrada
+> ese mismo dia por ese acto).
 > **Este mapa no afirma que el servicio pueda abrirse a empresas
 > reales**: los hechos de cada bloque (que no hay empresa real suscrita, que la compuerta sigue
 > apagada, que los permisos siguen en 777, que no hay respaldo fuera del servidor) siguen siendo
@@ -268,12 +269,13 @@ firmas).
 aplicable entro a la v1.4 (que se regenero). Esta en `tabla-de-solicitudes-2026-11-13.md`, con
 su destinatario, su verificacion y su fecha limite.
 
-### M.6 - La tabla supletoria de conservacion esta PREPARADA, con su compuerta cerrada a proposito; la validacion escrita de un tercero ya no es requisito (decision del owner del 13-nov-2026) — CERRADO. Solicitud S-02 cerrada por resolucion el 13-nov-2026
+### M.6 - La tabla supletoria de conservacion esta ACTIVADA por el acto expreso y fechado del owner del 13-nov-2026; la validacion escrita de un tercero ya no es requisito — CERRADO. Solicitudes S-02 (cerrada por resolucion) y S-25 (cerrada por el acto de apertura), el 13-nov-2026
 
 **Origen.** J8 del informe al abogado; la fila 3.1 y 3.2 del cuadro canonico.
 
-**Qué se verificó.** `config/tabla-conservacion.json` tiene `aplicacion.activada = false`: la
-compuerta de conservacion esta **cerrada a proposito** y asi sigue. El catalogo legado de 20 anos
+**Qué se verificó.** `config/tabla-conservacion.json` tiene `aplicacion.activada = true` **y**
+`aplicacion.activado_at = "2026-11-13"`: la compuerta de conservacion esta **abierta por el acto del
+owner** (15 993 B / `a7bdb281…56dd0`). El catalogo legado de 20 anos
 desde la firma no esta alineado con la precedencia del 8.6(a), y el sistema no lo aplica.
 
 **Lo que cambio el 13-nov-2026 (decision del owner).** La **validacion escrita de un tercero dejo de ser
@@ -281,8 +283,10 @@ requisito** para abrir la compuerta. Antes la regla era: `activada: true` **y** 
 `validado_at` reales. Ahora la regla es: `activada: true` **y** `activado_at` con fecha. El cambio esta
 en el codigo (`retencion.js`, `_tablaActivada()`), en la tabla (`config/tabla-conservacion.json`, con
 la nota que dice que la abre y que ya no se exige) y en los candidatos de la v1.4, que se regeneraron
-con el texto que dice la regla nueva. La compuerta **sigue cerrada**: lo que falta es el acto del owner
-(**S-25**), no un escrito de un tercero.
+con el texto que dice la regla nueva. Ese mismo dia, con la regla ya cambiada, probada y la compuerta
+**cerrada**, el owner **abrio la compuerta** con su acto expreso y **fechado** (**S-25**, cerrada):
+`activada: true` y `activado_at: 2026-11-13`. El orden importa y se respeto: primero la regla, con
+todo medido y en verde; despues el acto.
 
 **Lo que dice el Acuerdo vigente (13-nov-2026).** El Acuerdo vigente es la **v1.6**, publicada y activa
 desde el 11-nov-2026, y su numeral **8.6(a)** describe esta tabla: la administra K+AIR, es configurable,
@@ -909,7 +913,7 @@ suscrito no se toca) y corregir la tabla de instrumentos»); `verificacion-cierr
 requisitos 5.5 y 5.6 (**PENDIENTE** y **PARCIALMENTE**: ambos exigen «una version nueva del Anexo de
 Nube (v1.4)»); `sgsst-electron-app/legal/anexo-nube-v1.3.html` (los §1 y §5);
 `sgsst-electron-app/legal/anexo-encargo.html` (la remision); `candidatos-v1.4/` (candidato Nube v1.4:
-111 462 B, `ba664e6f...e3b47`; candidato Encargo 12-nov: 100 396 B, `b345ab87...3a749`; vigentes
+111 462 B, `ba664e6f...e3b47`; candidato Encargo 12-nov: 100 787 B, `55a58967...46fc9`; vigentes
 intactos: `fdd10551...b585d` y `6308b1f7...b8948`).
 
 **LO QUE LA MESA DE DETERMINACIONES LE METIO (12-nov-2026).** El generador de candidatos ahora arma el texto
@@ -944,7 +948,7 @@ vuelve a armar.
 13-nov-2026 **no es formal** y se archivo **como ratificacion, sin reabrir la fila**; el **texto final lo
 redacto K+AIR con la autorizacion del owner** y los candidatos se **regeneraron**
 (`candidatos-v1.4/anexo-nube-v1.4.html`, 111 462 B / `ba664e6f…e3b47`;
-`candidatos-v1.4/anexo-encargo-2026-11-12.html`, 100 396 B / `b345ab87…3a749`). Esta en
+`candidatos-v1.4/anexo-encargo-2026-11-12.html`, 100 787 B / `55a58967…46fc9`). Esta en
 `tabla-de-solicitudes-2026-11-13.md`, con
 su destinatario, su verificacion y su fecha limite.
 ## 3. Riesgos y deuda
@@ -1405,7 +1409,7 @@ salida de la prueba, en el servidor.
 
 **Quien lo tiene.** —
 
-### M.30 - La compuerta de conservacion se abria con la bandera sola: hoy la abre un acto FECHADO del owner, y la validacion escrita de un tercero ya no es requisito — CERRADO. Solicitud S-25 emitida el 13-nov-2026
+### M.30 - La compuerta de conservacion se abria con la bandera sola: hoy la abre un acto FECHADO del owner, y la validacion escrita de un tercero ya no es requisito — CERRADO. Solicitud S-25 emitida y CERRADA por el acto del owner el 13-nov-2026
 
 **Origen.** La determinacion legal del 12-nov-2026 (punto L3); la decision del owner del 13-nov-2026.
 
@@ -1439,15 +1443,22 @@ que la fija.
 
 **Evidencia.** `src/services/retencion.js` (`_tablaActivada`); `tests/services/conservacion-supletoria.test.js`
 (las cuatro formas y el guard de la regla nueva); `tests/helpers.js` (`tablaConservacionActivada`);
-`config/tabla-conservacion.json` (`aplicacion.activada = false`, `aplicacion.activado_at = null`, y la
+`config/tabla-conservacion.json` (`aplicacion.activada = true`, `aplicacion.activado_at = "2026-11-13"`,
+`aplicacion.estado = "ACTIVADA"`, el bloque `aplicacion.acto_de_apertura` con la fecha y el actor, y la
 nota que dice que la abre el acto fechado del owner).
 
-**Que falta.** El **acto de apertura** del owner, que es un acto expreso y **fechado**, con la suite
-reejecutada antes (abrir la compuerta cambia el comportamiento del servicio: los plazos por defecto de
-diez (10) y cinco (5) anos empiezan a aplicar). Eso es la **S-25**. La **validacion escrita de un
+**El acto (13-nov-2026).** El owner **abrio la compuerta**: `aplicacion.activada: true` y
+`aplicacion.activado_at: "2026-11-13"` (15 993 B / `a7bdb281…56dd0`), con el acto registrado en
+`aplicacion.acto_de_apertura` (fecha, actor y solicitud S-25) y el estado en `ACTIVADA`. Desde esa
+fecha los plazos por defecto de diez (10) y cinco (5) anos **se aplican en produccion** para los
+documentos que la Empresa no declare. La **S-25 quedo CERRADA** por ese acto.
+
+**Que falta.** Nada de este bloque. La **validacion escrita de un
 tercero ya no es requisito** y no se espera: lo que sigue pendiente en el mundo es la ratificación
 externa de L1, L2, L4, L5 y las condiciones C1 a C4 (M.5, M.18, M.28/M.7), que es otra cosa y no bloquea
-la apertura.
+la apertura. Y una consecuencia del acto que queda anotada, no hecha: las filas que ya tienen el *hold*
+`tabla_supletoria_pendiente_validacion` lo conservan hasta que se corra el **recálculo** expreso,
+autorizado y auditado (el *hold* es de los motivos liberables por recálculo, no un deber legal).
 
 **Quien lo tiene.** El owner.
 
@@ -1517,7 +1528,13 @@ sustancia validada y el candado de la compuerta **sin abrir**. La tabla quedo en
 **Anotacion del 13-nov-2026 (tarde, novena parte).** La S-02 **se cerro por resolucion** del owner, que
 declaro que la validacion escrita de un tercero **no es requisito** para la compuerta; la regla cambio en
 el codigo y en la tabla, y la tabla de solicitudes quedo en **25 solicitudes: 19 `EMITIDA`, 6 `CERRADA`, 0
-`RESPONDIDA`** (con la S-25 nueva: el acto del owner para abrir la compuerta).
+`RESPONDIDA`** (con la S-25 nueva: el acto del owner para abrir la compuerta). Ese mismo dia el owner
+**abrio la compuerta** (S-25, cerrada por ese acto) y la tabla quedo en **18 `EMITIDA`, 7 `CERRADA`, 0
+`RESPONDIDA`** (M.6 y M.30). Ese mismo dia el owner
+**abrio la compuerta** (S-25, cerrada por ese acto) y la tabla quedo en **18 `EMITIDA`, 7 `CERRADA`, 0
+`RESPONDIDA`** (M.6 y M.30). Ese mismo dia el owner
+**abrio la compuerta** (S-25, cerrada por ese acto) y la tabla quedo en **18 `EMITIDA`, 7 `CERRADA`, 0
+`RESPONDIDA`** (M.6 y M.30).
 **El codigo no se toca**: la decision era de procedimiento y de escritura.
 
 **Medido en produccion el 13-nov-2026 (SSH, solo lectura).** Las dos tablas del canal existen
@@ -1561,7 +1578,7 @@ operacion real del canal).
 | **TOTAL** | **31** | **0** | **0** | **31** |
 
 Los 0 pendientes concilian: ninguno = 0. Las 25 solicitudes de la tabla
-(`tabla-de-solicitudes-2026-11-13.md`): 19 EMITIDA, 6 CERRADA. Cerrado en este mapa
+(`tabla-de-solicitudes-2026-11-13.md`): 18 EMITIDA, 7 CERRADA. Cerrado en este mapa
 significa que el pedido esta emitido y medido, no que el acto este cumplido: cada acto
 de un tercero se sigue en esa tabla, con su estado, su destinatario y su fecha.
 

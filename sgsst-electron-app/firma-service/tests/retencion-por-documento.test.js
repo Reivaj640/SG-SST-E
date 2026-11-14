@@ -37,9 +37,9 @@ const {
   tablaConservacionActivada,
 } = require('./helpers');
 
-// La tabla con la COMPUERTA ABIERTA. La que se despacha viene cerrada: los
-// plazos de diez (10) y cinco (5) años no los validó el abogado. Estos tests
-// verifican el MECANISMO de la tabla, así que la usan con la compuerta
+// La tabla con la COMPUERTA ABIERTA. La que se despacha viene abierta desde
+// el 13-nov-2026 (la abre el owner con su acto expreso y fechado). Estos
+// tests verifican el MECANISMO de la tabla, así que la usan con la compuerta
 // abierta; el estado cerrado tiene sus propios tests en
 // tests/services/conservacion-supletoria.test.js.
 const TABLA_ACTIVADA = tablaConservacionActivada();

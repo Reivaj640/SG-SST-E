@@ -54,7 +54,8 @@ const EVIDENCIA = 'Correo de la Empresa del 30-oct-2026, radicado 2026-1044.';
 
 /**
  * La Empresa de la prueba: sin deber legal declarado y sin plazo declarado, que
- * es como se despacha (la tabla supletoria está apagada).
+ * es como se despacha (la tabla supletoria está abierta desde el 13-nov-2026,
+ * con el acto expreso y fechado del owner).
  */
 function sembrarEmpresa() {
   db.prepare('DELETE FROM gh_firma_empresas WHERE id_empresa = ?').run(EMPRESA);

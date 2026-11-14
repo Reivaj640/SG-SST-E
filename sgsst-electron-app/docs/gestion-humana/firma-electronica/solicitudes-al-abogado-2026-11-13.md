@@ -82,7 +82,7 @@ aplicamos tal cual, aunque nos contradiga.
 | Dictamen de L1 (con la sección **B.8** del escrito del abogado) | `docs/gestion-humana/firma-electronica/dictamen-legal-l1-2026-11-12.md` | 114 882 | `d77e6d8b04c0c494684340759df486c4c6948b402e723161ba92a4d61a887a04` |
 | Dictamen de L2, L3, L6 y L7 | `docs/gestion-humana/firma-electronica/dictamen-legal-2026-11-12-tandas-2-y-3.md` | 36 393 | `cbfd3ab9da4781b857a6125131fcd52712d92cf96d521348d22cf44b41857a38` |
 | Candidato del Anexo de Nube v1.4 (con L1 aplicada) | `docs/gestion-humana/firma-electronica/candidatos-v1.4/anexo-nube-v1.4.html` | 111 462 | `ba664e6f1ad130c968b6224ab71ed66a52017e96ac578b8b0e740fd55f9e3b47` |
-| Candidato del Anexo de Encargo 2026-11-12 (con L1 aplicada) | `docs/gestion-humana/firma-electronica/candidatos-v1.4/anexo-encargo-2026-11-12.html` | 100 396 | `b345ab87a816eddb98bf79c30be6de38d9d1fbe90f2682c89d8e7560bbe3a749` |
+| Candidato del Anexo de Encargo 2026-11-12 (con L1 aplicada) | `docs/gestion-humana/firma-electronica/candidatos-v1.4/anexo-encargo-2026-11-12.html` | 100 787 | `55a58967b3bb081bcee5f72d15b50b4b3141691418a9b8338df9db738b646fc9` |
 
 **Qué necesitamos de vuelta:** un escrito que **ratifique o corrija** L1 y L2 y que se pronuncie sobre
 las correcciones 0.5 y 0.6 **y sobre el contenido de la Circular Externa 002 de 2025**, que no
@@ -117,7 +117,7 @@ años** y **las cuatro condiciones** con las que la tabla supletoria queda aline
 
 | Documento | Ruta en el repositorio | Bytes | SHA-256 |
 |---|---|---|---:|
-| Tabla supletoria (8 categorías, con `plazo_anos` y las condiciones) | `firma-service/config/tabla-conservacion.json` | 14 164 | `033ad7f1f87e4d72f5fe5a6ced13de309def3e28769721c4f2e0852bed75cee3` |
+| Tabla supletoria (8 categorías, con `plazo_anos` y las condiciones) | `firma-service/config/tabla-conservacion.json` | 15 993 | `a7bdb2811c0a269165833382813b4d9ddae660128038a8aa8b5ed04480456dd0` |
 | Dictamen de L3 (la parte de la tabla) | `docs/gestion-humana/firma-electronica/dictamen-legal-2026-11-12-tandas-2-y-3.md` | 36 393 | `cbfd3ab9da4781b857a6125131fcd52712d92cf96d521348d22cf44b41857a38` |
 
 **Qué necesitamos de vuelta:** la validación con estos tres datos, que son los que el sistema exige
@@ -155,7 +155,7 @@ publicados**: son copias de trabajo.
 | Documento | Ruta en el repositorio | Bytes | SHA-256 |
 |---|---|---|---:|
 | Candidato del Anexo de Nube v1.4 | `docs/gestion-humana/firma-electronica/candidatos-v1.4/anexo-nube-v1.4.html` | 111 462 | `ba664e6f1ad130c968b6224ab71ed66a52017e96ac578b8b0e740fd55f9e3b47` |
-| Candidato del Anexo de Encargo 2026-11-12 | `docs/gestion-humana/firma-electronica/candidatos-v1.4/anexo-encargo-2026-11-12.html` | 100 396 | `b345ab87a816eddb98bf79c30be6de38d9d1fbe90f2682c89d8e7560bbe3a749` |
+| Candidato del Anexo de Encargo 2026-11-12 | `docs/gestion-humana/firma-electronica/candidatos-v1.4/anexo-encargo-2026-11-12.html` | 100 787 | `55a58967b3bb081bcee5f72d15b50b4b3141691418a9b8338df9db738b646fc9` |
 | Programa que los arma (para que vea el texto literal que se aplicó) | `firma-service/scripts/determinaciones-v1.4.js` | 22 902 | `57b5298ea69ee93e14c7dd182d714c27211dd85a87adbaaede429dbc29f7ee22` |
 
 **Un punto que le pedimos pronunciarse, porque fue decisión nuestra y no suya.** Al aplicar la
@@ -210,7 +210,7 @@ v1.4. **El manifiesto legal no se ha tocado** y no se tocará hasta que exista l
 |---|---|---|---:|
 | Pedido 6: las 16 cláusulas y las tres adiciones a la v1.4 | `docs/gestion-humana/firma-electronica/pedido-6-backblaze-v1-4-2026-11-12.md` | 40 916 | `4ab8d9ecdb7b38fe88fe54ee94a6757c1f12832569fed6e75b205213d7975769` |
 | Candidato del Anexo de Nube v1.4 (§4, con la cláusula aplicada) | `docs/gestion-humana/firma-electronica/candidatos-v1.4/anexo-nube-v1.4.html` | 111 462 | `ba664e6f1ad130c968b6224ab71ed66a52017e96ac578b8b0e740fd55f9e3b47` |
-| Candidato del Anexo de Encargo 2026-11-12 (§5, con la cláusula aplicada) | `docs/gestion-humana/firma-electronica/candidatos-v1.4/anexo-encargo-2026-11-12.html` | 100 396 | `b345ab87a816eddb98bf79c30be6de38d9d1fbe90f2682c89d8e7560bbe3a749` |
+| Candidato del Anexo de Encargo 2026-11-12 (§5, con la cláusula aplicada) | `docs/gestion-humana/firma-electronica/candidatos-v1.4/anexo-encargo-2026-11-12.html` | 100 787 | `55a58967b3bb081bcee5f72d15b50b4b3141691418a9b8338df9db738b646fc9` |
 
 **Qué necesitamos de vuelta:** (a) la ratificación de L4 y L5 con su nombre, fecha y huella; (b) el
 **texto final de la cláusula** para el contrato con Backblaze, con las cláusulas mínimas del art. 25; y
@@ -236,10 +236,12 @@ parte jurídica del M.7 (la cuenta, el bucket en la región US y el contrato con
 Las **únicas** huellas que hoy corresponden a los archivos del repositorio. Medidas el 13-nov-2026
 después de aplicar el escrito informal del abogado matriculado y de regenerar los candidatos.
 **Re-medidas el 13-nov-2026** después del cambio de la regla de la compuerta de la tabla supletoria
-(decisión del owner): por eso el candidato del Anexo de Encargo y la tabla supletoria tienen **bytes y
+(decisión del owner), y **re-medidas otra vez el 13-nov-2026 (tarde)** después del **acto de apertura**
+de esa compuerta (S-25): por eso el candidato del Anexo de Encargo y la tabla supletoria tienen **bytes y
 huella distintos** de los de la primera medición de este mismo día (el candidato pasó de 100 153 B /
-`d4df187a…4e2967` a **100 396 B / `b345ab87…3a749`**, y la tabla de 11 344 B / `8b6b5820…` a **14 164 B /
-`033ad7f1…cee3`**). Lo que explica el cambio está más abajo.
+`d4df187a…4e2967` a 100 396 B / `b345ab87…3a749` y a **100 787 B / `55a58967…46fc9`**, y la tabla de
+11 344 B / `8b6b5820…` a 14 164 B / `033ad7f1…cee3` y a **15 993 B / `a7bdb281…56dd0`**). Lo que explica
+el cambio está más abajo.
 
 | Documento | Ruta en el repositorio | Bytes | SHA-256 |
 |---|---|---:|---|
@@ -247,9 +249,9 @@ huella distintos** de los de la primera medición de este mismo día (el candida
 | Dictamen de L2, L3, L6 y L7 | `docs/gestion-humana/firma-electronica/dictamen-legal-2026-11-12-tandas-2-y-3.md` | 36 393 | `cbfd3ab9da4781b857a6125131fcd52712d92cf96d521348d22cf44b41857a38` |
 | Pedido 6: las 16 cláusulas y las tres adiciones a la v1.4 | `docs/gestion-humana/firma-electronica/pedido-6-backblaze-v1-4-2026-11-12.md` | 40 916 | `4ab8d9ecdb7b38fe88fe54ee94a6757c1f12832569fed6e75b205213d7975769` |
 | Candidato del Anexo de Nube v1.4 | `docs/gestion-humana/firma-electronica/candidatos-v1.4/anexo-nube-v1.4.html` | 111 462 | `ba664e6f1ad130c968b6224ab71ed66a52017e96ac578b8b0e740fd55f9e3b47` |
-| Candidato del Anexo de Encargo 2026-11-12 | `docs/gestion-humana/firma-electronica/candidatos-v1.4/anexo-encargo-2026-11-12.html` | 100 396 | `b345ab87a816eddb98bf79c30be6de38d9d1fbe90f2682c89d8e7560bbe3a749` |
+| Candidato del Anexo de Encargo 2026-11-12 | `docs/gestion-humana/firma-electronica/candidatos-v1.4/anexo-encargo-2026-11-12.html` | 100 787 | `55a58967b3bb081bcee5f72d15b50b4b3141691418a9b8338df9db738b646fc9` |
 | Programa que los arma (para que vea el texto literal que se aplicó) | `firma-service/scripts/determinaciones-v1.4.js` | 22 902 | `57b5298ea69ee93e14c7dd182d714c27211dd85a87adbaaede429dbc29f7ee22` |
-| Tabla supletoria (S-02) | `firma-service/config/tabla-conservacion.json` | 14 164 | `033ad7f1f87e4d72f5fe5a6ced13de309def3e28769721c4f2e0852bed75cee3` |
+| Tabla supletoria (S-02) | `firma-service/config/tabla-conservacion.json` | 15 993 | `a7bdb2811c0a269165833382813b4d9ddae660128038a8aa8b5ed04480456dd0` |
 
 **Dos cambios en el programa que debe saber**, porque los dos son de esta misma mañana:
 

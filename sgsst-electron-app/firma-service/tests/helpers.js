@@ -991,10 +991,11 @@ async function capturarLogs(fn) {
  * POR QUÉ EXISTE
  * --------------
  * La tabla que se despacha declara su propia activación
- * (`aplicacion.activada`), y viene CERRADA: los plazos de diez (10) y cinco
- * (5) años no los validó el abogado. Con la compuerta cerrada el sistema NO
- * aplica el plazo por defecto: el registro queda retenido con el hold
- * `tabla_supletoria_pendiente_validacion` y no se calcula fecha de supresión.
+ * (`aplicacion.activada`), y desde el 13-nov-2026 viene ABIERTA: el owner la
+ * abrió con un acto expreso y fechado (S-25). Con la compuerta cerrada el
+ * sistema NO aplica el plazo por defecto: el registro queda retenido con el
+ * hold `tabla_supletoria_pendiente_validacion` y no se calcula fecha de
+ * supresión.
  *
  * Los tests que verifican el MECANISMO de la tabla (que su plazo por defecto
  * sea el que aplica, con su fuente y su punto de inicio) necesitan la tabla
@@ -1022,6 +1023,30 @@ function tablaConservacionActivada() {
     aplicacion: Object.assign({}, base.aplicacion, {
       activada: true,
       activado_at: '2026-11-13T00:00:00.000Z',
+    }),
+  });
+}
+
+/**
+ * La tabla con la COMPUERTA CERRADA.
+ *
+ * Desde el 13-nov-2026 la compuerta la ABRE el owner, con su fecha (el
+ * acto S-25). El archivo que se despacha viene, entonces, ABIERTA. Por eso
+ * los tests del mecanismo CERRADO no pueden depender del estado de ese
+ * archivo: se inyectan esta tabla, que es la real con la compuerta cerrada.
+ *
+ * La rama cerrada sigue viva: otro acto del owner puede cerrar la
+ * compuerta, y el respaldo interno del codigo tambien arranca cerrado.
+ *
+ * @returns {object} la tabla con `aplicacion.activada` en false
+ */
+function tablaConservacionCerrada() {
+  const retencion = require('../src/services/retencion');
+  const base = retencion.tablaConservacion();
+  return Object.assign({}, base, {
+    aplicacion: Object.assign({}, base.aplicacion, {
+      activada: false,
+      activado_at: null,
     }),
   });
 }
@@ -1162,6 +1187,7 @@ module.exports = {
   seedActiveAgreement,
   sembrarPoderesDePrueba,
   tablaConservacionActivada,
+  tablaConservacionCerrada,
   makeApp,
   obtenerConsentimientoAceptado,
   withApiKey,

@@ -18,12 +18,13 @@
  *  - La mini-app los muestra en el bloque «Empresa que solicita tu firma».
  *  - El correo de invitacion los comunica (es la comunicacion que sale antes
  *    de que el Trabajador firme).
- *  - Si la Empresa NO los declara, la firma se puede pedir igual (D-03) y, con
- *    la compuerta de la tabla supletoria CERRADA (que es como se despacha: los
- *    plazos de diez (10) y cinco (5) años no los validó el abogado), no hay
- *    plazo aplicable: el catálogo legado de veinte (20) años desde la firma se
- *    retiró (J8 y J9), el registro queda retenido esperando la validación de la
- *    tabla y lo que se le comunica al Trabajador dice eso (decisión D1).
+ *  - Si la Empresa NO los declara, la firma se puede pedir igual (D-03) y el
+ *    plazo que se le aplica es el POR DEFECTO de la tabla supletoria, que
+ *    desde el 13-nov-2026 está ABIERTA por el acto expreso y fechado del
+ *    owner (la S-25): diez (10) años contados desde la fecha de la firma, sin
+ *    hold. La rama CERRADA (sin plazo aplicable, con el registro retenido
+ *    esperando la apertura de la tabla) también se prueba, con la tabla
+ *    cerrada inyectada.
  *
  * Tests:
  *   - node --test tests/plazo-retencion.test.js
@@ -35,13 +36,18 @@ const assert = require('node:assert/strict');
 const request = require('supertest');
 const {
   resetDb, makeApp, createSignRequestWithIdentificacion,
+  tablaConservacionCerrada,
 } = require('./helpers');
 const empresaService = require('../src/services/empresa');
 const signRequestService = require('../src/services/signRequest');
 const mailer = require('../src/services/mailer');
 const db = require('../src/db/connection');
+const retencion = require('../src/services/retencion');
 
 const PLAZO = '5 años para hoja de vida; 10 años para contrataciones.';
+
+// La tabla con la COMPUERTA CERRADA, para la rama cerrada del mecanismo.
+const TABLA_CERRADA = tablaConservacionCerrada();
 const CANAL = 'RRHH por correo o en la sede de la empresa.';
 
 const EMPRESA = {
@@ -173,11 +179,12 @@ test('D-03 · si la empresa no declara plazo, la firma SÍ se puede pedir', asyn
   // La Empresa no tiene NADA que declarar para pedir firmas: la falta de un
   // plazo declarado no bloquea la solicitud.
   //
-  // Lo de la conservación es otra cosa (J8 y J9): con la compuerta de la tabla
-  // supletoria CERRADA (que es como se despacha) y sin plazo declarado por la
-  // Empresa no hay fecha de supresión —el catálogo legado de veinte (20) años
-  // desde la firma se retiró— y el registro queda retenido con el motivo de la
-  // tabla pendiente de validación.
+  // Lo de la conservación (J8 y J9): desde el 13-nov-2026 la compuerta de la
+  // tabla supletoria la ABRIÓ el owner con su acto expreso y fechado (la S-25),
+  // asi que sin plazo declarado por la Empresa aplica el plazo POR DEFECTO de
+  // esa tabla: diez (10) años contados desde la fecha de la firma. No hay hold:
+  // el catálogo legado de veinte (20) años desde la firma se retiró (J8 y J9)
+  // y la tabla abierta no deja nada pendiente.
   resetDb();
   _crearEmpresa(false);
 
@@ -186,13 +193,25 @@ test('D-03 · si la empresa no declara plazo, la firma SÍ se puede pedir', asyn
   });
   assert.ok(signRequest && signRequest.id_solicitud,
     'una empresa sin plazo declarado puede pedir firmas');
-  assert.equal(signRequest.fecha_conservacion, null,
-    'no hay fecha de supresión: el sistema no inventa plazos');
-  assert.equal(signRequest.hold_legal, 1,
-    'y el registro queda retenido: la tabla supletoria espera la validación del abogado');
-  assert.equal(signRequest.motivo_hold, 'tabla_supletoria_pendiente_validacion');
+  assert.ok(signRequest.fecha_conservacion,
+    'con la compuerta abierta hay fecha de supresión: el plazo por defecto de la tabla');
+  assert.equal(signRequest.hold_legal, 0,
+    'y el registro NO queda retenido: la tabla supletoria ya está activada');
+  assert.equal(signRequest.motivo_hold, null,
+    'no hay ningún motivo de hold');
   assert.notEqual(signRequest.motivo_hold, 'plazo_no_declarado',
     'el motivo viejo (retención indefinida por falta de configuración) ya no existe');
+
+  // La fuente del plazo se lee de la BASE: no viene en el objeto devuelto.
+  const fila = db.prepare(
+    'SELECT plazo_conservacion_fuente, fecha_conservacion, hold_legal, motivo_hold '
+    + 'FROM gh_firmas_electronicas WHERE id_solicitud = ?'
+  ).get(signRequest.id_solicitud);
+  assert.equal(fila.plazo_conservacion_fuente, 'tabla_supletoria',
+    'el plazo sale de la tabla supletoria que administra K+AIR');
+  assert.equal(fila.fecha_conservacion, signRequest.fecha_conservacion);
+  assert.equal(fila.hold_legal, 0);
+  assert.equal(fila.motivo_hold, null);
 });
 
 test('si la empresa no declara plazo, el correo dice el plazo que REALMENTE aplica', async () => {
@@ -200,11 +219,12 @@ test('si la empresa no declara plazo, el correo dice el plazo que REALMENTE apli
   // aplica. No puede prometer un plazo que el sistema no tiene, ni callar de
   // dónde viene.
   //
-  // CON LA COMPUERTA CERRADA (que es como se despacha: los plazos de diez (10)
-  // y cinco (5) años de la tabla supletoria no los validó el abogado) NO hay
-  // plazo aplicable: el catálogo legado de veinte (20) años desde la firma se
-  // retiró (J8 y J9) y la tabla supletoria espera la validación. El correo lo
-  // dice así: el plazo está pendiente y el documento no se suprime.
+  // CON LA COMPUERTA ABIERTA (que es como se despacha desde el 13-nov-2026, con
+  // el acto expreso y fechado del owner) el plazo que aplica sin declaración de
+  // la Empresa es el POR DEFECTO de la tabla supletoria: diez (10) años
+  // contados desde la fecha de la firma. El correo lo dice y dice de dónde
+  // sale. El catálogo legado de veinte (20) años desde la firma se retiró
+  // (J8 y J9) y no puede prometer.
   resetDb();
   mailer.clearDevInbox();
   _crearEmpresa(false);
@@ -220,17 +240,64 @@ test('si la empresa no declara plazo, el correo dice el plazo que REALMENTE apli
   const cuerpo = inbox[0].body;
   assert.ok(!cuerpo.includes('20 años'),
     'el correo no puede prometer veinte (20) años desde la firma: ese catálogo se retiró (J8 y J9)');
-  assert.ok(!cuerpo.includes('la fecha de la firma'),
-    'y la fecha de la firma no es el punto de inicio de ningún plazo vigente');
-  assert.match(cuerpo, /pendiente/i,
-    'el correo dice que el plazo aplicable está pendiente de validación');
-  assert.ok(!cuerpo.includes('tabla de conservación del sistema'),
-    'el plazo no sale de la tabla supletoria mientras la compuerta esté cerrada');
+  assert.ok(cuerpo.includes('10 años'),
+    'el correo dice el plazo que realmente aplica: el de la tabla supletoria');
+  assert.ok(cuerpo.includes('tabla de conservación del sistema'),
+    'y dice de dónde sale: la tabla supletoria que administra K+AIR');
+  assert.ok(!/pendiente/i.test(cuerpo),
+    'el plazo ya no está pendiente de ninguna validación');
   assert.ok(!cuerpo.includes('Dónde puedes pedir una copia'),
     'no debe aparecer una línea de canal si la empresa no lo declaró');
   // El correo sale igual: la comunicación es un deber, no puede bloquear
   // la invitación.
   assert.ok(cuerpo.includes('ID de solicitud'), 'el correo debe salir igual');
+});
+
+test('con la compuerta CERRADA, el correo dice que el plazo NO es aplicable todavia', async () => {
+  // La rama cerrada del mecanismo sigue viva: la compuerta la puede cerrar
+  // otro acto del owner, y el respaldo interno del código arranca cerrado.
+  // Sin plazo declarado por la Empresa NO hay fecha de supresión: el registro
+  // queda retenido con el motivo de la tabla pendiente y el correo lo dice.
+  //
+  // El texto NO se transcribe: sale del motor, con la tabla cerrada inyectada.
+  resetDb();
+  mailer.clearDevInbox();
+  _crearEmpresa(false);
+
+  const { signRequest } = await createSignRequestWithIdentificacion({
+    id_empresa: EMPRESA.id_empresa,
+  });
+
+  const fila = db.prepare(
+    'SELECT fecha_creacion, categoria_retencion FROM gh_firmas_electronicas WHERE id_solicitud = ?'
+  ).get(signRequest.id_solicitud);
+  const plan = retencion.planificar({
+    categoria_retencion: fila.categoria_retencion,
+    fecha_creacion: '2026-01-01T00:00:00.000Z',
+    empresa: { plazo_retencion: null, plazo_retencion_dias: null },
+    tabla_conservacion: TABLA_CERRADA,
+  });
+  assert.equal(plan.fecha_conservacion, null,
+    'con la compuerta cerrada no hay fecha de supresión');
+  assert.equal(plan.hold.motivo, 'tabla_supletoria_pendiente_validacion');
+
+  // El alta con la compuerta cerrada devolvería el plan cerrado: eso es lo que
+  // se comunica en el correo.
+  await signRequestService.notifyRemote(Object.assign({}, signRequest, {
+    plazo_retencion_aplicable: plan.texto,
+    hold_legal: 1,
+    motivo_hold: plan.hold.motivo,
+  }), 'trabajador@example.com', {});
+
+  const cuerpo = mailer.getDevInbox()[0].body;
+  assert.ok(cuerpo.includes(plan.texto),
+    'el correo dice el texto del motor con la tabla cerrada');
+  assert.ok(!cuerpo.includes('tabla de conservación del sistema'),
+    'el plazo del sistema no sale de la tabla mientras la compuerta esté cerrada');
+  assert.ok(!cuerpo.includes('20 años'),
+    'y el catálogo legado de veinte (20) años está retirado (J8 y J9)');
+  assert.match(cuerpo, /pendiente/i,
+    'el correo dice que el plazo aplicable está pendiente');
 });
 
 test('MUTACION: el correo comunica el plazo de la EMPRESA, no uno del sistema', async () => {

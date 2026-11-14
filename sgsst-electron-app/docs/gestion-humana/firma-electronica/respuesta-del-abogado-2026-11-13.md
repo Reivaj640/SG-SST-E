@@ -126,6 +126,13 @@ es el **cambio de la regla de la compuerta** de la tabla supletoria (decision de
 generador aplica como fase 3 sobre el §8 del candidato. El candidato del Anexo de Nube **no se movió**
 (`ba664e6f…e3b47`). Los textos suscritos y el manifiesto **siguen intactos**.
 
+**Re-medido el 13-nov-2026 (tarde, misma fecha, otra vez).** El candidato del Anexo de Encargo **volvio a
+cambiar de bytes**: pasó de 100 396 B / `b345ab87…3a749` a **100 787 B / `55a58967…46fc9`**. La razon tampoco
+es este escrito: es el **acto de apertura** de la compuerta de la tabla supletoria (S-25, el owner la
+abrió con un acto expreso y fechado el 13-nov-2026), que el generador aplica como **fase 4** sobre el §8
+del candidato: dos frases del texto firmado que ya no eran ciertas. El candidato del Anexo de Nube **no se
+movió** (`ba664e6f…e3b47`). Los textos suscritos y el manifiesto **siguen intactos**.
+
 ---
 
 ## 5. Lo que este escrito no cierra

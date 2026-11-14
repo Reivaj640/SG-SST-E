@@ -5,12 +5,12 @@
  * QUE HACE ESTE TEST
  * ------------------
  * Los candidatos de la v1.4 y del Encargo 2026-11-12 se arman por un programa
- * (`scripts/generar-candidatos-v1.4.js`) en tres fases: C1 a C7, las
- * determinaciones legales de la mesa L1 a L7, y la regla de la compuerta de la
- * tabla supletoria (decision del owner del 13-nov-2026). Ese programa **se
- * niega a escribir** si una ancla no casa exactamente una vez, pero un
- * candidato que "sale sin error" no es lo mismo que un candidato que dice lo
- * que debe decir.
+ * (`scripts/generar-candidatos-v1.4.js`) en cuatro fases: C1 a C7, las
+ * determinaciones legales de la mesa L1 a L7, la regla de la compuerta de la
+ * tabla supletoria (decision del owner del 13-nov-2026) y el acto de apertura
+ * de esa compuerta (S-25, el 13-nov-2026). Ese programa **se niega a
+ * escribir** si una ancla no casa exactamente una vez, pero un candidato que
+ * "sale sin error" no es lo mismo que un candidato que dice lo que debe decir.
  *
  * LO QUE SE VERIFICA ACA
  * ----------------------
@@ -24,6 +24,9 @@
  * - Que el candidato del Encargo dice la regla de la compuerta (13-nov-2026):
  *   la apertura es un acto expreso y fechado de K+AIR, y no queda la frase que
  *   exigia una validacion escrita de un tercero.
+ * - Que el candidato del Encargo dice el ACTO de apertura (13-nov-2026): la
+ *   activacion se produjo con su fecha, el Acuerdo vigente es la v1.6 y no
+ *   quedan las dos frases que ya no eran ciertas.
  * - Que **el texto del candidato es byte a byte el de la determinacion**: no
  *   hay texto inventado entre el dictamen y el candidato.
  * - Que el generador **se niega** cuando una ancla no casa.
@@ -245,6 +248,65 @@ test('el candidato del Encargo dice la regla de la compuerta (13-nov-2026)', () 
     'ba664e6f1ad130c968b6224ab71ed66a52017e96ac578b8b0e740fd55f9e3b47',
     'el candidato del Anexo de Nube v1.4 sigue byte a byte el que estaba'
   );
+});
+
+test('el candidato del Encargo dice el ACTO de apertura de la compuerta (13-nov-2026)', () => {
+  // El 13-nov-2026 el owner ABRIO la compuerta de la tabla supletoria con un
+  // acto expreso y fechado (S-25). Dos frases del seccion 8 del texto firmado
+  // dejaron de ser ciertas:
+  //
+  //   1. "la compuerta de la tabla esta cerrada": ya no, desde el acto.
+  //   2. "el Acuerdo que describe este mecanismo no esta aprobado ni
+  //      publicado": eso YA NO ERA CIERTO desde el 11-nov-2026, porque el
+  //      Acuerdo vigente es la v1.6, publicada y activa, y su numeral 8.6(a)
+  //      SI describe esta tabla.
+  //
+  // El texto firmado NO se toca: un texto suscrito se sustituye, no se corrige.
+  // Lo que se sustituye es el v1.4, y el mecanismo de la sustitucion es la
+  // fase 4 del generador.
+  const planoEncargo = plano(fs.readFileSync(ENCARGO_CANDIDATO, 'utf8'));
+
+  assert.ok(planoEncargo.includes('La activaci&oacute;n de la tabla se produjo el 13 de noviembre de 2026'),
+    'el candidato dice que la activacion se produjo, CON SU FECHA');
+  assert.ok(planoEncargo.includes('el Acuerdo que describe este mecanismo es la v1.6'),
+    'el candidato dice cual es el Acuerdo vigente');
+  assert.ok(planoEncargo.includes('publicada y activa desde el 11 de noviembre de 2026'),
+    'y dice que esta publicado y activo');
+  assert.ok(planoEncargo.includes('Desde la activaci&oacute;n de la tabla el 13 de noviembre de 2026 el plazo supletorio'),
+    'el plazo supletorio se aplica desde el acto');
+
+  // Las dos frases que ya no eran ciertas NO pueden quedar.
+  assert.equal(planoEncargo.includes('la compuerta de la tabla est&aacute; cerrada'), false,
+    'no queda la frase que decia que la compuerta esta cerrada');
+  assert.equal(planoEncargo.includes('no est&aacute; aprobado ni'), false,
+    'no queda la frase que decia que el Acuerdo no esta aprobado ni publicado');
+  assert.equal(planoEncargo.includes('Mientras esa activaci&oacute;n no se produzca'), false,
+    'no queda la frase que condicionaba el plazo a una activacion que ya ocurrio');
+  assert.equal(planoEncargo.includes('Mientras la compuerta de activaci&oacute;n siga cerrada'), false,
+    'ni la del seccion 8 que describe el estado anterior');
+
+  // Y el TEXTO FIRMADO los conserva: no se corrige un texto suscrito.
+  const firmado = plano(fs.readFileSync(path.join(LEGAL, 'anexo-encargo.html'), 'utf8'));
+  assert.ok(firmado.includes('la compuerta de la tabla est&aacute; cerrada'),
+    'el texto firmado sigue diciendo lo que decia: lo que cambia es el texto NUEVO');
+  assert.ok(firmado.includes('Mientras la compuerta de activaci&oacute;n siga cerrada'),
+    'y tampoco se lo toca');
+
+  // El config registra el acto, con su fecha y su actor.
+  const config = JSON.parse(fs.readFileSync(
+    path.join(SERVICIO, 'config', 'tabla-conservacion.json'), 'utf8'));
+  assert.equal(config.aplicacion.activada, true, 'la compuerta esta abierta');
+  assert.equal(config.aplicacion.activado_at, '2026-11-13', 'con la fecha del acto');
+  assert.equal(config.aplicacion.estado, 'ACTIVADA', 'y el estado lo dice');
+  assert.equal(config.aplicacion.acto_de_apertura.solicitud, 'S-25',
+    'el acto deja escrito que solicitation lo pidio');
+  assert.equal(config.aplicacion.acto_de_apertura.actor, 'Owner',
+    'y quien lo hizo');
+  assert.equal(config.aplicacion.validado_por, null,
+    'la validacion escrita de un tercero sigue sin existir y ya no se exige');
+  assert.equal(config.version, '1.0', 'la version de la tabla no se movio');
+  assert.equal(config.actualizado_at, '2026-10-31',
+    'la fecha de la tabla no se movio: el texto firmado la publica');
 });
 
 test('el texto del candidato es byte a byte el de la determinacion', () => {

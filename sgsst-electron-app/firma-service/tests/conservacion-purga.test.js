@@ -35,11 +35,20 @@ const Database = require('better-sqlite3');
 const db = require('../src/db/connection');
 const conservacion = require('../src/services/conservacion');
 const retencion = require('../src/services/retencion');
-const { resetDb, asegurarTablasPurga, tablaConservacionActivada } = require('./helpers');
+const {
+  resetDb, asegurarTablasPurga,
+  tablaConservacionActivada, tablaConservacionCerrada,
+} = require('./helpers');
 
-// La tabla con la COMPUERTA ABIERTA. La que se despacha viene cerrada: los
-// plazos de diez (10) y cinco (5) años no los validó el abogado.
+// La tabla con la COMPUERTA ABIERTA. Desde el 13-nov-2026 la compuerta la
+// abre el owner con su acto expreso y fechado (la S-25), asi que la que se
+// despacha viene abierta.
 const TABLA_ACTIVADA = tablaConservacionActivada();
+
+// La tabla con la COMPUERTA CERRADA. Los tests del mecanismo cerrado la
+// inyectan: no dependen del estado del archivo que se despacha, que ya no
+// viene cerrado.
+const TABLA_CERRADA = tablaConservacionCerrada();
 
 const SERVICE = path.resolve(__dirname, '..');
 const SQL_020 = fs.readFileSync(
@@ -169,9 +178,11 @@ test('sin plazo declarado la firma toma el plazo de la tabla supletoria', () => 
   // tabla supletoria de conservación administrada por K+AIR. La firma NO
   // queda retenida por falta de configuración.
   //
-  // La tabla se inyecta con la compuerta ABIERTA: la que se despacha viene
-  // cerrada (los plazos de diez (10) y cinco (5) años no los validó el
-  // abogado), y el caso cerrado tiene su propio test más abajo.
+  // La tabla se inyecta con la compuerta ABIERTA. La que se despacha también
+  // viene abierta (la abre el acto del owner del 13-nov-2026), pero el
+  // mecanismo se prueba con la tabla inyectada, para que el test no dependa
+  // del estado de un archivo. El caso cerrado tiene su propio test más
+  // abajo, con la tabla cerrada inyectada.
   declararPlazo(null);
   const firmaId = sembrarFirma({});
   const fecha = conservacion.asignarFechaConservacion(
@@ -191,16 +202,20 @@ test('sin plazo declarado la firma toma el plazo de la tabla supletoria', () => 
   assert.equal(fila.plazo_conservacion_fuente, 'tabla_supletoria');
 });
 
-test('sin plazo declarado, con la compuerta CERRADA, no hay fecha: la tabla supletoria sigue sin validar', () => {
+test('sin plazo declarado, con la compuerta CERRADA, no hay fecha: la tabla supletoria no aplica', () => {
   // J8 (abogado, 30-oct-2026): con la compuerta cerrada el plazo por defecto
-  // de la tabla supletoria NO aplica (los plazos de diez (10) y cinco (5) años
-  // no los validó el abogado) y el catálogo legado de veinte (20) años desde
-  // la firma se retiró. Sin plazo declarado por la Empresa no hay, entonces,
-  // ninguna fecha de supresión: el sistema no inventa plazos.
+  // de la tabla supletoria NO aplica y el catálogo legado de veinte (20) años
+  // desde la firma se retiró. Sin plazo declarado por la Empresa no hay,
+  // entonces, ninguna fecha de supresión: el sistema no inventa plazos.
+  //
+  // La compuerta la abre el owner (S-25, 13-nov-2026), asi que la que se
+  // despacha viene ABIERTA: este caso de la rama cerrada se prueba con la
+  // tabla cerrada INYECTADA, no con el archivo.
   declararPlazo(null);
   const firmaId = sembrarFirma({});
   const fecha = conservacion.asignarFechaConservacion(
-    firmaId, EMPRESA, '2026-01-01T00:00:00.000Z'
+    firmaId, EMPRESA, '2026-01-01T00:00:00.000Z',
+    { tabla_conservacion: TABLA_CERRADA }
   );
   assert.equal(fecha, null,
     'con la compuerta cerrada no hay fecha de supresión');
@@ -215,11 +230,12 @@ test('sin plazo declarado, con la compuerta CERRADA, no hay fecha: la tabla supl
 
   // El motivo del pendiente es la TABLA, no un plazo inventado: el ALTA (el
   // camino que usa una solicitud de firma) deja el registro retenido con ese
-  // motivo, hasta que el abogado valide y active la tabla.
+  // motivo, mientras la tabla siga cerrada.
   const plan = retencion.planificar({
     categoria_retencion: 'TABLA_EMPRESA',
     fecha_creacion: '2026-01-01T00:00:00.000Z',
     empresa: { plazo_retencion: null, plazo_retencion_dias: null },
+    tabla_conservacion: TABLA_CERRADA,
   });
   assert.equal(plan.fecha_conservacion, null);
   assert.equal(plan.hold.motivo, 'tabla_supletoria_pendiente_validacion');
@@ -874,11 +890,11 @@ test('una firma con hold activo NO entra al lote ni se purga', () => {
 // SUPLETORIA de conservación administrada por K+AIR. El hold por plazo no
 // declarado NO se pone en el alta de una firma.
 //
-// Y con la COMPUERTA CERRADA (que es como se despacha: los plazos de diez (10)
-// y cinco (5) años no los validó el abogado) el plazo por defecto de esa tabla
-// tampoco aplica: no hay fecha de supresión hasta que el abogado la valide y
-// la active. El catálogo legado de veinte (20) años desde la firma se retiró
-// (J8 y J9): no se aplica para nada.
+// Y con la COMPUERTA CERRADA (la rama que el owner puede volver a dejar así
+// con un acto suyo, y en la que arranca el respaldo interno del código) el
+// plazo por defecto de esa tabla tampoco aplica: no hay fecha de supresión.
+// El catálogo legado de veinte (20) años desde la firma se retiró (J8 y J9):
+// no se aplica para nada.
 //
 // Su maquinaria, en cambio, SIGUE VIVA: en las bases ya hay filas con ese
 // hold (en producción y en los tests), y tienen que poder salir por el
@@ -886,19 +902,20 @@ test('una firma con hold activo NO entra al lote ni se purga', () => {
 // y que la liberación y el reporte siguen funcionando.
 //
 
-test('sin plazo declarado, la firma NO queda retenida por el motivo viejo (plazo no declarado)', () => {
+test('sin plazo declarado, con la compuerta CERRADA, la firma NO queda retenida por el motivo viejo (plazo no declarado)', () => {
   // El motivo 'plazo_no_declarado' se retiró: la retención indefinida por
   // falta de configuración ya no existe. Lo que retiene, cuando no hay plazo
   // aplicable, es el motivo vigente (la tabla supletoria pendiente de
   // validación), y lo pone el ALTA.
   //
-  // Aquí, con la compuerta CERRADA y sin plazo declarado por la Empresa, no
-  // hay fecha de supresión: el registro no se suprime porque NO tiene fecha,
-  // no porque un hold lo frene.
+  // Aquí, con la compuerta CERRADA (inyectada) y sin plazo declarado por la
+  // Empresa, no hay fecha de supresión: el registro no se suprime porque NO
+  // tiene fecha, no porque un hold lo frene.
   declararPlazo(null);
   const firmaId = sembrarFirma({});
   const fecha = conservacion.asignarFechaConservacion(
-    firmaId, EMPRESA, '2026-01-01T00:00:00.000Z'
+    firmaId, EMPRESA, '2026-01-01T00:00:00.000Z',
+    { tabla_conservacion: TABLA_CERRADA }
   );
 
   assert.equal(fecha, null, 'con la compuerta cerrada no hay fecha: la tabla supletoria no aplica');
@@ -1130,13 +1147,14 @@ test('MUTACION: la fila sin plazo declarado ya no depende de un hold para no sup
   ).get(conFecha);
   assert.equal(conservacion.esElegible(fila), true, 'sin hold, la firma vencida SÍ se suprime');
 
-  // Sin plazo declarado y con la compuerta CERRADA no hay fecha de supresión:
-  // la fila no se suprime porque NO tiene fecha, no porque su plazo no haya
-  // vencido.
+  // Sin plazo declarado y con la compuerta CERRADA (inyectada) no hay fecha de
+  // supresión: la fila no se suprime porque NO tiene fecha, no porque su plazo
+  // no haya vencido.
   declararPlazo(null);
   const sinPlazo = sembrarFirma({ id_solicitud: 'SIGN-2026-000031' });
   const fecha = conservacion.asignarFechaConservacion(
-    sinPlazo, EMPRESA, '2026-01-01T00:00:00.000Z'
+    sinPlazo, EMPRESA, '2026-01-01T00:00:00.000Z',
+    { tabla_conservacion: TABLA_CERRADA }
   );
   assert.equal(fecha, null,
     'con la compuerta cerrada no hay fecha: la tabla supletoria no aplica');

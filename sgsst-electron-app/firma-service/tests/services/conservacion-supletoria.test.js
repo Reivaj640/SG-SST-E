@@ -74,6 +74,17 @@ const DIAS_PISO_SST = 7305;
 // mecanismo de la tabla (que su plazo por defecto sea el que aplica).
 const TABLA_ACTIVADA = tablaConservacionActivada();
 
+// Una tabla supletoria con la COMPUERTA CERRADA. El 13-nov-2026 el owner
+// ABRIO la compuerta del archivo real (S-25), asi que los tests del mecanismo
+// cerrado no pueden depender del estado del archivo que se despacha: se la
+// inyectan. Lo que se prueba es el MECANISMO, no el estado de hoy.
+const TABLA_CERRADA = (() => {
+  const t = tablaConservacionActivada();
+  return Object.assign({}, t, {
+    aplicacion: Object.assign({}, t.aplicacion, { activada: false, activado_at: null }),
+  });
+})();
+
 // Una tabla supletoria MODIFICADA, para simular un cambio de la tabla de
 // conservación sin tocar el archivo de configuración (que es de solo lectura
 // para el código).
@@ -499,25 +510,27 @@ test('el cálculo de fechas: un caso por categoría', () => {
 // ─────────────────────────────────────────────────────────────────────────────
 // LA COMPUERTA DE ACTIVACIÓN.
 //
-// Lo que se despacha viene con la compuerta CERRADA: los plazos de diez (10)
-// y cinco (5) años no los validó el abogado, y el Acuerdo que los describe
-// (la v1.3) no está aprobado.
+// Lo que se despacha viene con la compuerta ABIERTA: el 13-nov-2026 el owner
+// la abrió con un acto expreso y fechado (S-25). Desde esa fecha los plazos de
+// diez (10) y cinco (5) años se aplican a los documentos que la Empresa no
+// declara, con su fuente y su punto de inicio.
 //
-// Con la compuerta CERRADA no hay plazo por defecto: el catálogo legado de
-// veinte (20) años desde la firma se retiró (J8 y J9) y la tabla supletoria
-// espera la validación del abogado. El registro queda RETENIDO con el motivo
-// `tabla_supletoria_pendiente_validacion` y SIN fecha de supresión.
+// El acto es del owner, no de un tercero: la validación escrita nunca fue
+// requisito (13-nov-2026) y los campos `validado_por` y `validado_at`
+// siguen en null porque no hay validación.
 //
 // Lo que NO depende de la compuerta son las EXCEPCIONES LEGALES: el piso del
 // SG-SST y el hold sin término del contrato. Son deberes.
 // ─────────────────────────────────────────────────────────────────────────────
 
-test('la tabla que se despacha viene con la compuerta CERRADA', () => {
+test('la tabla que se despacha viene con la compuerta ABIERTA por el acto fechado', () => {
   const tabla = retencion.tablaConservacion();
   assert.ok(tabla.aplicacion, 'la tabla declara su propia activación');
-  assert.equal(tabla.aplicacion.activada, false,
-    'los plazos de diez (10) y cinco (5) años no se activan hasta que el abogado los valide');
-  assert.equal(retencion.tablaActivada(), false);
+  assert.equal(tabla.aplicacion.activada, true,
+    'el owner abrió la compuerta el 13-nov-2026 (S-25)');
+  assert.equal(tabla.aplicacion.activado_at, '2026-11-13',
+    'el acto es FECHADO: sin la fecha no hay acto');
+  assert.equal(retencion.tablaActivada(), true);
 });
 
 // LA COMPUERTA SE ABRE CON EL ACTO FECHADO DEL OWNER (13-nov-2026).
@@ -621,6 +634,7 @@ test('con la compuerta cerrada, no hay plazo por defecto: la tabla sigue sin act
     categoria_retencion: 'TABLA_EMPRESA',
     fecha_creacion: FIRMA_BASE,
     empresa: EMPRESA_SIN_PLAZO,
+    tabla_conservacion: TABLA_CERRADA,
   });
 
   assert.equal(plan.fecha_conservacion, null,
@@ -644,6 +658,7 @@ test('con la compuerta cerrada, el texto NO promete la custodia que se retiró',
     categoria_retencion: 'TABLA_EMPRESA',
     fecha_creacion: FIRMA_BASE,
     empresa: EMPRESA_SIN_PLAZO,
+    tabla_conservacion: TABLA_CERRADA,
   });
 
   assert.doesNotMatch(plan.texto, /Se conserva 20 años contados desde la fecha de la firma/,
@@ -659,6 +674,7 @@ test('con la compuerta cerrada, la categoría se sigue registrando y no hay punt
     categoria_retencion: 'HISTORIA_LABORAL',
     fecha_creacion: FIRMA_BASE,
     empresa: EMPRESA_SIN_PLAZO,
+    tabla_conservacion: TABLA_CERRADA,
   });
 
   assert.equal(plan.categoria_conservacion, 'DOCUMENTO_FIRMADO',
@@ -675,6 +691,7 @@ test('con la compuerta cerrada, las EXCEPCIONES LEGALES siguen aplicando', () =>
     fecha_creacion: FIRMA_BASE,
     fecha_terminacion: '2027-06-30T10:00:00.000Z',
     empresa: EMPRESA_SIN_PLAZO,
+    tabla_conservacion: TABLA_CERRADA,
   });
   assert.equal(piso.plazo_conservacion_fuente, 'piso_legal');
   assert.equal(piso.plazo_conservacion_dias, DIAS_PISO_SST);
@@ -694,6 +711,7 @@ test('con la compuerta cerrada, las EXCEPCIONES LEGALES siguen aplicando', () =>
     categoria_retencion: 'CONTRATO_TRABAJO',
     fecha_creacion: FIRMA_BASE,
     empresa: EMPRESA_SIN_PLAZO,
+    tabla_conservacion: TABLA_CERRADA,
   });
   assert.ok(contrato.hold, 'el contrato sigue sin término');
   assert.equal(contrato.fecha_conservacion, null);
@@ -704,6 +722,7 @@ test('con la compuerta cerrada, el plazo de la Empresa tiene la precedencia de s
     categoria_retencion: 'TABLA_EMPRESA',
     fecha_creacion: FIRMA_BASE,
     empresa: EMPRESA_CON_PLAZO,
+    tabla_conservacion: TABLA_CERRADA,
   });
   assert.equal(plan.plazo_conservacion_fuente, 'empresa');
   assert.equal(plan.plazo_conservacion_dias, 1825);
@@ -753,9 +772,10 @@ test('el respaldo congelado también arranca con la compuerta cerrada', () => {
 // LAS CUATRO CONDICIONES DE LA VALIDACIÓN (C1 a C4).
 //
 // El dictamen legal del 12-nov-2026 (L3) propone cuatro condiciones que la
-// validación del abogado externo tiene que cubrir. Lo que se prueba aquí es
-// que la tabla que se entrega al abogado es la que el CÓDIGO ejecuta: cada
-// condición tiene su prueba, y la compuerta sigue CERRADA.
+// validación del abogado externo tenía que cubrir. Lo que se prueba aquí es
+// que la tabla que el CÓDIGO ejecuta es la que se entregó, y que las cuatro
+// condiciones se cumplen con la compuerta ABIERTA (acto del owner del
+// 13-nov-2026).
 //
 //   C1  el registro de operaciones sigue al documento asociado cuando este
 //       tiene piso legal o hold sin término.
@@ -764,15 +784,15 @@ test('el respaldo congelado también arranca con la compuerta cerrada', () => {
 //   C4  la fecha de cese la informa y valida la Empresa por escrito.
 // ─────────────────────────────────────────────────────────────────────────────
 
-test('la tabla que se despacha está PREPARADA para su apertura, y CERRADA', () => {
+test('la tabla que se despacha está ACTIVADA, con su acto fechado', () => {
   const tabla = retencion.tablaConservacion();
   const aplicacion = tabla.aplicacion;
 
-  assert.equal(aplicacion.activada, false, 'la compuerta sigue CERRADA');
-  assert.equal(aplicacion.estado, 'PREPARADA',
-    'preparada no es activada: su estado dice PREPARADA, no ACTIVADA');
-  assert.equal(aplicacion.activado_at, null,
-    'el acto de apertura no existe todavia: lo hace el owner, con su fecha');
+  assert.equal(aplicacion.activada, true, 'la compuerta está ABIERTA');
+  assert.equal(aplicacion.estado, 'ACTIVADA',
+    'el estado dice ACTIVADA: el acto ya se produjo');
+  assert.equal(aplicacion.activado_at, '2026-11-13',
+    'el acto de apertura lleva su fecha: lo hizo el owner el 13-nov-2026');
   assert.equal(aplicacion.validado_por, null,
     'no hay validacion escrita de un tercero, y ya no se exige una');
   assert.equal(aplicacion.validado_at, null,
@@ -804,10 +824,10 @@ test('la tabla que se despacha está PREPARADA para su apertura, y CERRADA', () 
 });
 
 test('el marcador de "PENDIENTE" no abre la compuerta aunque se ponga la bandera', () => {
-  // El archivo que se despacha trae la compuerta cerrada. Si alguien abriera
-  // la bandera sin poner la fecha real del acto, el código tiene que seguir
-  // tratándola como cerrada: el marcador es la ausencia del acto escrita, no
-  // un acto.
+  // El archivo que se despacha trae la compuerta ABIERTA por el acto del owner
+  // (13-nov-2026). Si alguien abriera la bandera SIN la fecha real del acto, el
+  // código tiene que seguir tratándola como cerrada: el marcador es la
+  // ausencia del acto escrita, no un acto.
   const tabla = retencion.tablaConservacion();
   const conMarcador = Object.assign({}, tabla, {
     aplicacion: Object.assign({}, tabla.aplicacion, {

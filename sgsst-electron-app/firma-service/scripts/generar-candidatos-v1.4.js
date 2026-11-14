@@ -22,6 +22,14 @@
  *   deja de ser requisito para abrir la compuerta. Son tres anclas literales
  *   en el Anexo de Encargo (que es donde esta la tabla del seccion 8).
  *
+ *   FASE 4 - el ACTO DE APERTURA de la compuerta (13-nov-2026, S-25): el
+ *   owner abrio la compuerta con un acto expreso y fechado, y dos frases
+ *   del seccion 8 del texto firmado dejaron de ser ciertas. Son dos anclas
+ *   literales en el Anexo de Encargo.
+ * *   decision del owner el 13-nov-2026: la validacion escrita de un tercero
+ *   deja de ser requisito para abrir la compuerta. Son tres anclas literales
+ *   en el Anexo de Encargo (que es donde esta la tabla del seccion 8).
+ *
  * QUE NO HACE (y por que importa)
  * --------------------------------
  * - No modifica `legal/anexo-nube-v1.3.html` ni `legal/anexo-encargo.html`: son
@@ -254,6 +262,84 @@ const ENCARGO_COMPUERTA = [
 ];
 
 // ---------------------------------------------------------------------------
+// FASE 4: EL ACTO DE APERTURA DE LA COMPUERTA (13-nov-2026)
+// ---------------------------------------------------------------------------
+//
+// QUE ES
+// ------
+// El 13-nov-2026 el owner ABRIO la compuerta de la tabla supletoria con un
+// acto expreso y fechado (S-25): `activada` en true y `activado_at` con la
+// fecha. Ese acto cambia lo que el mundo es, y el texto que se firma tiene
+// que decirlo.
+//
+// QUE CORRIGE ESTA FASE
+// -----------------------
+// Dos frases del seccion 8 del texto firmado dejaban de ser ciertas:
+//
+//   1. "la compuerta de la tabla esta cerrada y el Acuerdo que describe
+//      este mecanismo no esta aprobado ni publicado" - la primera mitad ya
+//      no era cierta desde el 13-nov-2026 (el acto), y la segunda YA NO ERA
+//      CIERTA desde el 11-nov-2026: el Acuerdo vigente es la v1.6, publicada
+//      y activa desde ese dia, y su numeral 8.6(a) SI describe esta tabla.
+//   2. "Mientras la compuerta de activacion siga cerrada el plazo
+//      supletorio no se aplica" - es una regla, pero la frase que la
+//      acompana ("el registro queda retenido, sin fecha de supresion")
+//      describe un estado que ya no es el de hoy.
+//
+// QUE HACE ESTA FASE
+// ------------------
+// Sustituye esas dos frases EN EL CANDIDATO, por ancla literal, con el
+// mismo guard que las demas fases: cada ancla tiene que casar EXACTAMENTE
+// una vez o no se escribe nada. Los dos "antes" se extrajeron del texto
+// firmado con una herramienta, no se transcribieron a mano.
+//
+// LO QUE DICE EL TEXTO NUEVO
+// ---------------------------
+// Que la activacion se produjo el 13-nov-2026 con el acto de K+AIR, que el
+// Acuerdo vigente es la v1.6 (publicada y activa desde el 11-nov-2026), que
+// desde esa fecha el plazo supletorio se aplica con su fuente y su punto de
+// inicio, y que los documentos abiertos antes de esa fecha conservan el
+// hold `tabla_supletoria_pendiente_validacion` hasta el RECALCULO que les
+// aplica el plazo supletorio (el recalculo es una operacion expresa,
+// autorizada y auditada; el hold es de los motivos liberables por
+// recalculo, no un deber legal).
+//
+// LO QUE NO HACE
+// ---------------
+// - No toca `legal/anexo-encargo.html`: el texto firmado se queda como esta.
+//   Un texto suscrito no se corrige, se sustituye: esto es la sustitucion
+//   (la v1.4), y es la que el owner tiene que revisar y firmar (M.18).
+// - No toca el Anexo de Nube: la compuerta de la tabla se describe en el
+//   Anexo de Encargo, que es donde esta la tabla del seccion 8.
+// - No enciende ni apaga la compuerta: eso es el config
+//   (`config/tabla-conservacion.json`), y lo hizo el acto del owner.
+//
+const ENCARGO_COMPUERTA_ACTO = [
+  {
+    id: 'COMPUERTA-ACTO-1',
+    donde: 'Seccion 8, el parrafo que presenta la tabla supletoria',
+    antes:
+      '<strong>Mientras esa activaci&oacute;n no se produzca el plazo supletorio no se aplica</strong>: la' +
+      '\n' +
+      '  compuerta de la tabla est&aacute; cerrada y el Acuerdo que describe este mecanismo no est&aacute; aprobado ni' +
+      '\n' +
+      '  publicado, de modo que el registro queda retenido, sin fecha de supresi&oacute;n, con el <em>hold</em>' +
+      '\n' +
+      '  <code>tabla_supletoria_pendiente_validacion</code>;',
+    despues:
+      '<strong>La activaci&oacute;n de la tabla se produjo el 13 de noviembre de 2026, con el acto expreso y fechado de K+AIR</strong>: el Acuerdo que describe este mecanismo es la v1.6, publicada y activa desde el 11 de noviembre de 2026, y desde esa fecha el plazo supletorio se aplica, con la fuente y el punto de inicio que esta tabla declara en sus ocho categor&iacute;as, de modo que el registro se conserva con su fecha de supresi&oacute;n calculada; los documentos abiertos antes de esa fecha conservan el <em>hold</em> <code>tabla_supletoria_pendiente_validacion</code> hasta el rec&aacute;lculo que les aplica el plazo supletorio;',
+  },
+  {
+    id: 'COMPUERTA-ACTO-2',
+    donde: 'Seccion 8, la descripcion de la tabla del seccion 8',
+    antes:
+      '<strong>Mientras la compuerta de activaci&oacute;n siga cerrada el plazo supletorio no se aplica</strong>: el registro queda retenido, sin fecha de supresi&oacute;n, con el <em>hold</em> <code>tabla_supletoria_pendiente_validacion</code>;',
+    despues:
+      '<strong>Desde la activaci&oacute;n de la tabla el 13 de noviembre de 2026 el plazo supletorio se aplica</strong>: el registro se conserva con su fecha de supresi&oacute;n calculada, y los documentos abiertos antes de esa fecha conservan el <em>hold</em> <code>tabla_supletoria_pendiente_validacion</code> hasta el rec&aacute;lculo que les aplica el plazo supletorio;',
+  },
+];
+
+// ---------------------------------------------------------------------------
 // EL MOTOR
 // ---------------------------------------------------------------------------
 
@@ -341,6 +427,19 @@ function correr(escribir) {
   }
   textoEncargoFinal = rc.texto;
 
+  // FASE 4: el ACTO DE APERTURA de la compuerta (13-nov-2026). El texto
+  // firmado describia un estado que ya no es el de hoy: la compuerta esta
+  // abierta y el Acuerdo vigente (la v1.6) si esta aprobado y publicado.
+  const r4 = aplicar(textoEncargoFinal, ENCARGO_COMPUERTA_ACTO);
+  console.log('Acto de apertura de la compuerta (13-nov-2026): ' + ENCARGO_COMPUERTA_ACTO.length + ' reemplazos.');
+  if (r4.problemas.length) {
+    console.error('\nERROR: un ancla del acto de apertura no se pudo aplicar:');
+    r4.problemas.forEach((p) => console.error('  ' + p));
+    console.error('NO SE ESCRIBE NADA.');
+    return 1;
+  }
+  textoEncargoFinal = r4.texto;
+
   // El texto vigente no se toca: se comprueba antes de escribir nada.
   const bufNube = fs.readFileSync(origenNube);
   const bufEncargo = fs.readFileSync(origenEncargo);
@@ -378,7 +477,8 @@ function correr(escribir) {
   return 0;
 }
 
-module.exports = { correr: correr, NUBE: NUBE, ENCARGO: ENCARGO, ENCARGO_COMPUERTA: ENCARGO_COMPUERTA };
+module.exports = { correr: correr, NUBE: NUBE, ENCARGO: ENCARGO, ENCARGO_COMPUERTA: ENCARGO_COMPUERTA,
+  ENCARGO_COMPUERTA_ACTO: ENCARGO_COMPUERTA_ACTO };
 
 if (require.main === module) {
   const args = process.argv.slice(2);

@@ -69,9 +69,10 @@ Anexo de Encargo 2026-11-12 — **97 962 B**, `7576b1a1dd7f7ded71ac6be7ff556a704
 > `respuesta-del-abogado-2026-11-13.md`; **no es formal**: sin nombre, sin fecha de suscripción y sin
 > huella), y los candidatos se regeneraron. **Las huellas vigentes** son: Anexo de Nube v1.4 —
 > **111 462 B**, `ba664e6f1ad130c968b6224ab71ed66a52017e96ac578b8b0e740fd55f9e3b47`; Anexo de Encargo
-> 2026-11-12 — **100 396 B**, `b345ab87a816eddb98bf79c30be6de38d9d1fbe90f2682c89d8e7560bbe3a749`
-> (re-medido otra vez el 13-nov-2026, por el cambio de la regla de la compuerta: el Anexo de Nube **no se
-> movió**).
+> 2026-11-12 — **100 787 B**, `55a58967b3bb081bcee5f72d15b50b4b3141691418a9b8338df9db738b646fc9`
+> (re-medido el 13-nov-2026 por el cambio de la regla de la compuerta y otra vez el 13-nov-2026, tarde,
+> por el **acto de apertura** de esa compuerta (S-25): el Anexo de Nube **no se movió** en ninguno de los
+> dos cambios).
 > Las de arriba **no se reescriben** (este registro tiene fecha) pero **tampoco se pueden mandar**: el
 > pedido al abogado (`solicitudes-al-abogado-2026-11-13.md`) trae la tabla de huellas vigentes al final.
 
