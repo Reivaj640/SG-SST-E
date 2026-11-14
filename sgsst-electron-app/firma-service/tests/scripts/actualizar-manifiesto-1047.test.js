@@ -32,6 +32,7 @@
 
 const { test, beforeEach, afterEach } = require('node:test');
 const assert = require('node:assert/strict');
+const crypto = require('crypto');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
@@ -40,6 +41,7 @@ const script = require('../../scripts/actualizar-manifiesto-1047');
 
 const SERVICE_ROOT = path.resolve(__dirname, '..', '..');
 const MANIFIESTO_REAL = path.join(SERVICE_ROOT, 'legal-readiness.json');
+const TEXTO_ENCARGO_REAL = path.join(SERVICE_ROOT, '..', 'legal', 'anexo-encargo.html');
 
 let tmp;
 let copia;
@@ -256,6 +258,27 @@ test('1047 · la suscripcion del Anexo de Encargo NO se reescribe al publicar', 
     'con la huella del texto que la Empresa suscribio el 12-nov-2026',
   );
   assert.ok(v1111.evidencia, 'con su evidencia');
-  assert.equal(man.anexo_encargo.estado, 'no_firmado',
-    'el texto vigente (2026-11-12) no esta suscrito todavia');
+
+  // EL ESTADO DEL TEXTO VIGENTE NO SE FIJA AQUI: SE FIJA SU COHERENCIA.
+  //
+  // El texto vigente (el 2026-11-12) no estaba suscrito cuando se escribio este
+  // test, y el 14-nov-2026 quedo suscrito y contrafirmado. Un test que congela
+  // el estado del mundo se rompe con cada acto, y uno que solo mira el estado
+  // no prueba nada. Lo que se prueba es la REGLA: si el manifiesto declara una
+  // firma, esa firma tiene que describir el texto vigente de verdad (misma
+  // version, misma huella del archivo real) y traer su fecha y su evidencia.
+  const hashVigente = crypto.createHash('sha256')
+    .update(fs.readFileSync(TEXTO_ENCARGO_REAL)).digest('hex');
+  if (man.anexo_encargo.estado === 'firmado') {
+    assert.equal(man.anexo_encargo.version, '2026-11-12',
+      'la firma declarada tiene que describir el texto vigente');
+    assert.equal(String(man.anexo_encargo.hash || '').toLowerCase(), hashVigente,
+      'la firma declarada tiene que traer la huella del texto vigente: si el archivo '
+      + 'cambio, la firma ya no lo describe y no puede quedar declarada');
+    assert.ok(man.anexo_encargo.fecha, 'una firma declarada tiene que traer su fecha');
+    assert.ok(man.anexo_encargo.evidencia, 'una firma declarada tiene que traer su evidencia');
+  } else {
+    assert.equal(man.anexo_encargo.estado, 'no_firmado',
+      'sin los dos actos, el estado del texto vigente es "no_firmado"');
+  }
 });

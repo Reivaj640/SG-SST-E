@@ -348,6 +348,37 @@ function main(args = process.argv.slice(2)) {
   }
   const firmadoPrevio = firmadasPrevias.filter((x) => x && x.version);
 
+  // LA NOTA DICE EL ESTADO, NO UNA FOTOGRAFIA.
+  //
+  // La nota del texto vigente decia "NO SUSCRITO todavia" FIJO en el codigo. El
+  // 14-nov-2026 ese texto quedo suscrito por la Empresa y contrafirmado por
+  // K+AIR, y el manifiesto se contradio a si mismo: el bloque decia "firmado" y
+  // su nota decia "no firmado". Un manifiesto que se contradice no prueba nada,
+  // y esta nota es la que lee la gente.
+  //
+  // Por eso la nota se arma con el estado REAL que declara el manifiesto: la
+  // firma con sus dos fechas, o el aviso de que faltan los actos.
+  const notaEstadoNube = firmaDelTextoVigente
+    ? 'Texto vigente del Anexo de Nube: la v' + VERSION_NUBE + '. PUBLICADO EL 14-nov-2026, por '
+      + 'acto expreso del owner, y SUSCRITO: la Empresa lo suscribio el '
+      + (nubePrevio.fecha || '(sin fecha)') + ' y K+AIR lo contrafirmo el '
+      + (nubePrevio.contrafirma_fecha || '(sin fecha)')
+      + (nubePrevio.contrafirmado === true
+        ? '. Los dos actos ocurrieron: el instrumento esta EJECUTADO.'
+        : ', y FALTA el segundo acto (la contrafirma del Encargado).')
+    : 'Texto vigente del Anexo de Nube: la v' + VERSION_NUBE + '. PUBLICADO EL 14-nov-2026, por '
+      + 'acto expreso del owner, y NO SUSCRITO todavia: el manifiesto lo declara no firmado '
+      + '("firmado" en false y "contrafirmado" en false) mientras no ocurran los dos actos (la '
+      + 'suscripcion de la Empresa y la contrafirma del Encargado).';
+
+  // Lo mismo para la frase que compara con los instrumentos anteriores.
+  const notaHistoriaNube = firmaDelTextoVigente
+    ? 'instrumentos anteriores (la v1.3 de este Anexo y el Anexo de Encargo 2026-11-11) ya '
+      + 'quedaron suscritos y contrafirmados el 12-nov-2026, y esta v1.4 quedo suscrita y '
+      + 'contrafirmada el 14-nov-2026. '
+    : 'instrumentos anteriores (la v1.3 de este Anexo y el Anexo de Encargo 2026-11-11) ya '
+      + 'quedaron suscritos y contrafirmados el 12-nov-2026, y que esta v1.4 no esta suscrita. ';
+
   m.anexo_nube = {
     firmado: firmaDelTextoVigente,
     fecha: firmaDelTextoVigente ? nubePrevio.fecha : null,
@@ -374,18 +405,14 @@ function main(args = process.argv.slice(2)) {
       hash: hashNube,
       bytes: bytesNube,
       actualizado: FECHA,
-      nota: 'Texto vigente del Anexo de Nube: la v' + VERSION_NUBE + '. PUBLICADO EL 14-nov-2026, por '
-        + 'acto expreso del owner, y NO SUSCRITO todavia: el manifiesto lo declara no firmado '
-        + '("firmado" en false y "contrafirmado" en false) mientras no ocurran los dos actos (la '
-        + 'suscripcion de la Empresa y la contrafirma del Encargado). Corrige la fila de Google: '
+      nota: notaEstadoNube + ' Corrige la fila de Google: '
         + 'Google LLC es el Encargado de la operacion concreta y del vinculo contractual, y '
         + '"Subencargado" es una figura contractual, no una categoria legal, con el art. 24 num. 2 y '
         + 'el art. 25 del Decreto 1377 de 2013; la comunicacion al exterior es una TRANSMISION '
         + 'internacional a un Encargado, no una transferencia, y por eso el art. 26 no se activa. '
         + 'Declara a Backblaze, Inc. como subencargado, con la region del bucket. Corrige doce '
         + 'afirmaciones del expediente (las del §0 del dictamen de L1). Declara que los dos '
-        + 'instrumentos anteriores (la v1.3 de este Anexo y el Anexo de Encargo 2026-11-11) ya '
-        + 'quedaron suscritos y contrafirmados el 12-nov-2026, y que esta v1.4 no esta suscrita. '
+        + notaHistoriaNube
         + 'Remite al Anexo de Encargo version 2026-11-12. Los pendientes P3 (los alias del dominio) '
         + 'y P6 (revocar las app passwords) siguen pendientes, a cargo del owner. La v1.3, suscrita '
         + 'y contrafirmada el 12-nov-2026, y la v1.1, suscrita el 5-nov-2026, quedan en '
@@ -444,6 +471,19 @@ function main(args = process.argv.slice(2)) {
     && Boolean(encargoPrevio.fecha)
     && Boolean(encargoPrevio.evidencia);
 
+  // LA NOTA DEL ENCARGO TAMBIEN DICE EL ESTADO. La del Anexo de Nube ya lo
+  // hace (arriba): sin esto, el 14-nov-2026 el manifiesto del Anexo de Encargo
+  // decia "firmado" y su nota decia "no firmado".
+  const notaEstadoEncargo = encargoVigenteFirmado
+    ? 'Texto vigente del Anexo de Encargo: la version ' + VERSION_ENCARGO + '. PUBLICADO EL '
+      + '14-nov-2026, por acto expreso del owner, y SUSCRITO: la Empresa lo suscribio y K+AIR lo '
+      + 'contrafirmo el ' + (encargoPrevio.fecha || '(sin fecha)') + '. Los dos actos ocurrieron: el '
+      + 'instrumento esta EJECUTADO.'
+    : 'Texto vigente del Anexo de Encargo: la version ' + VERSION_ENCARGO + '. PUBLICADO EL '
+      + '14-nov-2026, por acto expreso del owner, y NO SUSCRITO todavia: el manifiesto lo declara '
+      + 'no firmado ("estado": "no_firmado") mientras no ocurran los dos actos (la suscripcion de la '
+      + 'Empresa y la contrafirma del Encargado).';
+
   m.anexo_encargo = {
     estado: encargoVigenteFirmado ? 'firmado' : 'no_firmado',
     fecha: encargoVigenteFirmado ? encargoPrevio.fecha : null,
@@ -454,10 +494,7 @@ function main(args = process.argv.slice(2)) {
     contrafirma_facultad: encargoVigenteFirmado ? (encargoPrevio.contrafirma_facultad || null) : null,
     version: VERSION_ENCARGO,
     hash: hashEncargo,
-    nota: 'Texto vigente del Anexo de Encargo: la version ' + VERSION_ENCARGO + '. PUBLICADO EL '
-      + '14-nov-2026, por acto expreso del owner, y NO SUSCRITO todavia: el manifiesto lo declara '
-      + 'no firmado ("estado": "no_firmado") mientras no ocurran los dos actos (la suscripcion de la '
-      + 'Empresa y la contrafirma del Encargado). Es una version NUEVA, no una correccion: el texto que '
+    nota: notaEstadoEncargo + ' Es una version NUEVA, no una correccion: el texto que '
       + 'la Empresa suscribio y K+AIR contrafirmo el 12-nov-2026 (la 2026-11-11, huella '
       + '6308b1f7a51007cb1e973de0210d1e5659d3b3ceb8e3e3b7a3ee52a7275b8948) queda INTACTO y pasa a '
       + '`versiones_firmadas` como instrumento anterior, con su evidencia y su contrafirma; la '

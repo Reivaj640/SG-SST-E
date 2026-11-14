@@ -1331,9 +1331,18 @@ function evaluar(opciones = {}) {
             ? `La versión activa es ${versionActiva}, la misma que declara el manifiesto.`
             : `La versión activa es ${versionActiva}, pero el manifiesto declara ${versionEsperada || 'ninguna'}: `
               + 'el texto que está en vigor no es el texto vigente declarado.'),
+        // DEFECTO CORREGIDO EL 14-NOV-2026: la llamada pasaba TRES argumentos y
+        // `_accionSi(condicion, accion)` solo lee dos: el tercero se descartaba en
+        // silencio. `_accionSi` devuelve la accion cuando la condicion es FALSA
+        // (o sea, cuando el item queda pendiente), asi que el texto que se
+        // imprimia en el caso pendiente era el del caso ya publicado: "No hay
+        // nada que publicar: la version en vigor es la que declara el
+        // manifiesto". En produccion (14-nov-2026, la v1.5 en vigor y la v1.6
+        // declarada) el gate le decia al operador que no habia nada que hacer,
+        // cuando lo que habia que hacer era registrar la v1.6. El texto de la
+        // accion es el que va en el SEGUNDO argumento; el tercero no existia.
         accion: _accionSi(
           publicadoV11,
-          'No hay nada que publicar: la versión en vigor es la que declara el manifiesto.',
           'Registrar en la base la versión que declara el manifiesto (con su huella) para que el '
             + 'texto que está en vigor sea el vigente.',
         ),

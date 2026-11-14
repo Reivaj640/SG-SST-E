@@ -10471,3 +10471,76 @@ fija. Un guard que solo mira un lado no sabe qué regla está vigente.
 `activado_at: null`): abrirla es un acto del owner, con su fila (S-25) y su fecha. El texto firmado no se
 tocó. El manifiesto no se tocó. Y la ratificación externa de L1, L2, L4, L5 y de las condiciones C1 a C4
 sigue pendiente **en el mundo**: la regla del código cambió, no el mundo.
+
+## 🐗 El gate que mandaba a registrar una versión que ya estaba vigente (📦1078, 2026-11-14)
+
+### La medición que se hizo contra una copia de la base sin el WAL
+
+**El síntoma.** El gate de readiness medido en el servidor dio cinco bloqueantes, y uno de ellos decía
+«la versión activa es v1.5, pero el manifiesto declara v1.6». De ese texto salió una tarea: registrar la
+v1.6 como versión vigente en `gh_firma_acuerdo_versiones` y registrar su aprobación operativa. **Las dos
+cosas ya estaban hechas desde el 11-nov-2026**: la v1.6 era la versión activa (`id 5`, `activa = 1`, desde
+`2026-11-11T19:51:42.036Z`) y su autorización operativa estaba en `gh_firma_aprobaciones_publicacion`
+(`id 4`, `tipo = OPERATIVA`, 2026-11-11, `aprobado_por` el owner de K+AIR, con la huella `08e1eb8b…` que es
+la que declara el manifiesto). La tarea no era un recordatorio: era **trabajo que ya no había que hacer**, y
+de trabajo inventado salen actos administrativos reales.
+
+**Por qué se rompió.** La medición no pudo correr contra la base viva (es de `kairfirma` y el `.env` es
+`600 root`), así que corrió contra una **copia**: la del script, hecha con `cp` del **archivo principal**.
+Con el servicio corriendo en **WAL**, el archivo principal no contiene lo último que se escribió: contiene
+el estado del **último checkpoint** (en el servidor, el de las 12:13 del 11-nov). En ese mundo la v1.5
+seguía vigente, la Empresa no había suscrito nada y la v1.6 no estaba registrada. O sea: **la copia era de
+otro día**, y el gate —que es una fotografía— fotografió ese otro día con la misma fidelidad con que
+fotografía el de hoy. Lo peor: el número parecía legítimo (42 items, 5 bloqueantes, un detalle que se lee
+como verdad) y el detalle era **consistente con la copia**: un bloqueante inventado por una copia vieja no
+se delata, porque en esa copia es verdad.
+
+**Por qué no se vio antes.** La **§5.37** (6-nov-2026) ya lo decía, con su propio caso real: «la copia se
+hace con `sqlite3 .backup`, no copiando el archivo». La regla existía, estaba escrita y se violó. **Una
+regla escrita no es una regla cumplida**, y una medición que no nombra el insumo no es auditable: el
+informe decía «el gate» y no «el gate contra esta copia, tomada el 14-nov a las 17:49».
+
+**La prueba: un experimento controlado, no una interpretación.** Con la misma copia **sin WAL**, el gate
+reproduce **exactamente** los números de la medición anterior: `Items: 42 · OK: 35 · Pendientes: 4 ·
+Avisos: 2`, `Bloqueantes: 37 · Pendientes: 5`, con el item `publicado` pendiente y su detalle «la versión
+activa es v1.5». Con una copia **consistente** (`sqlite3 .backup`, que sí incluye el WAL), el mundo real:
+la v1.6 en vigor **es** la que declara el manifiesto y el item queda en verde. La contradicción entre las
+dos mediciones dejó de ser una contradicción: eran **dos mundos**.
+
+**Lo que queda del caso, medido contra la misma base y con la variable del servicio vivo
+(`FIRMA_EXIGIR_ANEXO_NUBE=true`):**
+
+| manifiesto | gate | listo | items | OK | pendientes | bloqueantes pendientes |
+|---|---|---|---|---|---|---|
+| el viejo (el desplegado) | `publicacion` | sí | 42 | 37 | 3 | 0 |
+| el viejo (el desplegado) | `primera_firma` | **no** | 42 | 37 | 3 | **4** (`firmado_nube`, `contrafirma_nube`, `estado_encargo`, `empresas_base`) |
+| el nuevo (con la firma) | `publicacion` | sí | 42 | 41 | 0 | 0 |
+| el nuevo (con la firma) | `primera_firma` | **sí** | 42 | 41 | 0 | **0** |
+
+Los cuatro bloqueantes del manifiesto viejo son, uno por uno, los que el manifiesto nuevo resuelve.
+
+**Las reglas.**
+
+1. **Un bloqueante medido contra una copia no se ejecuta: primero se reproduce.** Si el número no se
+   reproduce contra la base viva (o contra una copia consistente), el bloqueante no existe — y la tarea que
+   genera tampoco.
+2. **La copia de la base se hace con `sqlite3 .backup`**, no copiando el archivo (§5.37). Con el servicio
+   corriendo, el archivo principal puede no incluir el WAL: es un mundo viejo, con su propia historia.
+3. **Reproducir el número viejo es la prueba del diagnóstico.** Cuando dos mediciones se contradicen, la
+   que se reproduce con la copia sospechosa es la que explica a la otra.
+4. **Toda afirmación «en producción pasa X» dice contra qué base y con qué copia se midió.** Sin eso, una
+   medición de laboratorio se cuenta como un hecho del servidor, y el Historial y las trampas heredan el
+   error.
+5. **Un item que dice «no hay nada que hacer» tampoco prueba que no haya nada que hacer.** El gate mide
+   contra la base que le das: un «no hay nada que publicar» puede ser el texto equivocado de un item
+   pendiente, y un «todo en verde» puede ser un mundo al que todavía no le falta ningún acto.
+
+**Lo que se corrigió en el registro.** La **trampa 183** (el `_accionSi` con tres argumentos, que devolvía
+el texto del caso contrario) decía «en producción» algo que solo ocurrió en esa copia sin WAL: el defecto
+era **latente** — el item `publicado` estaba en verde, porque la v1.6 ya estaba en vigor, así que la acción
+equivocada nunca se imprimió. Se corrigió **antes de commitearla**, porque un registro que afirma un hecho
+falso del servidor es peor que un registro que falta.
+
+**Medido.** Suite completa de `firma-service`: **2 709 tests · 2 707 pass · 0 fail · 2 skipped** (Node 22,
+en solitario). Manifiesto regenerado desde la base viva: `115a94e7…58d72`. Sello del despliegue vivo:
+`2a48678f4656` (255 archivos).

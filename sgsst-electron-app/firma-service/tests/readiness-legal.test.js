@@ -1366,6 +1366,31 @@ test('readiness · con una versión activa distinta de la que declara el manifie
   }
 });
 
+test('readiness · la accion de `publicado` dice lo que hay que hacer, no lo contrario', () => {
+  // DEFECTO CORREGIDO EL 14-NOV-2026: `_accionSi(condicion, accion)` solo lee
+  // DOS argumentos y la llamada le pasaba TRES: el tercero (el texto correcto)
+  // se descartaba en silencio. Con la condicion sin invertir, el item PENDIENTE
+  // imprimia "No hay nada que publicar: la version en vigor es la que declara
+  // el manifiesto", que es justo lo que NO hay que hacer cuando la version en
+  // vigor no es la que declara el manifiesto. En produccion (14-nov-2026: la
+  // v1.5 en vigor y la v1.6 declarada) el gate le decia al operador que no
+  // hiciera nada, cuando lo que tenia que hacer era registrar la v1.6.
+  const man = manifiestoCompleto();
+  const ruta = rutaTemporal('kair-readiness-publicado-accion');
+  const bd = bdConAcuerdo(ruta, [{ version: 'v1.5', hash: 'f'.repeat(64), activa: true }]);
+  try {
+    const r = reporteConBd(bd, man);
+    const item = r.pendientes.find((p) => p.id === 'publicado');
+    assert.ok(item, 'publicado no quedo pendiente con la v1.5 activa y otra declarada');
+    assert.match(item.accion, /Registrar en la base la versi/,
+      `la accion no dice lo que hay que hacer: ${item.accion}`);
+    assert.doesNotMatch(item.accion, /No hay nada que publicar/,
+      `la accion dice lo contrario de lo que hay que hacer: ${item.accion}`);
+  } finally {
+    bd.close();
+  }
+});
+
 test('readiness · con la versión activa igual a la del manifiesto y su huella, `publicado` queda ok', () => {
   const man = manifiestoCompleto();
   const hash = readiness._internos._hash(ACUERDO_OK);
