@@ -17,6 +17,33 @@
 
 ## 🚦 ESTADO AL CIERRE
 
+> **Actualización 2026-11-14 (mañana, décima parte) — EL ACTO DEL OWNER ABRIÓ LA COMPUERTA DE LA TABLA SUPLETORIA: `activada: true` CON SU FECHA, Y QUEDÓ DESPACHADA EN PRODUCCIÓN (SIN REINICIAR)**
+> 
+> **Qué decidió el owner.** (1) «Sí: activada=true y activado_at=2026-11-13» — la **S-25**, el acto expreso y fechado que abre la compuerta. (2) «Copiar 📦 1066 al servidor, **sin reiniciar**».
+> 
+> **Lo que se aplicó.** `config/tabla-conservacion.json`: `aplicacion.activada` de `false` a **true**, `aplicacion.activado_at` de `null` a **"2026-11-13"**, `aplicacion.estado` de `PREPARADA` a **ACTIVADA**, y un bloque nuevo `aplicacion.acto_de_apertura` (fecha, actor Owner, solicitud S-25, tipo «acto expreso y fechado del owner»). **`version` (`1.0`) y `actualizado_at` (`2026-10-31`) NO se movieron**: la fecha de la tabla la publica el texto firmado (trampa 171). Resultado: **15 993 B / `a7bdb281…56dd0`**.
+> 
+> **El texto del candidato, corregido; el texto suscrito, intacto.** El generador recibíó una **fase 4** (dos anclas literales, extraídas a máquina del texto firmado): las dos frases del §8 que decían «la compuerta de la tabla está cerrada» y «el Acuerdo que describe este mecanismo no está aprobado ni publicado» ya eran falsas, y el §8 firmado las conserva. El Anexo de Encargo candidato pasó de 100 396 B a **100 787 B / `55a58967…46fc9`**; el **Anexo de Nube no cambió** (111 462 B / `ba664e6f…e3b47`); los suscritos siguen en `6308b1f7…` y `fdd10551…`, y el manifiesto en `d9b59699…`.
+> 
+> **Lo que se midió en el servidor antes de tocar nada (y cambiaba el plan).** El código desplegado era del **11-nov-2026**: la ronda 23 **no** estaba en producción. La tabla del servidor tenía **7 384 B / `9c81a175…`**, con `activada=false` y sin `activado_at`. El manifiesto del servidor estaba **103 B atrás** (`191c08b8…` contra `d9b59699…`: solo difieren las `nota`, y la del repo es la correcta). Las dependencias instaladas son **zod 3.25.76**, **nodemailer 6.10.1**, **express 4.22.2** y **Node v20.20.2**, mientras el `package.json` del repo salta a **zod ^4** y **nodemailer ^10**: por eso los `src/schemas/*.js`, que ya usan la API de zod 4, **no** se copiaron.
+> 
+> **Lo que se desplegó (copia acotada, sin reiniciar).** Cinco archivos: `config/tabla-conservacion.json`, `src/services/retencion.js`, `scripts/generar-candidatos-v1.4.js`, `scripts/correspondencia-texto-codigo.js` y `legal-readiness.json`. **Respaldo previo** de los cuatro que ya existían en `/tmp/kair-r24-respaldo/` (copia local en `%TEMP%\kair-p8\prev-r24\`), **hashes verificados byte a byte en destino**, y el acto **leído desde el archivo ya despachado**: `activada = true`, `activado_at = 2026-11-13`, `estado = ACTIVADA`, `version = 1.0`, `actualizado_at = 2026-10-31`. El servicio **sigue vivo** (`active`, `/health` → `status: ok`, uptime 26,8 h): **no se reinició**, como se pidió.
+> 
+> **Lo que NO se desplegó y por qué.** `package.json`, `package-lock.json` y `src/schemas/*` (y el resto de `src/` de la ronda 23) quedan pendientes: instalarlos exige **`npm ci` con sudo y Node 22** (la decisión M.14). Copiarlos sin eso dejaría el servidor declarando zod 4 con zod 3 instalado y **tumbaría el próximo reinicio**. Con lo que se copió, el servidor queda **reiniciable**.
+> 
+> **El defecto que encontró la medición (y era de fondo).** La suite completa no salió en verde: **5 pruebas** afirmaban el estado viejo («con la compuerta cerrada no hay fecha») apoyándose en el **archivo que se despacha**, que ya viene abierto. Se corrigieron **inyectando la tabla cerrada** (`TABLA_CERRADA`) en `tests/helpers.js`, de modo que los tests del mecanismo cerrado ya no dependen del estado de un archivo; los del flujo real se actualizaron al estado abierto, y se **añadió** el caso del correo con la compuerta cerrada, cuyo texto sale del motor y **no** se transcribe a mano. De paso se corrigieron los comentarios que afirmaban que la tabla «se despacha cerrada» (`retencion.js`, cuatro archivos de test y el generador de la correspondencia), y el ancla de la fila 8.6(h) de la correspondencia, que exigía `"activada": false` y con el acto no existía.
+> 
+> **El EOL de `CONTEXT.md`.** Al medirlo apareció que el archivo, **mixto** (2 396 CRLF, 2 768 CR, 114 LF), había quedado con 2 882 líneas sin terminador. La medición previa de `HEAD` estaba **contaminada**: el pipe de PowerShell normaliza a CRLF y hacía ver el blob como 100 % CRLF. Se reconstruyó **por bytes desde `HEAD`**, conservando el terminador original de cada línea y aplicando solo el cambio de contenido: el diff quedó en **una línea**.
+> 
+> **Medido.** Suite completa de `firma-service` (180 archivos): **2 700 tests, 2 698 pass, 0 fail, 2 skipped** (259,9 s, `exit 0`, Node 22, en solitario). Subconjunto afectado: **180/180**. Barrido sobre los **29** archivos modificados: **0 caracteres prohibidos** (CJK, cirílico, hangul, griego), **ASCII puro** en los tres programas del motor y en los dos candidatos, sin BOM, sin EOL nuevo en los archivos mixtos. **Textos suscritos y manifiesto intactos** después de la corrida (`git status`): la trampa 171 no se disparó.
+> 
+> **El registro.** La **S-25** pasó a `CERRADA` por el acto del owner (el tercer criterio de cierre: respuesta aplicada, resolución y **acto del owner**), con la aclaración de que **no ratifica nada del abogado**. Las cifras: **25 solicitudes = 18 `EMITIDA` / 0 `RESPONDIDA` / 7 `CERRADA`**, propagadas a los seis documentos vivos y al mapa (31 bloques, todos cerrados).
+> 
+> **Las reglas nuevas.** `PROMPT.md` recibió la **§5.49** y las **trampas 172 y 173**: el EOL se mide con los bytes (un pipe de PowerShell normaliza los terminadores a CRLF y falseó la medición de `HEAD`) y un test del mecanismo no puede depender del archivo que se despacha, porque lo cambia un acto humano.
+> 
+> **El commit y el push.** Esta ronda queda en el **📦 1068** (`ba767bb5`, 26 archivos, +604 / −221) y la anotación de esta misma línea en el **📦 1069**: el **push** espera «pushea». `origin/Dev` sigue en `98238ce3` (medido con `git ls-remote`).
+> 
+> **La cola del owner al cierre de esta ronda.** (1) **Reiniciar el servicio con sudo** (`sudo systemctl restart kair-firma`): hasta el reinicio la compuerta **está en el archivo pero no corre** — el proceso en memoria es el del 11-nov. (2) **Autorizar el commit y el push** del 📦 1068. (3) **La ventana de dependencias**: `npm ci` + **Node 22** + sudo, para poder desplegar el resto de la ronda 23 (`src/schemas`, `src/routes`, `src/config.js`, `package.json`). (4) **Revisar y firmar la v1.4**: los dos párrafos nuevos del §8 los redactó el agente. (5) **Decidir `FIRMA_EXIGIR_ANEXO_NUBE=true`** en `/opt/kair-firma/.env` (root 600, no medible sin sudo). (6) Quedan **18 actos `EMITIDA`** para empresas reales y **5 ratificaciones externas** que ya no son requisito para abrir la compuerta pero siguen pendientes (M.5, M.18, M.28/M.7, M.31).
 > **Actualización 2026-11-13 (tarde, novena parte) — CAMBIÓ LA REGLA DE LA COMPUERTA DE LA TABLA SUPLETORIA: EL ESCRITO FORMAL DEL ABOGADO DEJA DE SER REQUISITO, LA S-02 SE CERRÓ POR RESOLUCIÓN Y LA TABLA PASÓ A 25 SOLICITUDES (19 `EMITIDA`, 0 `RESPONDIDA`, 6 `CERRADA`).**
 > 
 > **Qué decidió el owner.** (1) «Cambio la regla: no exige validación» — la compuerta de la tabla supletoria **no** exige la validación escrita de un tercero; (2) «Sí: corregí todo y anotá la decisión». Tres decisiones de diseño se tomaron con el cuestionario: la compuerta la abre **`activada: true` más `activado_at` con fecha** (acto expreso y fechado del owner); el **Anexo de Encargo v1.4** —aún sin firmar— **corrige** las dos frases del §8 que decían lo contrario, por sustitución determinista en el generador; y el acto de abrir la compuerta **se registra como la fila S-25**, con dueño y fecha.
@@ -1924,7 +1951,7 @@ sus 53 huecos (punto 7). (3) Falta el despliegue en el servidor: el paquete est�
 
 ### 2026-10-25 · 📦️954 · El Anexo de Nube: el modelo diligenciado y el check que ya no pide lo imposible
 
-**El encargo.** "quiero que trabajes en Anexo de Nube U0001F7E1 Publicado y medido; falta la decisión de fondo.
+**El encargo.** "quiero que trabajes en Anexo de Nube 📗 Publicado y medido; falta la decisión de fondo.
 De 6 cláusulas faltantes a 0, 53 huecos intactos… Sigue la pregunta de fondo: ¿modelo o documento final?
 Hoy nadie lo diligencia — ciéralo que falta para cerrarlo sin romper nada".
 
