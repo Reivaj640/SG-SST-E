@@ -1,816 +1,1173 @@
 Número Radicado: REME-SGSST - 779305 - 2024 - 1
-Nombre de la Empresa : 	TEMPOACTIVA EST S.A.S.
-Tipo Persona 	Jurídica 	Regimén Tributario : 	Régimen común
-Tipo Documento Empresa : 	Número de Identificación Tributario 	Número de Documento 	900511178
-Nombre Representante Legal : 	Freedy Enrique Torrez Madariaga
-Responsable SG-SST : 	Javier Robles Fontalvo 	Correo SG-SST : 	jrf2011@live.com
-Periodo Correspondiente : 	2024 	Número Teléfonico fijo : 	6053406159
-Correo Electrónico : 	tempoactivaestsasst@gmail.com 	Cantidad Trabajadores : 	158
-Código CIIU 	Riesgo 	Actividad Económica
-3782001 	Riesgo III 	ACTIVIDADES DE AGENCIAS DE EMPLEO TEMPORAL, INCLUYE EL SUMINISTRO DE TRABAJADORES
+
+Nombre de la Empresa : TEMPOACTIVA EST S.A.S.
+
+Tipo Persona Jurídica Regimén Tributario : Régimen común
+
+Tipo Documento Empresa : Número de Identificación Tributario Número de Documento 900511178
+
+Nombre Representante Legal : Freedy Enrique Torrez Madariaga
+
+Responsable SG-SST : Javier Robles Fontalvo Correo SG-SST : jrf2011@live.com
+
+Periodo Correspondiente : 2024 Número Teléfonico fijo : 6053406159
+
+Correo Electrónico : tempoactivaestsasst@gmail.com Cantidad Trabajadores : 158
+
+Código CIIU Riesgo Actividad Económica
+
+3782001 Riesgo III ACTIVIDADES DE AGENCIAS DE EMPLEO TEMPORAL, INCLUYE EL SUMINISTRO DE TRABAJADORES
+
 PARA LAS ACTIVIDADES DE LOS CLIENTES POR PERÍODOS LIMITADOS CON EL FIN DE
+
 REEMPLAZAR A EMPLEADOS O SUPLEMENTAR TEMPORALMENTE SU FUERZA DE TRABAJO,
+
 CUANDO EL PERSONAL SUMINISTRADO ES EMPLEADO DE LAS PROPIAS AGENCIAS DE EMPLEO
+
 TEMPORAL. LAS UNIDADES CLASIFICADAS EN ESTA CLASE NO SE ENCARGAN DE LASUPERVISIÓN
+
 DIRECTA DE SUS EMPLEADOS EN LOS LUGARES DE TRABAJO DE LOS CLIENTES.
+
 ESTÁNDARES MÍNIMOS SGSST
+
 TABLA DE VALORES Y CALIFICACIÓN
-CICLO 	ESTÁNDAR 	ESTÁNDAR 	ITEM
+
 VALOR
-ESTÁNDAR 	PUNTAJE 	CALIFICACION
-Planear 	1. Recursos 	1.1. Recursos
-financieros,
-técnicos humanos
-y de otra índole
-requeridos para
-coordinar y
-desarrollar el
-Sistema de Gestión
-de la Seguridad y
-Salud en el Trabajo
-1.1.1 Responsable del
-Sistema de Gestión de
-Seguridad y Salud en el
-Trabajo SG - SST
-0.50 	Cumple
-totalmente 0.50
 
--- 1 of 9 --
+CICLO ESTÁNDAR ESTÁNDAR ITEM 
+ESTÁNDAR PUNTAJE CALIFICACION
 
-Planear 	1. Recursos 	1.1. Recursos
-financieros,
-técnicos humanos
-y de otra índole
-requeridos para
-coordinar y
-desarrollar el
-Sistema de Gestión
-de la Seguridad y
-Salud en el Trabajo
-1.1.2 Responsabilidades en
-el Sistema de Gestión de
+Planear 1. Recursos 1.1. Recursos 
+1.1.1 Responsable del 
+0.50 Cumple 0.50
+
+financieros, 
+Sistema de Gestión de 
+totalmente
+
+técnicos humanos 
 Seguridad y Salud en el
+
+y de otra índole 
 Trabajo SG - SST
-0.50 	Cumple
-totalmente 0.50
-Planear 	1. Recursos 	1.1. Recursos
-financieros,
-técnicos humanos
-y de otra índole
+
 requeridos para
+
 coordinar y
+
 desarrollar el
+
 Sistema de Gestión
+
 de la Seguridad y
+
 Salud en el Trabajo
-1.1.3 Asignación de
-recursos para el Sistema
+
+VALOR
+
+CICLO ESTÁNDAR ESTÁNDAR ITEM 
+ESTÁNDAR PUNTAJE CALIFICACION
+Planear 1. Recursos 1.1. Recursos 
+1.1.2 Responsabilidades en 
+0.50 Cumple 0.50
+
+financieros, 
+el Sistema de Gestión de 
+totalmente
+
+técnicos humanos 
+Seguridad y Salud en el
+
+y de otra índole 
+Trabajo SG - SST
+
+requeridos para
+
+coordinar y
+
+desarrollar el
+
+Sistema de Gestión
+
+de la Seguridad y
+
+Salud en el Trabajo
+
+Planear 1. Recursos 1.1. Recursos 
+1.1.3 Asignación de 
+0.50 Cumple 0.50
+
+financieros, 
+recursos para el Sistema 
+totalmente
+
+técnicos humanos 
 de Gestión de Seguridad y
+
+y de otra índole 
 Salud en el Trabajo SG -
+
+requeridos para 
 SST
-0.50 	Cumple
-totalmente 0.50
-Planear 	1. Recursos 	1.1. Recursos
-financieros,
-técnicos humanos
-y de otra índole
-requeridos para
+
 coordinar y
+
 desarrollar el
+
 Sistema de Gestión
+
 de la Seguridad y
+
 Salud en el Trabajo
-1.1.4 Afiliación al Sistema
-General de Riesgos
+
+Planear 1. Recursos 1.1. Recursos 
+1.1.4 Afiliación al Sistema 
+0.50 Cumple 0.50
+
+financieros, 
+General de Riesgos 
+totalmente
+
+técnicos humanos 
 Laborales
-0.50 	Cumple
-totalmente 0.50
-Planear 	1. Recursos 	1.1. Recursos
-financieros,
-técnicos humanos
+
 y de otra índole
+
 requeridos para
+
 coordinar y
+
 desarrollar el
+
 Sistema de Gestión
+
 de la Seguridad y
+
 Salud en el Trabajo
-1.1.5 Identificación de
-trabajadores de alto riesgo
+
+Planear 1. Recursos 1.1. Recursos 
+1.1.5 Identificación de 
+0.50 Cumple 0.50
+
+financieros, 
+trabajadores de alto riesgo 
+totalmente
+
+técnicos humanos 
 y cotización de pensión
+
+y de otra índole 
 especial
-0.50 	Cumple
-totalmente 0.50
-Planear 	1. Recursos 	1.1. Recursos
-financieros,
-técnicos humanos
-y de otra índole
-requeridos para
-coordinar y
-desarrollar el
-Sistema de Gestión
-de la Seguridad y
-Salud en el Trabajo
-1.1.6 Conformación
-COPASST 0.50 	Cumple
-totalmente 0.50
-CICLO 	ESTÁNDAR 	ESTÁNDAR 	ITEM VALOR
-ESTÁNDAR 	PUNTAJE 	CALIFICACION
 
--- 2 of 9 --
+requeridos para
 
-Planear 	1. Recursos 	1.1. Recursos
-financieros,
-técnicos humanos
-y de otra índole
-requeridos para
 coordinar y
+
 desarrollar el
+
 Sistema de Gestión
+
 de la Seguridad y
+
 Salud en el Trabajo
-1.1.7 Capacitación
-COPASST 0.50 	Cumple
-totalmente 0.50
-Planear 	1. Recursos 	1.1. Recursos
-financieros,
+
+Planear 1. Recursos 1.1. Recursos 
+1.1.6 Conformación 0.50 Cumple 0.50
+
+financieros, 
+COPASST 
+totalmente
+
 técnicos humanos
+
 y de otra índole
+
 requeridos para
+
 coordinar y
+
 desarrollar el
+
 Sistema de Gestión
+
 de la Seguridad y
+
 Salud en el Trabajo
-1.1.8 Conformación
-Comité Convivencia 0.50 	Cumple
-totalmente 0.50
-Planear 	1. Recursos 	1.2. Capacitación
-en el Sistema de
-Gestión de la
-Seguridad y Salud
-en el Trabajo
-1.2.1 Programa
-Capacitación Promoción
+
+VALOR
+
+CICLO ESTÁNDAR ESTÁNDAR ITEM 
+ESTÁNDAR PUNTAJE CALIFICACION
+Planear 1. Recursos 1.1. Recursos 
+1.1.7 Capacitación 0.50 Cumple 0.50
+
+financieros, 
+COPASST 
+totalmente
+
+técnicos humanos
+
+y de otra índole
+
+requeridos para
+
+coordinar y
+
+desarrollar el
+
+Sistema de Gestión
+
+de la Seguridad y
+
+Salud en el Trabajo
+
+Planear 1. Recursos 1.1. Recursos 
+1.1.8 Conformación 0.50 Cumple 0.50
+
+financieros, 
+Comité Convivencia 
+totalmente
+
+técnicos humanos
+
+y de otra índole
+
+requeridos para
+
+coordinar y
+
+desarrollar el
+
+Sistema de Gestión
+
+de la Seguridad y
+
+Salud en el Trabajo
+
+Planear 1. Recursos 1.2. Capacitación 
+1.2.1 Programa 
+2.00 Cumple 2.00
+
+en el Sistema de 
+Capacitación Promoción 
+totalmente
+
+Gestión de la 
 y Prevención P y P
-2.00 	Cumple
-totalmente 2.00
-Planear 	1. Recursos 	1.2. Capacitación
-en el Sistema de
-Gestión de la
+
 Seguridad y Salud
+
 en el Trabajo
-1.2.2 Inducción y
-reinducción en Sistema de
+
+Planear 1. Recursos 1.2. Capacitación 
+1.2.2 Inducción y 
+2.00 Cumple 2.00
+
+en el Sistema de 
+reinducción en Sistema de 
+totalmente
+
+Gestión de la 
 Gestión de Seguridad y
+
+Seguridad y Salud 
 Salud en el Trabajo SG -
+
+en el Trabajo 
 SST Actividades de
+
 Promoción y Prevención
+
 P y P
-2.00 	Cumple
-totalmente 2.00
-Planear 	1. Recursos 	1.2. Capacitación
-en el Sistema de
-Gestión de la
-Seguridad y Salud
-en el Trabajo
-1.2.3 Responsables del
-Sistema de Gestión de
+
+Planear 1. Recursos 1.2. Capacitación 
+1.2.3 Responsables del 
+2.00 Cumple 2.00
+
+en el Sistema de 
+Sistema de Gestión de 
+totalmente
+
+Gestión de la 
 Seguridad y Salud en el
+
+Seguridad y Salud 
 Trabajo SG - SST con curso
+
+en el Trabajo 
 virtual de 50 horas
-2.00 	Cumple
-totalmente 2.00
-Planear 	2. Gestión integral
-del sistema de
-gestión de la
-seguridad y salud
-en el trabajo
-2.1. Política de
-Seguridad y Salud
-en el Trabajo
-2.1.1 Política del Sistema de
-Gestión de Seguridad y
+
+Planear 2. Gestión integral 
+2.1. Política de 
+2.1.1 Política del Sistema de 
+1.00 Cumple 1.00
+
+del sistema de 
+Seguridad y Salud 
+Gestión de Seguridad y 
+totalmente
+
+gestión de la 
+en el Trabajo 
 Salud en el Trabajo SG -
+
+seguridad y salud 
 SST firmada, fecha y
+
+en el trabajo 
 comunicada al COPASST
-1.00 	Cumple
-totalmente 1.00
-Planear 	2. Gestión integral
-del sistema de
-gestión de la
-seguridad y salud
-en el trabajo
-2.2. Objetivos del
-Sistema de Gestión
-de la Seguridad y
-Salud en el Trabajo
-SG-SST
-2.2.1 Objetivos definidos,
-claros, medibles,
+
+Planear 2. Gestión integral 
+2.2. Objetivos del 
+2.2.1 Objetivos definidos, 
+1.00 Cumple 1.00
+
+del sistema de 
+Sistema de Gestión 
+claros, medibles, 
+totalmente
+
+gestión de la 
+de la Seguridad y 
 cuantificables, con metas,
+
+seguridad y salud 
+Salud en el Trabajo 
 documentados, revisados
+
+en el trabajo 
+SG-SST 
 del SG - SST
-1.00 	Cumple
-totalmente 1.00
-CICLO 	ESTÁNDAR 	ESTÁNDAR 	ITEM VALOR
-ESTÁNDAR 	PUNTAJE 	CALIFICACION
 
--- 3 of 9 --
+VALOR
 
-Planear 	2. Gestión integral
-del sistema de
-gestión de la
-seguridad y salud
-en el trabajo
-2.3. Evaluación
-inicial del SG-SST 2.3.1 Evaluación e
-identificación de
+CICLO ESTÁNDAR ESTÁNDAR ITEM 
+ESTÁNDAR PUNTAJE CALIFICACION
+Planear 2. Gestión integral 
+2.3. Evaluación 2.3.1 Evaluación e 
+1.00 Cumple 1.00
+
+del sistema de 
+inicial del SG-SST 
+identificación de 
+totalmente
+
+gestión de la 
 prioridades
-1.00 	Cumple
-totalmente 1.00
-Planear 	2. Gestión integral
-del sistema de
-gestión de la
+
 seguridad y salud
+
 en el trabajo
-2.4. Plan anual de
-trabajo 2.4.1 Plan que identifica
-objetivos, metas,
+
+Planear 2. Gestión integral 
+2.4. Plan anual de 2.4.1 Plan que identifica 
+2.00 Cumple 2.00
+
+del sistema de 
+trabajo 
+objetivos, metas, 
+totalmente
+
+gestión de la 
 responsabilidad, recursos
+
+seguridad y salud 
 con cronograma y
+
+en el trabajo 
 firmado
-2.00 	Cumple
-totalmente 2.00
-Planear 	2. Gestión integral
-del sistema de
-gestión de la
-seguridad y salud
-en el trabajo
-2.5. Conservación
-de la
-documentación
-2.5.1 Archivo o retención
-documental del Sistema
+
+Planear 2. Gestión integral 
+2.5. Conservación 
+2.5.1 Archivo o retención 
+2.00 Cumple 
+2.00
+
+del sistema de 
+de la 
+documental del Sistema 
+totalmente
+
+gestión de la 
+documentación 
 de Gestión de Seguridad y
+
+seguridad y salud 
 Salud en el Trabajo SG-SST
-2.00 	Cumple
-totalmente
-2.00
-Planear 	2. Gestión integral
-del sistema de
-gestión de la
-seguridad y salud
+
 en el trabajo
-2.6. Rendición de
-cuentas
-2.6.1 Rendición sobre el
-desempeño
-1.00 	Cumple
-totalmente
+
+Planear 2. Gestión integral 
+2.6. Rendición de 
+2.6.1 Rendición sobre el 
+1.00 Cumple 
 1.00
-Planear 	2. Gestión integral
-del sistema de
+
+del sistema de 
+cuentas 
+desempeño 
+totalmente
+
 gestión de la
+
 seguridad y salud
+
 en el trabajo
-2.7. Normatividad
-nacional vigente y
+
+Planear 2. Gestión integral 
+2.7. Normatividad 
+2.7.1 Matriz legal 2.00 Cumple 2.00
+
+del sistema de 
+nacional vigente y 
+totalmente
+
+gestión de la 
 aplicable en
+
+seguridad y salud 
 materia de
+
+en el trabajo 
 seguridad y salud
+
 en el trabajo
-2.7.1 Matriz legal 	2.00 	Cumple
-totalmente 2.00
-Planear 	2. Gestión integral
-del sistema de
-gestión de la
-seguridad y salud
-en el trabajo
-2.8. Comunicación 	2.8.1 Mecanismos de
-comunicación, auto
+
+Planear 2. Gestión integral 
+2.8. Comunicación 2.8.1 Mecanismos de 
+1.00 Cumple 
+1.00
+
+del sistema de 
+comunicación, auto 
+totalmente
+
+gestión de la 
 reporte en Sistema de
+
+seguridad y salud 
 Gestión de Seguridad y
+
+en el trabajo 
 Salud en el Trabajo SG-SST
-1.00 	Cumple
-totalmente
-1.00
-Planear 	2. Gestión integral
-del sistema de
-gestión de la
-seguridad y salud
-en el trabajo
-2.9. Adquisiciones 	2.9.1 Identificación,
+
+Planear 2. Gestión integral 
+2.9. Adquisiciones 2.9.1 Identificación, 
+1.00 No cumple 0
+
+del sistema de 
 evaluación, para
+
+gestión de la 
 adquisición de productos
+
+seguridad y salud 
 y servicios en Sistema de
+
+en el trabajo 
 Gestión de Seguridad y
+
 Salud en el Trabajo SG-SST
-1.00 	No cumple 	0
-Planear 	2. Gestión integral
-del sistema de
-gestión de la
-seguridad y salud
-en el trabajo
-2.10. Contratación 	2.10.1 Evaluación y
+
+Planear 2. Gestión integral 
+2.10. Contratación 2.10.1 Evaluación y 
+2.00 No cumple 0
+
+del sistema de 
 selección de proveedores
+
+gestión de la 
 y contratistas
-2.00 	No cumple 	0
-CICLO 	ESTÁNDAR 	ESTÁNDAR 	ITEM VALOR
-ESTÁNDAR 	PUNTAJE 	CALIFICACION
 
--- 4 of 9 --
-
-Planear 	2. Gestión integral
-del sistema de
-gestión de la
 seguridad y salud
+
 en el trabajo
-2.11. Gestión del
-cambio 2.11.1 Evaluación del
-impacto de cambios
+
+
+VALOR
+
+CICLO ESTÁNDAR ESTÁNDAR ITEM 
+ESTÁNDAR PUNTAJE CALIFICACION
+Planear 2. Gestión integral 
+2.11. Gestión del 2.11.1 Evaluación del 
+1.00 Cumple 1.00
+
+del sistema de 
+cambio 
+impacto de cambios 
+totalmente
+
+gestión de la 
 internos y externos en el
+
+seguridad y salud 
 Sistema de Gestión de
+
+en el trabajo 
 Seguridad y Salud en el
+
 Trabajo SG-SST
-1.00 	Cumple
-totalmente 1.00
-Hacer 	3. Gestión de la
-Salud 3.1. Condiciones de
-salud en el trabajo 3.1.1 Descripción
-sociodemográfica –
+
+Hacer 3. Gestión de la 3.1. Condiciones de 3.1.1 Descripción 
+1.00 Cumple 1.00
+
+Salud 
+salud en el trabajo 
+sociodemográfica – 
+totalmente
+
 Diagnóstico de
+
 condiciones de salud
-1.00 	Cumple
-totalmente 1.00
-Hacer 	3. Gestión de la
-Salud
-3.1. Condiciones de
-salud en el trabajo
-3.1.2 Actividades de
-Promoción y Prevención
+
+Hacer 3. Gestión de la 
+3.1. Condiciones de 
+3.1.2 Actividades de 
+1.00 Cumple 
+1.00
+
+Salud 
+salud en el trabajo 
+Promoción y Prevención 
+totalmente
+
 en Salud
-1.00 	Cumple
+
+Hacer 3. Gestión de la 3.1. Condiciones de 3.1.3 Información al 
+1.00 Cumple 1.00
+
+Salud 
+salud en el trabajo 
+médico de los perfiles de 
 totalmente
-1.00
-Hacer 	3. Gestión de la
-Salud 3.1. Condiciones de
-salud en el trabajo 3.1.3 Información al
-médico de los perfiles de
+
 cargo
-1.00 	Cumple
-totalmente 1.00
-Hacer 	3. Gestión de la
-Salud
-3.1. Condiciones de
-salud en el trabajo
-3.1.4 Realización de
-Evaluaciones Médicas
+
+Hacer 3. Gestión de la 
+3.1. Condiciones de 
+3.1.4 Realización de 
+1.00 Cumple 
+1.00
+
+Salud 
+salud en el trabajo 
+Evaluaciones Médicas 
+totalmente
+
 Ocupacionales -Peligros-
+
 Periodicidad-
+
 Comunicación al
+
 Trabajador
-1.00 	Cumple
+
+Hacer 3. Gestión de la 3.1. Condiciones de 3.1.5 Custodia de Historias 1.00 Cumple 1.00
+
+Salud 
+salud en el trabajo 
+Clínicas 
 totalmente
-1.00
-Hacer 	3. Gestión de la
-Salud 3.1. Condiciones de
-salud en el trabajo 3.1.5 Custodia de Historias
-Clínicas 1.00 	Cumple
-totalmente 1.00
-Hacer 	3. Gestión de la
-Salud 3.1. Condiciones de
-salud en el trabajo 3.1.6 Restricciones y
-recomendaciones
+
+Hacer 3. Gestión de la 3.1. Condiciones de 3.1.6 Restricciones y 
+1.00 Cumple 1.00
+
+Salud 
+salud en el trabajo 
+recomendaciones 
+totalmente
+
 médico/laborales
-1.00 	Cumple
-totalmente 1.00
-Hacer 	3. Gestión de la
-Salud
-3.1. Condiciones de
-salud en el trabajo
-3.1.7 Estilos de vida y
-entornos saludables
+
+Hacer 3. Gestión de la 
+3.1. Condiciones de 
+3.1.7 Estilos de vida y 
+1.00 Cumple 
+1.00
+
+Salud 
+salud en el trabajo 
+entornos saludables 
+totalmente
+
 (controles tabaquismo,
+
 alcoholismo,
+
 farmacodependencia y
+
 otros)
-1.00 	Cumple
+
+Hacer 3. Gestión de la 3.1. Condiciones de 3.1.8 Agua potable, 
+1.00 Cumple 1.00
+
+Salud 
+salud en el trabajo 
+servicios sanitarios y 
 totalmente
-1.00
-Hacer 	3. Gestión de la
-Salud 3.1. Condiciones de
-salud en el trabajo 3.1.8 Agua potable,
-servicios sanitarios y
+
 disposición de basuras
-1.00 	Cumple
-totalmente 1.00
-Hacer 	3. Gestión de la
-Salud
-3.1. Condiciones de
-salud en el trabajo
-3.1.9 Eliminación adecuada
-de residuos sólidos,
+
+Hacer 3. Gestión de la 
+3.1. Condiciones de 
+3.1.9 Eliminación adecuada 
+1.00 Cumple 
+1.00
+
+Salud 
+salud en el trabajo 
+de residuos sólidos, 
+totalmente
+
 líquidos o gaseosos
-1.00 	Cumple
-totalmente
-1.00
-CICLO 	ESTÁNDAR 	ESTÁNDAR 	ITEM
+
+
 VALOR
-ESTÁNDAR 	PUNTAJE 	CALIFICACION
 
--- 5 of 9 --
-
-Hacer 	3. Gestión de la
-Salud
-3.2. Registro,
-reporte e
-investigación de
-las enfermedades
-laborales, los
-incidentes y
-accidentes de
-trabajo
-3.2.1 Reporte de los
-Accidentes de Trabajo y
-Enfermedad Laboral a la
-ARL, EPS y Dirección
-Territorial del Ministerio de
-Trabajo
-2.00 	Cumple
-totalmente
+CICLO ESTÁNDAR ESTÁNDAR ITEM 
+ESTÁNDAR PUNTAJE CALIFICACION
+Hacer 3. Gestión de la 
+3.2. Registro, 
+3.2.1 Reporte de los 
+2.00 Cumple 
 2.00
-Hacer 	3. Gestión de la
-Salud 3.2. Registro,
-reporte e
-investigación de
-las enfermedades
-laborales, los
-incidentes y
+
+Salud 
+reporte e 
+Accidentes de Trabajo y 
+totalmente
+
+investigación de 
+Enfermedad Laboral a la
+
+las enfermedades 
+ARL, EPS y Dirección
+
+laborales, los 
+Territorial del Ministerio de
+
+incidentes y 
+Trabajo
+
 accidentes de
+
 trabajo
-3.2.2 Investigación de
-incidentes, accidentes y
+
+Hacer 3. Gestión de la 3.2. Registro, 
+3.2.2 Investigación de 
+2.00 Cumple 2.00
+
+Salud 
+reporte e 
+incidentes, accidentes y 
+totalmente
+
+investigación de 
 enfermedades laborales
-2.00 	Cumple
-totalmente 2.00
-Hacer 	3. Gestión de la
-Salud
-3.2. Registro,
-reporte e
-investigación de
+
 las enfermedades
+
 laborales, los
+
 incidentes y
+
 accidentes de
+
 trabajo
-3.2.3 Registro y análisis
-estadístico de accidentes
+
+Hacer 3. Gestión de la 
+3.2. Registro, 
+3.2.3 Registro y análisis 
+1.00 Cumple 
+1.00
+
+Salud 
+reporte e 
+estadístico de accidentes 
+totalmente
+
+investigación de 
 y enfermedades laborales
-1.00 	Cumple
+
+las enfermedades
+
+laborales, los
+
+incidentes y
+
+accidentes de
+
+trabajo
+
+Hacer 3. Gestión de la 3.3. Mecanismos 
+3.3.1 Medición de la 
+1.00 Cumple 1.00
+
+Salud 
+de vigilancia de las 
+frecuencia de la 
 totalmente
-1.00
-Hacer 	3. Gestión de la
-Salud 3.3. Mecanismos
-de vigilancia de las
-condiciones de
-salud de los
-trabajadores
-3.3.1 Medición de la
-frecuencia de la
+
+condiciones de 
 accidentalidad
-1.00 	Cumple
-totalmente 1.00
-Hacer 	3. Gestión de la
-Salud 3.3. Mecanismos
-de vigilancia de las
-condiciones de
+
 salud de los
+
 trabajadores
-3.3.2 Medición de la
-severidad de la
+
+Hacer 3. Gestión de la 3.3. Mecanismos 
+3.3.2 Medición de la 
+1.00 Cumple 1.00
+
+Salud 
+de vigilancia de las 
+severidad de la 
+totalmente
+
+condiciones de 
 accidentalidad
-1.00 	Cumple
-totalmente 1.00
-Hacer 	3. Gestión de la
-Salud 3.3. Mecanismos
-de vigilancia de las
-condiciones de
+
 salud de los
+
 trabajadores
-3.3.3 Medición de la
-mortalidad por
+
+Hacer 3. Gestión de la 3.3. Mecanismos 
+3.3.3 Medición de la 
+1.00 Cumple 1.00
+
+Salud 
+de vigilancia de las 
+mortalidad por 
+totalmente
+
+condiciones de 
 Accidentes de Trabajo
-1.00 	Cumple
-totalmente 1.00
-Hacer 	3. Gestión de la
-Salud
-3.3. Mecanismos
-de vigilancia de las
-condiciones de
+
 salud de los
+
 trabajadores
-3.3.4 Medición de la
-prevalencia de
+
+Hacer 3. Gestión de la 
+3.3. Mecanismos 
+3.3.4 Medición de la 
+1.00 Cumple 
+1.00
+
+Salud 
+de vigilancia de las 
+prevalencia de 
+totalmente
+
+condiciones de 
 Enfermedad Laboral
-1.00 	Cumple
-totalmente
-1.00
-CICLO 	ESTÁNDAR 	ESTÁNDAR 	ITEM
-VALOR
-ESTÁNDAR 	PUNTAJE 	CALIFICACION
 
--- 6 of 9 --
-
-Hacer 	3. Gestión de la
-Salud 3.3. Mecanismos
-de vigilancia de las
-condiciones de
 salud de los
+
 trabajadores
-3.3.5 Medición de la
-incidencia de Enfermedad
+
+VALOR
+
+CICLO ESTÁNDAR ESTÁNDAR ITEM 
+ESTÁNDAR PUNTAJE CALIFICACION
+Hacer 3. Gestión de la 3.3. Mecanismos 
+3.3.5 Medición de la 
+1.00 Cumple 1.00
+
+Salud 
+de vigilancia de las 
+incidencia de Enfermedad 
+totalmente
+
+condiciones de 
 Laboral
-1.00 	Cumple
-totalmente 1.00
-Hacer 	3. Gestión de la
-Salud
-3.3. Mecanismos
-de vigilancia de las
-condiciones de
+
 salud de los
+
 trabajadores
-3.3.6 Medición del
-ausentismo por causa
-médica
-1.00 	Cumple
-totalmente
+
+Hacer 3. Gestión de la 
+3.3. Mecanismos 
+3.3.6 Medición del 
+1.00 Cumple 
 1.00
-Hacer 	4. Gestión de
-peligros y riesgos 4.1. Identificación
-de peligros,
-evaluación y
-valoración de los
-riesgos
-4.1.1 Metodología para la
-identificación de peligros,
+
+Salud 
+de vigilancia de las 
+ausentismo por causa 
+totalmente
+
+condiciones de 
+médica
+
+salud de los
+
+trabajadores
+
+Hacer 4. Gestión de 4.1. Identificación 
+4.1.1 Metodología para la 
+4.00 Cumple 4.00
+
+peligros y riesgos 
+de peligros, 
+identificación de peligros, 
+totalmente
+
+evaluación y 
 evaluación y valoración de
+
+valoración de los 
 los riesgos
-4.00 	Cumple
-totalmente 4.00
-Hacer 	4. Gestión de
-peligros y riesgos 4.1. Identificación
-de peligros,
-evaluación y
-valoración de los
+
 riesgos
-4.1.2 Identificación de
-peligros con participación
+
+Hacer 4. Gestión de 4.1. Identificación 
+4.1.2 Identificación de 
+4.00 Cumple 4.00
+
+peligros y riesgos 
+de peligros, 
+peligros con participación 
+totalmente
+
+evaluación y 
 de todos los niveles de la
+
+valoración de los 
 empresa
-4.00 	Cumple
-totalmente 4.00
-Hacer 	4. Gestión de
-peligros y riesgos 4.1. Identificación
-de peligros,
-evaluación y
-valoración de los
+
 riesgos
-4.1.3 Identificación de
-sustancias catalogadas
+
+Hacer 4. Gestión de 4.1. Identificación 
+4.1.3 Identificación de 
+3.00 Cumple 3.00
+
+peligros y riesgos 
+de peligros, 
+sustancias catalogadas 
+totalmente
+
+evaluación y 
 como carcinógenas o con
+
+valoración de los 
 toxicidad aguda
-3.00 	Cumple
-totalmente 3.00
-Hacer 	4. Gestión de
-peligros y riesgos 4.1. Identificación
-de peligros,
-evaluación y
-valoración de los
+
 riesgos
-4.1.4 Realización
-mediciones ambientales,
+
+Hacer 4. Gestión de 4.1. Identificación 
+4.1.4 Realización 
+4.00 Cumple 4.00
+
+peligros y riesgos 
+de peligros, 
+mediciones ambientales, 
+totalmente
+
+evaluación y 
 químicos, físicos y
+
+valoración de los 
 biológicos
-4.00 	Cumple
-totalmente 4.00
-Hacer 	4. Gestión de
-peligros y riesgos
-4.2. Medidas de
-prevención y
-control para
-intervenir los
-peligros / riesgos
-4.2.1 Implementación de
-medidas de prevención y
+
+riesgos
+
+Hacer 4. Gestión de 
+4.2. Medidas de 
+4.2.1 Implementación de 
+2.50 Cumple 
+2.50
+
+peligros y riesgos 
+prevención y 
+medidas de prevención y 
+totalmente
+
+control para 
 control de peligros/riesgos
+
+intervenir los 
 identificados
-2.50 	Cumple
-totalmente
-2.50
-Hacer 	4. Gestión de
-peligros y riesgos 4.2. Medidas de
-prevención y
-control para
-intervenir los
+
 peligros / riesgos
-4.2.2 Verificación de
-aplicación de medidas de
+
+Hacer 4. Gestión de 4.2. Medidas de 
+4.2.2 Verificación de 
+2.50 Cumple 2.50
+
+peligros y riesgos 
+prevención y 
+aplicación de medidas de 
+totalmente
+
+control para 
 prevención y control por
+
+intervenir los 
 parte de los trabajadores
-2.50 	Cumple
-totalmente 2.50
-Hacer 	4. Gestión de
-peligros y riesgos 4.2. Medidas de
-prevención y
-control para
-intervenir los
+
 peligros / riesgos
-4.2.3 Elaboración de
-procedimientos,
+
+Hacer 4. Gestión de 4.2. Medidas de 
+4.2.3 Elaboración de 
+2.50 Cumple 2.50
+
+peligros y riesgos 
+prevención y 
+procedimientos, 
+totalmente
+
+control para 
 instructivos, fichas,
+
+intervenir los 
 protocolos
-2.50 	Cumple
-totalmente 2.50
-CICLO 	ESTÁNDAR 	ESTÁNDAR 	ITEM VALOR
-ESTÁNDAR 	PUNTAJE 	CALIFICACION
 
--- 7 of 9 --
+peligros / riesgos
 
-Hacer 	4. Gestión de
-peligros y riesgos
-4.2. Medidas de
-prevención y
-control para
-intervenir los
-peligros / riesgos
-4.2.4 Realización de
-inspecciones a las
-instalaciones, maquinaria
-o equipos con la
-participación del
-COPASST
-2.50 	Cumple
-totalmente
-2.50
-Hacer 	4. Gestión de
-peligros y riesgos 4.2. Medidas de
-prevención y
-control para
-intervenir los
-peligros / riesgos
-4.2.5 Mantenimiento
-periódico de instalaciones,
-equipos, máquinas,
-herramientas
-2.50 	Cumple
-totalmente 2.50
-Hacer 	4. Gestión de
-peligros y riesgos
-4.2. Medidas de
-prevención y
-control para
-intervenir los
-peligros / riesgos
-4.2.6 Entrega de
-Elementos de Protección
-Personal EPP, se verifica
-con contratistas y
-subcontratistas
-2.50 	Cumple
-totalmente
-2.50
-Hacer 	5. Gestión de
-amenazas 5.1. Plan de
-prevención,
-preparación y
-respuesta ante
-emergencias
-5.1.1 Se cuenta con el Plan
-de Prevención,
-Preparación y Respuesta
-ante emergencias
-5.00 	Cumple
-totalmente 5.00
-Hacer 	5. Gestión de
-amenazas 5.1. Plan de
-prevención,
-preparación y
-respuesta ante
-emergencias
-5.1.2 Brigada de
-prevención conformada,
-capacitada y dotada
-5.00 	Cumple
-totalmente 5.00
-Verificar 	6. Verificación del
-SG - SST 6.1. Gestión y
-resultados del SG -
-SST
-6.1.1 Definición de
-indicadores del SG-SST de
-acuerdo condiciones de la
-empresa
-1.25 	Cumple
-totalmente 1.25
-Verificar 	6. Verificación del
-SG - SST 6.1. Gestión y
-resultados del SG -
-SST
-6.1.2 La empresa adelanta
-auditoría por lo menos
-una vez al año
-1.25 	Cumple
-totalmente 1.25
-Verificar 	6. Verificación del
-SG - SST
-6.1. Gestión y
-resultados del SG -
-SST
-6.1.3 Revisión anual por la
-alta dirección, resultados y
-alcance de la auditoría
-1.25 	Cumple
-totalmente
-1.25
-Verificar 	6. Verificación del
-SG - SST
-6.1. Gestión y
-resultados del SG -
-SST
-6.1.4 Planificación
-auditorías con el COPASST
-1.25 	Cumple
-totalmente
-1.25
-CICLO 	ESTÁNDAR 	ESTÁNDAR 	ITEM
+
 VALOR
-ESTÁNDAR 	PUNTAJE 	CALIFICACION
 
--- 8 of 9 --
-
-Actuar 	7. Mejoramiento 	7.1. Acciones
-preventivas y
-correctivas con
-base en los
-resultados del SG -
-SST
-7.1.1 Definición de acciones
-preventivas y correctivas
-con base en resultados del
-SG-SST
-2.50 	Cumple
-totalmente 2.50
-Actuar 	7. Mejoramiento 	7.1. Acciones
-preventivas y
-correctivas con
-base en los
-resultados del SG -
-SST
-7.1.2 Acciones de mejora
-conforme a revisión de la
-alta dirección
-2.50 	Cumple
-totalmente
+CICLO ESTÁNDAR ESTÁNDAR ITEM 
+ESTÁNDAR PUNTAJE CALIFICACION
+Hacer 4. Gestión de 
+4.2. Medidas de 
+4.2.4 Realización de 
+2.50 Cumple 
 2.50
-Actuar 	7. Mejoramiento 	7.1. Acciones
-preventivas y
-correctivas con
-base en los
-resultados del SG -
-SST
-7.1.3 Acciones de mejora
-con base en
-investigaciones de
-accidentes de trabajo y
-enfermedades laborales
-2.50 	Cumple
-totalmente 2.50
-Actuar 	7. Mejoramiento 	7.1. Acciones
-preventivas y
-correctivas con
-base en los
-resultados del SG -
-SST
-7.1.4 Elaboración Plan de
-Mejoramiento e
-implementación de
-medidas y acciones
-correctivas solicitadas por
-autoridades y ARL
-2.50 	Cumple
-totalmente 2.50
-Total, Valor Estándar Valores Míminos de Calificación 	97.00
-CICLO 	ESTÁNDAR 	ESTÁNDAR 	ITEM VALOR
-ESTÁNDAR 	PUNTAJE 	CALIFICACION
-Cuando se cumple con el ítem del estándar la calificación será la máxima del respectivo ítem, de lo contrario su calificación será igual a cero (0).
-En los ítems de la Tabla de Valores que no aplican para las empresas de menos de cincuenta (50) trabajadores clasificados con riesgo I, II, o III, de
-conformidad con los Estándares Mínimos de SST vigentes, se deberá otorgar el porcentaje máximo de calificación en la columna “No Aplica” frente al
-ítem correspondiente.
-El presente formulario es documento público. La información aquí consignada debe ser veraz. La inclusión de manifestaciones falsas estará sujeta a las
-sanciones contempladas en la Ley 599 de 2000, Código Penal Colombiano (artículos 287, 288, 291, 294).
-Fecha y hora de generación del Reporte 3/14/2025 8:53 PM
-Fecha de Diligenciamiento : 3/14/2025
 
--- 9 of 9 --
+peligros y riesgos 
+prevención y 
+inspecciones a las 
+totalmente
+
+control para 
+instalaciones, maquinaria
+
+intervenir los 
+o equipos con la
+
+peligros / riesgos 
+participación del
+
+COPASST
+
+Hacer 4. Gestión de 4.2. Medidas de 
+4.2.5 Mantenimiento 
+2.50 Cumple 2.50
+
+peligros y riesgos 
+prevención y 
+periódico de instalaciones, 
+totalmente
+
+control para 
+equipos, máquinas,
+
+intervenir los 
+herramientas
+
+peligros / riesgos
+
+Hacer 4. Gestión de 
+4.2. Medidas de 
+4.2.6 Entrega de 
+2.50 Cumple 
+2.50
+
+peligros y riesgos 
+prevención y 
+Elementos de Protección 
+totalmente
+
+control para 
+Personal EPP, se verifica
+
+intervenir los 
+con contratistas y
+
+peligros / riesgos 
+subcontratistas
+
+Hacer 5. Gestión de 5.1. Plan de 
+5.1.1 Se cuenta con el Plan 
+5.00 Cumple 5.00
+
+amenazas 
+prevención, 
+de Prevención, 
+totalmente
+
+preparación y 
+Preparación y Respuesta
+
+respuesta ante 
+ante emergencias
+
+emergencias
+
+Hacer 5. Gestión de 5.1. Plan de 
+5.1.2 Brigada de 
+5.00 Cumple 5.00
+
+amenazas 
+prevención, 
+prevención conformada, 
+totalmente
+
+preparación y 
+capacitada y dotada
+
+respuesta ante
+
+emergencias
+
+Verificar 6. Verificación del 6.1. Gestión y 
+6.1.1 Definición de 
+1.25 Cumple 1.25
+
+SG - SST 
+resultados del SG - 
+indicadores del SG-SST de 
+totalmente
+
+SST 
+acuerdo condiciones de la
+
+empresa
+
+Verificar 6. Verificación del 6.1. Gestión y 
+6.1.2 La empresa adelanta 
+1.25 Cumple 1.25
+
+SG - SST 
+resultados del SG - 
+auditoría por lo menos 
+totalmente
+
+SST 
+una vez al año
+
+Verificar 6. Verificación del 
+6.1. Gestión y 
+6.1.3 Revisión anual por la 
+1.25 Cumple 
+1.25
+
+SG - SST 
+resultados del SG - 
+alta dirección, resultados y 
+totalmente
+
+SST 
+alcance de la auditoría
+
+Verificar 6. Verificación del 
+6.1. Gestión y 
+6.1.4 Planificación 
+1.25 Cumple 
+1.25
+
+SG - SST 
+resultados del SG - 
+auditorías con el COPASST 
+totalmente
+
+SST
+
+VALOR
+
+CICLO ESTÁNDAR ESTÁNDAR ITEM 
+ESTÁNDAR PUNTAJE CALIFICACION
+Actuar 7. Mejoramiento 7.1. Acciones 
+7.1.1 Definición de acciones 
+2.50 Cumple 2.50
+
+preventivas y 
+preventivas y correctivas 
+totalmente
+
+correctivas con 
+con base en resultados del
+
+base en los 
+SG-SST
+
+resultados del SG -
+
+SST
+
+Actuar 7. Mejoramiento 7.1. Acciones 
+7.1.2 Acciones de mejora 
+2.50 Cumple 
+2.50
+
+preventivas y 
+conforme a revisión de la 
+totalmente
+
+correctivas con 
+alta dirección
+
+base en los
+
+resultados del SG -
+
+SST
+
+Actuar 7. Mejoramiento 7.1. Acciones 
+7.1.3 Acciones de mejora 
+2.50 Cumple 2.50
+
+preventivas y 
+con base en 
+totalmente
+
+correctivas con 
+investigaciones de
+
+base en los 
+accidentes de trabajo y
+
+resultados del SG - 
+enfermedades laborales
+
+SST
+
+Actuar 7. Mejoramiento 7.1. Acciones 
+7.1.4 Elaboración Plan de 
+2.50 Cumple 2.50
+
+preventivas y 
+Mejoramiento e 
+totalmente
+
+correctivas con 
+implementación de
+
+base en los 
+medidas y acciones
+
+resultados del SG - 
+correctivas solicitadas por
+
+SST 
+autoridades y ARL
+
+Total, Valor Estándar Valores Míminos de Calificación 97.00
+
+Cuando se cumple con el ítem del estándar la calificación será la máxima del respectivo ítem, de lo contrario su calificación será igual a cero (0).
+
+En los ítems de la Tabla de Valores que no aplican para las empresas de menos de cincuenta (50) trabajadores clasificados con riesgo I, II, o III, de
+
+conformidad con los Estándares Mínimos de SST vigentes, se deberá otorgar el porcentaje máximo de calificación en la columna “No Aplica” frente al
+
+ítem correspondiente.
+
+El presente formulario es documento público. La información aquí consignada debe ser veraz. La inclusión de manifestaciones falsas estará sujeta a las
+
+sanciones contempladas en la Ley 599 de 2000, Código Penal Colombiano (artículos 287, 288, 291, 294).
+
+Fecha y hora de generación del Reporte 3/14/2025 8:53 PM
+
+Fecha de Diligenciamiento : 3/14/2025
 
