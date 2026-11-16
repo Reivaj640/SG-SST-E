@@ -9911,3 +9911,23 @@ politica de la sesion dejo bloqueadas. **Sin push**: `origin/Dev` no se mueve ha
 > **Lo medido.** Suite oficial **2 709 tests · 2 707 pass · 0 fail · 2 skipped** (Node 22, en solitario). Manifiesto `115a94e7…58d72`. Sello del despliegue `2a48678f4656` (255 archivos). `/health` 200 con `commit ec9a891b`.
 >
 > **Lo que NO se hizo en esta ronda.** No se commiteó ni se pusheó: `origin/Dev` no se mueve hasta que el owner diga «dale» y «pushea». No se redesplegó (el redespliegue lo ejecuta el owner con `sudo`): hasta que salga el 📦1078, el servicio vivo sirve la v1.4 con el **manifiesto viejo**, y el gate vivo seguirá mostrando los 4 bloqueantes de la primera firma. Quedan para el owner: `sitio/index.html` (sigue apuntando al Anexo de Nube v1.1 y menciona la cuenta de Gmail anterior — acto aparte) y la limpieza de `/tmp` (775 MB, con `sudo`).
+> **Actualización 2026-11-16 (tarde, quinceava parte) — EL 📦1078 ESTÁ PUSHEADO Y DESPLEGADO, Y LOS DOS GATES DEL SERVICIO VIVO SALEN LISTOS: 42 ÍTEMS, 41 OK, 0 PENDIENTES, 0 BLOQUEANTES**
+>
+> **El commit y el push.** El 📦1078 quedó en **`23b32835`** (9 archivos, +356 / −30) y el remoto medido con `git ls-remote origin refs/heads/Dev` da ese mismo sha: la rama local y la remota quedaron en sync, sin divergencia. Lo que la catorceava parte dejó anotado ("no se commiteó ni se pusheó") queda desmentido por esta: era el estado de ese momento.
+>
+> **El paquete, armado desde el commit.** Con `git archive` sobre `23b32835` y la **misma selección** del paquete anterior (255 archivos de app —las rutas del sello— más 6 documentos legales), **0 diferencias de bytes** contra los blobs del commit. El sello se generó **sobre el stage**: `arbol 5d651446b9f5`, 255 archivos, commit `23b32835`. El tar quedó en 1 387 957 B con sha256 `7a0f4af1…`, verificado **en el servidor**, y su reextracción de prueba dio el sello en verde. Frente al paquete del 📦1077: **3 archivos cambiados y ninguno nuevo** (`legal-readiness.json`, `scripts/actualizar-manifiesto-1047.js`, `src/services/readinessLegal.js`).
+>
+> **El despliegue (lo ejecutó el owner con `sudo`).** Respaldo `/opt/kair-firma/backup-v14-1078-20261116-184248.tar.gz` (1,5 M), servicio **activo (PID 687140)**, `NRestarts = 0`, arranque el 16-nov a las 18:42:52 (-05). No había directorio espurio (el del despliegue anterior ya se había borrado).
+>
+> **Verificado desde AFUERA, no del log del script:**
+>
+> - El sello **recalculado** en el servidor sobre el árbol instalado: `OK: el arbol corresponde al sello (5d651446b9f5, 255 archivos)`, exit 0.
+> - `/health` por la URL pública: **200**, con `commit 23b32835` y `arbol 5d651446b9f5`.
+> - Los dos textos servidos, **byte a byte**: el Anexo de Encargo (100 787 B, `a3014202…`) y el Anexo de Nube v1.4 (111 462 B, `57983e54…`).
+> - Los tres archivos cambiados, con la huella del commit.
+> - **El gate vivo**, medido con una copia consistente de la base (`sqlite3 .backup`) y el **manifiesto desplegado**: `publicacion` **LISTO** (42 ítems, 41 OK, 0 pendientes, 0 avisos, 1 N/A, 0 bloqueantes) y `primera_firma` **LISTO** (ídem). La copia de la base se borró al terminar.
+> - El manifiesto desplegado declara `anexo_nube.firmado = true` y `contrafirmado = true` (v1.4, 2026-11-14T22:06:42.921Z), `anexo_encargo.estado = "firmado"` (2026-11-12, 2026-11-14T22:19:21.359Z), y su nota dice **"SUSCRITO: …"**: **0 ocurrencias** de "NO SUSCRITO todavia" (el fix de la trampa 182 está vivo).
+>
+> **La lección del turno (mi propio tropiezo, ya cubierto por la trampa 117).** El primer script de verificación que escribí usaba `sudo -u kairfirma` y falló con «sudo: a terminal is required to read the password»: por SSH no hay TTY. La verificación del agente es **de solo lectura y sin `sudo`**: el sello se recalcula como `javier` (los archivos quedan `u=rwX,go=rX`) y la base se mide sobre una copia en `/tmp` que se borra. Lo que necesita root lo ejecuta el owner.
+>
+> **Lo que queda abierto.** (1) **`sitio/index.html`**: sigue apuntando al Anexo de Nube v1.1 y menciona la cuenta de Gmail anterior — **acto aparte**, del owner. (2) **`/tmp` del servidor**: 778 MB, a limpiar con `sudo` (el tar nuevo son 1,4 MB). (3) La cola de la ronda 25.

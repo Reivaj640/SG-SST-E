@@ -56,6 +56,25 @@
 > **El bloque 3, medido: la ventana está lista (y el runbook tenía un rollback peligroso, ya corregido).** El verificador de runtime ya está en el servidor (`/opt/kair-firma/app/deploy/verificar-runtime-node.sh`, idéntico al repo) y su **preflight de solo lectura da exit 0, 0 fallos**: Node 20.20.2 ABI 115, `better-sqlite3` 11.10.0 cargando y respondiendo `SELECT 1`, `/health` 200. Los dos insumos de la ventana se **descargaron y verificaron por SHA-256** (el runtime `v22.23.5 ABI 127` y el prebuild ABI 127, cuyo binario da `d7d9272b…da37`) y quedaron cacheados en `/tmp`. El runbook pedía `systemctl revert` para el rollback, y **la unidad de este servidor es local**: ese comando la habría **borrado**, dejando el servidor sin servicio. Corregido en el repo (el rollback ahora quita el drop-in a mano) y escrito como **trampa 177**.
 >
 > **Lo que sigue.** Abrir la ventana de Node 22 (script en el servidor, con rollback automático), el resto de la ronda 23 (bloque 4) y **firmar la v1.4** (`55a58967…46fc9`) en el bloque 5.
+> **🆕 16-nov-2026 (tarde, quinceava parte) — EL 📦1078 ESTÁ PUSHEADO Y DESPLEGADO, Y LOS DOS GATES DEL SERVICIO VIVO SALEN LISTOS: 42 ÍTEMS, 41 OK, 0 PENDIENTES, 0 BLOQUEANTES**
+>
+> **El commit y el push.** `23b32835` (9 archivos, +356 / −30), con el remoto medido en `git ls-remote origin refs/heads/Dev`: local y remoto en sync.
+>
+> **El paquete, armado desde el commit** con `git archive` y la misma selección del anterior (255 de app + 6 legales), **0 diferencias de bytes** contra los blobs, sello generado **sobre el stage** → `arbol 5d651446b9f5` (255 archivos, commit `23b32835`), tar de 1 387 957 B con sha256 `7a0f4af1…`, verificado en el servidor. Frente al paquete del 📦1077: **3 archivos cambiados, ninguno nuevo**.
+>
+> **El despliegue (lo ejecutó el owner con `sudo`).** Respaldo `backup-v14-1078-20261116-184248.tar.gz` (1,5 M), servicio **activo (PID 687140)**, `NRestarts = 0`, arranque 18:42:52 (-05).
+>
+> **Verificado desde AFUERA (no del log del script):**
+>
+> - Sello **recalculado** en el servidor: `OK: el arbol corresponde al sello (5d651446b9f5, 255 archivos)`, exit 0.
+> - `/health` por la URL pública: **200**, con `commit 23b32835` y `arbol 5d651446b9f5`.
+> - Los dos textos servidos **byte a byte**: Anexo de Encargo (100 787 B, `a3014202…`) y Anexo de Nube v1.4 (111 462 B, `57983e54…`).
+> - **Gate vivo** con el manifiesto **desplegado** y una copia consistente de la base (`sqlite3 .backup`, borrada al terminar): `publicacion` **LISTO** y `primera_firma` **LISTO** — 42 ítems, 41 OK, 0 pendientes, 0 avisos, 1 N/A, **0 bloqueantes**.
+> - El manifiesto desplegado declara `anexo_nube.firmado = true` + `contrafirmado = true` (v1.4) y `anexo_encargo.estado = "firmado"` (2026-11-12), y su nota dice **"SUSCRITO: …"**: **0 ocurrencias** de "NO SUSCRITO todavia".
+>
+> **La lección del turno.** Mi primer script de verificación usó `sudo -u kairfirma` y falló («sudo: a terminal is required»): por SSH no hay TTY. La verificación del agente es **de solo lectura y sin `sudo`**; lo que necesita root lo ejecuta el owner (trampa 117).
+>
+> **Pendiente.** `sitio/index.html` (sigue apuntando al Anexo de Nube v1.1 y menciona la cuenta de Gmail anterior — acto aparte del owner), la limpieza de `/tmp` (778 MB, con `sudo`) y la cola de la ronda 25.
 > **🆕 14-nov-2026 (noche, catorceava parte) — LA v1.4 QUEDÓ SUSCRITA Y CONTRAFIRMADA (LOS DOS ACTOS), EL MANIFIESTO SE REGENERÓ DESDE LA BASE, EL SERVICIO VIVO YA SIRVE LA v1.4, Y LOS "5 BLOQUEANTES" DEL GATE ERAN UNA MEDICIÓN CONTRA UNA COPIA SIN EL WAL: NO QUEDA NINGÚN BLOQUEANTE REAL**
 >
 > **El despliegue canónico (y el error propio que quedó escrito).** El paquete sale del **commit** con `git archive`: un stage de **255 archivos** de la app más 6 legales, con **0 diferencias de bytes** contra el repo, y el sello generado **sobre el stage** → `arbol 2a48678f4656` (255 archivos). El tar final (`/tmp/kair-v14-can.tar.gz`, 1 386 304 B, sha256 `56856f91…`) se verificó en el servidor y su reextracción de prueba dio el sello en verde. Los **dos primeros intentos** (14:41 y 14:53) mapearon la app a `app/firma-service/` y dejaron el despliegue **a medias**: el `legal/` sí quedó bien, la app viva siguió siendo la de `72fab5d3` → **trampa 181**. El espurio (7 archivos) se borró **solo después** de comprobar que coincidían byte a byte con `app/`. El owner ejecutó `/tmp/desplegar-v14.sh`: respaldo `backup-v14-20261114-150806.tar.gz` (1,4 M), servicio **activo (PID 621720)**, `NRestarts = 0`, `/health` 200. **Verificado desde afuera**: sello recalculado `OK: 2a48678f4656, 255 archivos`; `/health` local y `https://firma.kair.fyi/health` 200 con `commit ec9a891b`; espurio inexistente; `anexoNubeModelo.js` `2af393c2…` con `VERSION_MODELO = '1.4'`; los dos textos servidos con sus huellas (`a3014202…` y `57983e54…`). El manifiesto vivo seguía siendo el viejo (`9afa23a3…`): por eso el redespliegue del 📦1078 es necesario.
