@@ -1216,6 +1216,74 @@ function createFirmaClient(opts) {
   }
 
   /**
+   * POST .../anexo-nube/contrafirmar/codigo
+   *
+   * El gemelo del Anexo de Nube de `adminPedirCodigoContrafirma`: pide el
+   * codigo de contrafirma del SEGUNDO ACTO del Anexo de Nube. El codigo sale al
+   * buzon de proteccion de datos de K+AIR (NO al de la Empresa) y el service lo
+   * enmascara en la respuesta. NO lleva `X-Admin-Motivo`: pedir el codigo no es
+   * contrafirmar.
+   *
+   * 📦1082 · Esta ruta existia en el service desde el 9-nov-2026 pero NO tenia
+   * camino en la app: el segundo acto se hacia por HTTP a mano. Ahora tiene el
+   * mismo camino que su gemelo.
+   *
+   * @param {string} id_empresa
+   * @param {number} id_suscripcion
+   * @returns {Promise<{success,data}|{success:false,error}>}
+   *   data: { expira_en_segundos, canal }
+   *   errors: FIRMANTE_NO_COINCIDE (409), SUSCRIPCION_NO_FIRMADA (409),
+   *           YA_CONTRAFIRMADO (409), LIMITE_ENVIOS (429)
+   */
+  function adminPedirCodigoContrafirmaNube(id_empresa, id_suscripcion) {
+    if (!id_empresa || typeof id_empresa !== 'string') {
+      return Promise.resolve(_fail('INVALID_REQUEST_BODY', 'id_empresa requerido (string)'));
+    }
+    if (!id_suscripcion) {
+      return Promise.resolve(_fail('INVALID_REQUEST_BODY', 'id_suscripcion requerido'));
+    }
+    var path = '/internal/admin/empresas/' + encodeURIComponent(id_empresa)
+      + '/anexo-nube/contrafirmar/codigo';
+    return _adminRequest('POST', path, { id_suscripcion: id_suscripcion });
+  }
+
+  /**
+   * POST .../anexo-nube/contrafirmar
+   *
+   * EL SEGUNDO ACTO DEL ANEXO DE NUBE: K+AIR contrafirma. Con esto el
+   * instrumento queda EJECUTADO (es lo que escribe `anexo_nube_ejecutado_at`).
+   *
+   * EXIGE `X-Admin-Motivo` (sin el, el service responde 400
+   * MOTIVO_REQUERIDO y el acto no se registra) y la ACEPTACION EXPRESA
+   * (`acepta: true`: sin el, 400 ACEPTACION_REQUERIDA).
+   *
+   * 📦1082 · El gemelo de `adminContrafirmar`. La ruta del service es
+   * `anexo-nube/contrafirmar`, NO la del Encargo: confundirlas haria que el
+   * segundoacto se escribiera en el instrumento equivocado.
+   *
+   * @param {string} id_empresa
+   * @param {number} id_suscripcion
+   * @param {string} otp - los 6 digitos
+   * @param {string} motivo
+   * @returns {Promise<{success,data}|{success:false,error}>}
+   *   errors: OTP_INVALIDO (400), CODIGO_NO_SOLICITADO (400),
+   *           CODIGO_EXPIRADO (400), ACEPTACION_REQUERIDA (400),
+   *           MOTIVO_REQUERIDO (400), FACULTAD_NO_ACREDITADA (409),
+   *           FIRMANTE_NO_COINCIDE (409)
+   */
+  function adminContrafirmarNube(id_empresa, id_suscripcion, otp, motivo) {
+    var pre = _preAnexo(id_empresa, id_suscripcion, motivo);
+    if (pre) return Promise.resolve(pre);
+    if (!otp || !/^\d{6}$/.test(String(otp))) {
+      return Promise.resolve(_fail('INVALID_REQUEST_BODY', 'el codigo son 6 digitos'));
+    }
+    var path = '/internal/admin/empresas/' + encodeURIComponent(id_empresa)
+      + '/anexo-nube/contrafirmar';
+    var body = { id_suscripcion: id_suscripcion, otp: String(otp), acepta: true };
+    return _adminRequest('POST', path, body, { 'X-Admin-Motivo': motivo });
+  }
+
+  /**
    * Valida lo que las rutas de anexos exigen antes de gastar un HTTP: la
    * empresa, la suscripción y el MOTIVO (que va en `X-Admin-Motivo` y sin el
    * el service responde 400 MOTIVO_REQUERIDO y el acto no se registra).
@@ -1328,6 +1396,8 @@ function createFirmaClient(opts) {
     adminVerificarRepresentante: adminVerificarRepresentante,
     adminPedirCodigoContrafirma: adminPedirCodigoContrafirma,
     adminContrafirmar: adminContrafirmar,
+    adminPedirCodigoContrafirmaNube: adminPedirCodigoContrafirmaNube,
+    adminContrafirmarNube: adminContrafirmarNube,
     // Expose for tests
     _internals: {
       _buildHeaders: _buildHeaders,

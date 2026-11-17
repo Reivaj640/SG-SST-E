@@ -10631,3 +10631,58 @@ después del `--amend`. Remoto: `origin/gh-pages = a7a4097ccdec983b2a5970e4931c9
 rutas (`index.html`, `anexo-nube-v1.4.html`, `anexo-encargo.html`, `politica-firma.html`, `privacidad.html`,
 `terminos.html`, `autorizacion-trabajadores.html`) respondieron **200** y son **byte a byte idénticas** a los
 archivos del repo.
+
+### 16-nov-2026 (tarde) — EL SEGUNDO ACTO DEL ANEXO DE NUBE EXISTÍA EN EL SERVICIO PERO NO EN LA APP: AHORA TIENE CANAL, BOTONES Y PRUEBAS
+
+**El hueco.** El **segundo acto** del Anexo de Nube —la contrafirma de K+AIR— tenía sus dos rutas en el servicio
+desde el 9-nov-2026 (`POST .../anexo-nube/contrafirmar/codigo` y `POST .../anexo-nube/contrafirmar`), con su acta,
+su rastro y el cotejo de faculty. En la app de escritorio **no había camino**: ni handler en `main/firma-bridge.js`,
+ni método en `preload.js`, ni botón en el panel del operador. El operador lo ejecutaba **por HTTP a mano**, con el
+paso a paso escrito en un documento del expediente. La primera corrida real de la v1.4 (14-nov) salió por ese carril.
+
+**Por qué es un defecto y no una manía.** Un carril paralelo **no se mide**: nadie lo corre en la suite, nadie lo ve
+en la vista, y el que faltaba era justo el segundo acto —el que hace que un instrumento bilateral quede
+**EJECUTADO**. El gemelo del Anexo de Encargo sí tenía los tres botones.
+
+**Lo que se hizo (📦1082).** Cuatro capas, en el mismo orden en que las recorre un clic:
+
+1. **`main/firma-client.js`**: `adminPedirCodigoContrafirmaNube` y `adminContrafirmarNube`, que pegan a las rutas
+   **del Nube** (`anexo-nube/contrafirmar/*`), mandan `acepta: true` y el motivo en `X-Admin-Motivo`.
+2. **`main/firma-bridge.js`**: los handlers `firma:anexo:nube-contrafirma-codigo` y `firma:anexo:nube-contrafirmar`,
+   registrados, con el motivo obligatorio antes de gastar un HTTP.
+3. **`preload.js`**: `firmaAnexoNubeContrafirmaCodigo` y `firmaAnexoNubeContrafirmar`.
+4. **`modules/gestion-humana/firma-operador/index.js`**: los dos botones en el detalle del Anexo de Nube
+   ("Pedir codigo de contrafirma" y "Contrafirmar"), y el `_modo` que decide a qué instrumento va el acto.
+
+**La invariante que más muerde.** El modal tiene que saber **de qué instrumento** es: el `_modo` lo decide. Sin eso,
+el botón contrafirma el instrumento equivocado —y el service lo acepta sin quejarse, porque las dos rutas son
+gemelas. Los guards de comportamiento (no de texto) comprueban que, con el modo del Nube, el acto va al método del
+Nube, y con el modo del Encargo, al del Encargo.
+
+**Lo que NO cambió, y es importante.** El Anexo de Nube **no tiene** el paso de `verificar-representante` que
+tiene el Encargo: ese cotejo (el firmante de la suscripción contra el representante legal de la ficha, y la
+faculty de quien contrafirma por Gesstiar) lo hace el propio service, con `FIRMANTE_NO_COINCIDE` y
+`FACULTAD_NO_ACREDITADA`. Un botón de "verificar" para el Nube apuntaría a un paso que no existe, y por eso un
+guard nuevo **prohíbe** que aparezca.
+
+**El check invertido (PROMPT.md §7.3).** El test del 📦1038 **prohibía** el botón del Nube, porque en ese momento
+no había canal IPC: un botón que no hace nada es peor que un botón que no existe. Ese check se **invirtió** —no se
+borró— después de escribir los dos handlers: el hueco que el 📦1047 abrió (la tabla de canales de `API.md` listaba
+dos canales que nunca se escribieron) se cerraba **escribiendo los canales**, no borrando la advertencia.
+
+**Reglas que salieron de aquí.**
+
+1. **Si el service tiene el acto y la app no lo expone, el acto se hace a mano**: es la señal de que falta el
+   camino, no una forma de trabajar. Un documento con el paso a paso del `curl` es la huella de un camino que falta.
+2. **Cuando el canal existe, el botón tiene que existir**; y cuando el botón aparece, el check que lo prohibía se
+   invierte.
+3. **Un modal que ejecuta un acto tiene que saber de qué instrumento es** (el `_modo`): sin eso, es un acto a ciegas.
+4. **Los dos instrumentos se parecen pero no son el mismo**: el Encargo tiene `verificar-representante` y el Nube no,
+   y `anexo-encargo/contrafirmar` no es `anexo-nube/contrafirmar`.
+5. **El guard que cruza bridge, preload y vista** es el que muerde: un método en el preload sin handler en el
+   bridge es un botón que no hace nada.
+
+**Medido.** Suite de la app: **153 tests, 153 en verde, 0 con fallos** (4 sin resumen verificable, los conocidos).
+Test nuevo `main/test-anexos-nube-contrafirma-1082.js`: **14/14**. Los tests de anexos que ya existían
+(`test-anexos-1038.js`, `1039`, `1041`): **27/27**. Los del cliente y el bridge: **141/141**. El `?v=` del panel del
+operador se bumpeó a `GH-20261116-contrafirma-nube`, porque sin eso el navegador sirve la versión vieja.

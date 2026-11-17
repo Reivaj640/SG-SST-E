@@ -183,27 +183,42 @@ test('vistas · 📦1047 · las dos vistas muestran la acreditacion de la facult
     'la vista distingue al representante legal de quien actua con un poder acreditado');
 });
 
-test('vistas · 📦1047 · la vista NO ofrece la contrafirma del Anexo de Nube sin canal IPC', function () {
-  // La app NO expone las dos rutas de contrafirma del Anexo de Nube (no hay
-  // handler en el bridge ni metodo en el preload): el segundo acto se hace por
-  // HTTP contra el servicio. Si la vista ofreciera un boton para ese acto, el
-  // operador lo pulsaria y no pasaria nada: un boton que no hace nada es peor
-  // que un boton que no existe.
+test('vistas · 📦1082 · la vista del operador SÍ ofrece la contrafirma del Anexo de Nube', function () {
+  // 📦1082 · ESTE CHECK INVERTIDO (PROMPT.md §7.3: un check borrado es un
+  // hueco; uno invertido sigue protegiendo). Antes exigía que NO hubiera
+  // boton de contrafirma del Anexo de Nube, porque NO HABIA CANAL IPC: el
+  // service tenia las dos rutas del segundo acto, pero no habia handler en
+  // el bridge ni metodo en el preload, y el operador lo hacia por HTTP a
+  // mano.
+  //
+  // 📦1082 · Ahora el canal existe (`firma:anexo:nube-contrafirmar` y
+  // `firma:anexo:nube-contrafirma-codigo`, con sus metodos en el preload), y
+  // la vista los ofrece. El guard sigue mirando el MISMO bloque: el detalle
+  // del Anexo de Nube.
+  //
+  // Por que esta vez el boton es lo correcto y antes era un error: un boton
+  // que no hace nada es peor que un boton que no existe. Con el canal
+  // escrito, el boton hace el acto.
   const detalleNube = srcOperador.slice(srcOperador.indexOf('_htmlSuscripcionNube'));
   const finDetalle = detalleNube.indexOf('FirmaOperadorComponent.prototype._htmlEventos');
   const bloque = detalleNube.slice(0, finDetalle > 0 ? finDetalle : detalleNube.length);
-  assert.doesNotMatch(bloque, /data-fo-accion="nube-contrafirmar"/,
-    'no puede haber un boton de contrafirma del Anexo de Nube: no hay canal IPC');
-  assert.doesNotMatch(bloque, /data-fo-accion="nube-pedir-codigo"/,
-    'ni un boton de pedir el codigo del Anexo de Nube');
+  assert.match(bloque, /data-fo-accion="nube-contrafirmar"/,
+    'el detalle del Anexo de Nube tiene que ofrecer la contrafirma: el canal IPC existe');
+  assert.match(bloque, /data-fo-accion="nube-pedir-codigo"/,
+    'y el paso de pedir el codigo de contrafirma del Anexo de Nube');
 });
 
-test('vistas · 📦1047 · la vista NO declara un canal IPC que no existe', function () {
-  // El guard de la trampa 148 aplicado a la app: `API.md` listaba dos canales
-  // de contrafirma del Anexo de Nube que NUNCA se escribieron. Si la vista
-  // llegara a invocarlos, seria el mismo mentira por el otro lado.
-  assert.doesNotMatch(srcOperador, /nube-contrafirmar|nube-contrafirma-codigo/,
-    'la vista no puede llamar a un canal que el bridge no registra');
+test('vistas · 📦1082 · la vista del Nube NO ofrece el paso de "verificar representante"', function () {
+  // El Anexo de Nube NO tiene el paso documental que tiene el Encargo: el
+  // cotejo del firmante contra el representante legal de la ficha, y el de la
+  // faculty de quien contrafirma por Gesstiar, los hace el propio service
+  // (`FIRMANTE_NO_COINCIDE` y `FACULTAD_NO_ACREDITADA`). Un boton de
+  // "verificar" para el Nube apuntaria a un paso que no existe.
+  const detalleNube = srcOperador.slice(srcOperador.indexOf('_htmlSuscripcionNube'));
+  const finDetalle = detalleNube.indexOf('FirmaOperadorComponent.prototype._htmlEventos');
+  const bloque = detalleNube.slice(0, finDetalle > 0 ? finDetalle : detalleNube.length);
+  assert.doesNotMatch(bloque, /data-fo-accion="nube-verificar"/,
+    'el Anexo de Nube no tiene paso de verificar representante: lo hace el service');
 });
 
 test('vistas · el CSS de la vista del operador usa los tokens y tiene dark mode', function () {

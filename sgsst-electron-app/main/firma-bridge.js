@@ -2482,6 +2482,57 @@ function _handlerAnexoContrafirmar(args) {
     [args.id_empresa, args.id_suscripcion, args.otp, args.motivo]);
 }
 
+// -------- firma:anexo:nube-contrafirma-codigo --------
+// 📦1082 · El gemelo del Anexo de Nube de `firma:anexo:contrafirma-codigo`.
+// Pide el codigo de contrafirma del Anexo de Nube. Sale al buzon de K+AIR; NO
+// lleva motivo (pedir el codigo no es contrafirmar).
+//
+// La ruta del service existe desde el 9-nov-2026, pero NO habia handler ni
+// metodo en el preload: el segundo acto se hacia por HTTP a mano, con el
+// paso a paso escrito en un documento. Ahora el operador lo hace desde la
+// misma vista en la que abre la suscripcion.
+function _handlerAnexoNubeContrafirmaCodigo(args) {
+  args = args || {};
+  if (!args.id_empresa || typeof args.id_empresa !== 'string') {
+    return _err('INVALID_REQUEST_BODY', 'id_empresa requerido (string)');
+  }
+  if (!args.id_suscripcion) {
+    return _err('INVALID_REQUEST_BODY', 'id_suscripcion requerido');
+  }
+  var c = _clienteAdminAnexos();
+  if (!c.ok) return c.response;
+  return _delegarAdminAnexo(c.client, 'adminPedirCodigoContrafirmaNube',
+    [args.id_empresa, args.id_suscripcion]);
+}
+
+// -------- firma:anexo:nube-contrafirmar --------
+// 📦1082 · EL SEGUNDO ACTO DEL ANEXO DE NUBE: K+AIR contrafirma. Con esto el
+// instrumento queda EJECUTADO y la Empresa queda habilitada.
+//
+// Es el gemelo de `firma:anexo:contrafirmar`, con una diferencia que NO es
+// cosmetics: el service coteja el firmante de la suscripcion contra el
+// representante legal de la ficha de la Empresa (`FIRMANTE_NO_COINCIDE`) y la
+// faculty de quien contrafirma por Gesstiar (`FACULTAD_NO_ACREDITADA`). El
+// Anexo de Nube NO tiene el paso aparte de "verificar representante" que
+// tiene el Encargo: ese cotejo lo hace el propio service.
+function _handlerAnexoNubeContrafirmar(args) {
+  args = args || {};
+  if (!args.id_empresa || typeof args.id_empresa !== 'string') {
+    return _err('INVALID_REQUEST_BODY', 'id_empresa requerido (string)');
+  }
+  if (!args.id_suscripcion) {
+    return _err('INVALID_REQUEST_BODY', 'id_suscripcion requerido');
+  }
+  if (!args.motivo || !String(args.motivo).trim()) {
+    return _err('MOTIVO_REQUERIDO',
+      'este acto exige un motivo: va en X-Admin-Motivo y queda en el rastro');
+  }
+  var c = _clienteAdminAnexos();
+  if (!c.ok) return c.response;
+  return _delegarAdminAnexo(c.client, 'adminContrafirmarNube',
+    [args.id_empresa, args.id_suscripcion, args.otp, args.motivo]);
+}
+
 // -------- firma:anexo:anular y firma:anexo:nube-anular --------
 // Da de baja una suscripción que todavía no se firmó.
 function _handlerAnexoAnular(args) {
@@ -2813,6 +2864,14 @@ function registerFirmaHandlers(appArg, deps) {
   handle('firma:anexo:nube-anular', function (event, payload) {
     try { return _handlerAnexoNubeAnular(payload || {}); }
     catch (e) { console.error('[' + MOD + '][anexo:nube-anular]', e.message); return _err('INTERNAL', e.message); }
+  });
+  handle('firma:anexo:nube-contrafirma-codigo', function (event, payload) {
+    try { return _handlerAnexoNubeContrafirmaCodigo(payload || {}); }
+    catch (e) { console.error('[' + MOD + '][anexo:nube-contrafirma-codigo]', e.message); return _err('INTERNAL', e.message); }
+  });
+  handle('firma:anexo:nube-contrafirmar', function (event, payload) {
+    try { return _handlerAnexoNubeContrafirmar(payload || {}); }
+    catch (e) { console.error('[' + MOD + '][anexo:nube-contrafirmar]', e.message); return _err('INTERNAL', e.message); }
   });
   handle('firma:empresa:anexos', function (event, payload) {
     try { return _handlerEmpresaAnexos(payload || {}); }

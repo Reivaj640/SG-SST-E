@@ -64,6 +64,8 @@ exigía contrafirma.
 | Servicio | `firma-service/src/services/anexoNube.js` | `solicitarContrafirmaAnexoNube()` y `contrafirmarAnexoNube()` |
 | Acta | `firma-service/src/services/actaAnexoNube.js` | El acta del segundo acto, con su nombre, su SHA-256 y su tamaño, en la misma forma que el acta del Anexo de Encargo |
 | Rutas | `firma-service/src/routes/admin-empresas.js` | `POST .../anexo-nube/contrafirmar/codigo` y `POST .../anexo-nube/contrafirmar` |
+| Canal IPC (📦1082) | `sgsst-electron-app/main/firma-bridge.js`, `sgsst-electron-app/preload.js` | `firma:anexo:nube-contrafirma-codigo` y `firma:anexo:nube-contrafirmar`: el segundo acto del Nube, desde la app |
+| Botones (📦1082) | `sgsst-electron-app/modules/gestion-humana/firma-operador/index.js` | Los dos botones del panel del operador (pedir el código y contrafirmar), en el detalle del Anexo de Nube |
 | Manifiesto | `firma-service/scripts/actualizar-manifiesto-anexo-nube.js` | Declara los **dos** actos: `firmado` (el primero) y `contrafirmado` con su fecha, actor, motivo y evidencia (el segundo) |
 | Gate | `firma-service/src/services/readinessLegal.js` | Mide los dos actos por separado: `firmado_nube` y `contrafirma_nube`, cada uno con su detalle y su acción |
 | Habilitación | `firma-service/src/services/empresa.js` | La Empresa solo puede pedir firmas con el instrumento **ejecutado**, no solo suscrito |
@@ -276,8 +278,12 @@ por el **cuerpo** del correo, no por el asunto. Un error de tecleo se reintenta 
 código (hasta 3 veces): gasta un *intento* (hay 5) y no un *envío* (el límite de 5 envíos **no se
 resetea**). Y la contrafirma se confirma **contra la base**, no contra el HTTP 200.
 
-**No tiene canal IPC**: como la contrafirma del Anexo de Nube, se ejecuta por HTTP contra el
-servicio. La app de escritorio **muestra** el estado; no ejecuta el acto.
+**Sí tiene canal IPC (📦1082, 16-nov-2026).** Antes no: la contrafirma del Anexo de
+Encargo sí lo tenía, y la del Anexo de Nube se ejecutaba por HTTP contra el
+servicio. La app de escritorio **muestra** el estado y **ejecuta** el acto: el
+panel del operador tiene los dos botones (pedir el código y contrafirmar), y el
+paso a paso de §3.2 sigue siendo el del HTTP por si hay que hacerlo fuera de la
+app.
 
 ---
 
@@ -298,10 +304,14 @@ servicio. La app de escritorio **muestra** el estado; no ejecuta el acto.
   Si P7 dice que la verificación documental también es exigible en el Anexo de Nube, hay que
   abrirle columna y ruta: es un cambio acotado, pero es una decisión jurídica, no de código.
 - **No abre producción.** `FIRMA_EXIGIR_ANEXO_NUBE` sigue apagada.
-- **No pone el segundo acto en la app de escritorio.** Las dos rutas existen en el servicio, pero
-  **la app no las expone**: no hay canal IPC ni botón. Por eso §3.2 usa `curl` contra el
-  servicio. La app sí **muestra** el estado de los dos actos (columna del listado y detalle de la
-  suscripción), pero no permite ejecutarlo.
+- **Ya pone el segundo acto en la app de escritorio (📦1082, 16-nov-2026).** Esto fue una
+  carencia hasta ese día: las dos rutas existían en el servicio, pero **la app no las
+  exponía** (no había canal IPC ni botón), y por eso §3.2 usaba `curl` contra el
+  servicio. Hoy hay handler en `main/firma-bridge.js` (`firma:anexo:nube-contrafirmar` y
+  `firma:anexo:nube-contrafirma-codigo`), métodos en `preload.js` y los dos botones en el
+  panel del operador. **Lo que NO cambió:** el Anexo de Nube sigue **sin** el paso de
+  `verificar-representante` que tiene el Encargo —ese cotejo lo hace el service—, así que
+  un botón de "verificar" para el Nube apuntaría a un paso que no existe.
 - **La v1.6 del Acuerdo ya está publicada; la Constancia ya tiene los datos del registro.** La
   publicación y el registro de la Constancia son actos del owner, distintos de la contrafirma, y ya
   se hicieron el 11-nov-2026: la v1.6 quedó **publicada** (`publicado: true` en el manifiesto) con su

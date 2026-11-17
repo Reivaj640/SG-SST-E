@@ -633,6 +633,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   firmaAnexoVerificarRepresentante: (args) => ipcRenderer.invoke('firma:anexo:verificar-representante', args || {}),
   firmaAnexoContrafirmaCodigo: (args) => ipcRenderer.invoke('firma:anexo:contrafirma-codigo', args || {}),
   firmaAnexoContrafirmar: (args) => ipcRenderer.invoke('firma:anexo:contrafirmar', args || {}),
+  // 📦1082 · El segundo acto del Anexo de Nube. Antes no existia ningun canal
+  // para el: el service tenia las rutas, pero la app no las exponia y el acto
+  // se hacia por HTTP a mano.
+  firmaAnexoNubeContrafirmaCodigo: (args) => ipcRenderer.invoke('firma:anexo:nube-contrafirma-codigo', args || {}),
+  firmaAnexoNubeContrafirmar: (args) => ipcRenderer.invoke('firma:anexo:nube-contrafirmar', args || {}),
   firmaAnexoAnular: (args) => ipcRenderer.invoke('firma:anexo:anular', args || {}),
   firmaAnexoNubeAnular: (args) => ipcRenderer.invoke('firma:anexo:nube-anular', args || {}),
   firmaEmpresaAnexos: (args) => ipcRenderer.invoke('firma:empresa:anexos', args || {}),

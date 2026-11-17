@@ -466,8 +466,10 @@
     if (nombre === 'suscripcion') { self._mostrarFormSuscripcion(false); return; }
     if (nombre === 'nube-suscripcion') { self._mostrarFormSuscripcion(true); return; }
     if (nombre === 'verificar') { self._mostrarFormVerificar(); return; }
-    if (nombre === 'pedir-codigo') { self._pedirCodigo(); return; }
-    if (nombre === 'contrafirmar') { self._mostrarFormContrafirmar(); return; }
+    if (nombre === 'pedir-codigo') { self._pedirCodigo(false); return; }
+    if (nombre === 'nube-pedir-codigo') { self._pedirCodigo(true); return; }
+    if (nombre === 'contrafirmar') { self._mostrarFormContrafirmar(false); return; }
+    if (nombre === 'nube-contrafirmar') { self._mostrarFormContrafirmar(true); return; }
     if (nombre === 'anular') { self._mostrarFormAnular(false); return; }
     if (nombre === 'nube-anular') { self._mostrarFormAnular(true); return; }
     if (nombre === 'copiar') { self._copiarEnlace(); return; }
@@ -648,6 +650,25 @@
           + 'no puede quedar ok</span></div>');
       }
     }
+    // 📦1082 · EL SEGUNDO ACTO DEL ANEXO DE NUBE, DESDE LA VISTA.
+    //
+    // Antes estos botones NO existian: el service tenia las dos rutas del
+    // segundo acto, pero no habia handler en el bridge ni metodo en el
+    // preload, y el operador lo hacia por HTTP a mano. El boton no estaba
+    // porque no habia camino: un boton que no hace nada es peor que un
+    // boton que no existe.
+    //
+    // EL NUBE NO TIENE EL PASO DE "VERIFICAR REPRESENTANTE" que tiene el
+    // Encargo: ese cotejo (el firmante de la suscripcion contra el
+    // representante legal de la ficha, y la faculty de quien contrafirma por
+    // Gesstiar) lo hace el propio service. Por eso los dos botones aparecen
+    // juntos, sin la precondicion de la verificacion documental.
+    if (sub.estado === 'FIRMADA' && !contrafirmada) {
+      html.push('<div class="fo-acciones">');
+      html.push('<button class="fo-btn fo-btn--primary" type="button" data-fo-accion="nube-pedir-codigo">Pedir codigo de contrafirma</button>');
+      html.push('<button class="fo-btn fo-btn--ghost" type="button" data-fo-accion="nube-contrafirmar">Contrafirmar</button>');
+      html.push('</div>');
+    }
     if (sub.estado !== 'FIRMADA') {
       html.push('<div class="fo-acciones"><button class="fo-btn fo-btn--peligro" type="button"'
         + ' data-fo-accion="nube-anular">Anular la suscripcion</button></div>');
@@ -826,27 +847,42 @@
     await self._abrirDetalle(self._seleccion);
   };
 
-  FirmaOperadorComponent.prototype._pedirCodigo = async function () {
+  FirmaOperadorComponent.prototype._pedirCodigo = async function (esNube) {
     var self = this;
-    var sub = (self._detalle && self._detalle.anexo_encargo && self._detalle.anexo_encargo.suscripcion) || null;
+    // 📦1082 · El codigo de contrafirma se pide para el instrumento que se
+    // esta mirando: el del Nube va a SU ruta y el del Encargo a la suya.
+    // Pedir el codigo del instrumento equivocado gasta un envio del limite
+    // (hay cinco, y no se resetean) y no deja contrafirmar nada.
+    var sub = esNube
+      ? ((self._detalle && self._detalle.anexo_nube && self._detalle.anexo_nube.suscripcion) || null)
+      : ((self._detalle && self._detalle.anexo_encargo && self._detalle.anexo_encargo.suscripcion) || null);
     if (!sub) { self._showToast('No hay suscripcion abierta', 'error'); return; }
-    var r = await _api().firmaAnexoContrafirmaCodigo({
-      id_empresa: self._seleccion,
-      id_suscripcion: sub.id
-    });
+    var r = esNube
+      ? await _api().firmaAnexoNubeContrafirmaCodigo({
+        id_empresa: self._seleccion,
+        id_suscripcion: sub.id
+      })
+      : await _api().firmaAnexoContrafirmaCodigo({
+        id_empresa: self._seleccion,
+        id_suscripcion: sub.id
+      });
     if (!r || !r.success) {
       self._showToast((r && r.error && r.error.message) || 'No se pudo pedir el codigo', 'error');
       return;
     }
     self._showToast('Codigo enviado al buzon de K+AIR (' + ((r.data && r.data.canal) || 'enmascarado') + ')', 'success');
-    self._mostrarFormContrafirmar();
+    self._mostrarFormContrafirmar(esNube);
   };
 
-  FirmaOperadorComponent.prototype._mostrarFormContrafirmar = function () {
+  FirmaOperadorComponent.prototype._mostrarFormContrafirmar = function (esNube) {
     var self = this;
-    self._modo = 'contrafirmar';
+    // 📦1082 · El modo distingue el modal del Encargo del del Nube: sin el,
+    // el boton "Contrafirmar" de los dos instrumentos escribiria el segundo
+    // acto en el instrumento equivocado.
+    self._modo = esNube ? 'nube-contrafirmar' : 'contrafirmar';
+    var que = esNube ? 'el Anexo de Nube' : 'el Anexo de Encargo';
     var html = [];
-    html.push('<p class="fo-form__nota">Este es el <strong>segundo acto</strong>: K+AIR contrafirma el Anexo de Encargo. '
+    html.push('<p class="fo-form__nota">Este es el <strong>segundo acto</strong>: K+AIR contrafirma ' + que + '. '
       + 'Con esto el instrumento queda ejecutado y la Empresa ya puede firmar los documentos de sus trabajadores.</p>');
     html.push('<p class="fo-form__nota">El codigo llego al buzon de proteccion de datos de K+AIR, no al de la Empresa. '
       + 'Copia el de ahi: <strong>esta vista no lo pide ni lo guarda</strong>.</p>');
@@ -862,23 +898,35 @@
     html.push('<button class="fo-btn fo-btn--ghost" type="button" data-fo-accion="volver">Volver</button>');
     html.push('<button class="fo-btn fo-btn--primary" type="button" data-fo-accion="guardar-contrafirma">Contrafirmar</button>');
     html.push('</div>');
-    self._abrirModal('Contrafirmar el Anexo de Encargo', html.join('\n'));
+    self._abrirModal('Contrafirmar ' + que, html.join('\n'));
   };
 
   FirmaOperadorComponent.prototype._guardarContrafirma = async function () {
     var self = this;
+    // 📦1082 · El segundo acto va al instrumento del modal. Un modal de
+    // contrafirma sin saber de que instrumento es, es un acto a ciegas.
+    var esNube = self._modo === 'nube-contrafirmar';
     var motivo = self._valor('fo-ctr-motivo');
     var otp = self._valor('fo-ctr-otp');
     if (!motivo) { self._showToast('Falta el motivo: queda en el rastro', 'error'); return; }
     if (!/^\d{6}$/.test(otp)) { self._showToast('El codigo son 6 digitos', 'error'); return; }
-    var sub = (self._detalle && self._detalle.anexo_encargo && self._detalle.anexo_encargo.suscripcion) || null;
+    var sub = esNube
+      ? ((self._detalle && self._detalle.anexo_nube && self._detalle.anexo_nube.suscripcion) || null)
+      : ((self._detalle && self._detalle.anexo_encargo && self._detalle.anexo_encargo.suscripcion) || null);
     if (!sub) { self._showToast('No hay suscripcion abierta', 'error'); return; }
-    var r = await _api().firmaAnexoContrafirmar({
-      id_empresa: self._seleccion,
-      id_suscripcion: sub.id,
-      otp: otp,
-      motivo: motivo
-    });
+    var r = esNube
+      ? await _api().firmaAnexoNubeContrafirmar({
+        id_empresa: self._seleccion,
+        id_suscripcion: sub.id,
+        otp: otp,
+        motivo: motivo
+      })
+      : await _api().firmaAnexoContrafirmar({
+        id_empresa: self._seleccion,
+        id_suscripcion: sub.id,
+        otp: otp,
+        motivo: motivo
+      });
     if (!r || !r.success) {
       self._showToast((r && r.error && r.error.message) || 'No se pudo contrafirmar', 'error');
       return;

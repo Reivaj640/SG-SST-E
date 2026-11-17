@@ -4029,7 +4029,7 @@ contrafirma.
 | `401` | `INVALID_API_KEY` (falta el header o la key no es la de operador) |
 | `400` | `INVALID_REQUEST_BODY` (el `id_empresa` del path no es válido) |
 
-### 6.22.3 Los once canales IPC de la app de escritorio
+### 6.22.3 Los trece canales IPC de la app de escritorio
 
 La app de escritorio no habla con el servicio por HTTP suelto: lo hace por
 **IPC** (`main/firma-bridge.js`), y cada canal es una operación con su
@@ -4047,28 +4047,34 @@ La respuesta de un canal es `{ success: true, data }` o
 | `firma:anexo:verificar-representante` | Operador (admin key) | `POST .../anexo-encargo/suscripcion/:id_suscripcion/verificar-representante` | **Sí** | Registra la verificación documental de quien firmó por la Empresa |
 | `firma:anexo:contrafirma-codigo` | Operador (admin key) | `POST .../anexo-encargo/contrafirmar/codigo` | No | Pide el código de contrafirma (sale al buzón de K+AIR) |
 | `firma:anexo:contrafirmar` | Operador (admin key) | `POST .../anexo-encargo/contrafirmar` | **Sí** | **Fase 2**: K+AIR contrafirma y el instrumento queda ejecutado |
+| `firma:anexo:nube-contrafirma-codigo` | Operador (admin key) | `POST .../anexo-nube/contrafirmar/codigo` | No | Pide el código de contrafirma del Anexo de Nube (sale al buzón de K+AIR) |
+| `firma:anexo:nube-contrafirmar` | Operador (admin key) | `POST .../anexo-nube/contrafirmar` | **Sí** | **Fase 2 del Anexo de Nube**: K+AIR contrafirma y el instrumento queda ejecutado |
 | `firma:anexo:anular` | Operador (admin key) | `POST .../anexo-encargo/suscripcion/:id_suscripcion/anular` | **Sí** | Da de baja una suscripción que todavía no se firmó |
 | `firma:anexo:nube-anular` | Operador (admin key) | `POST .../anexo-nube/suscripcion/:id_suscripcion/anular` | **Sí** | Da de baja una suscripción del Anexo de Nube |
 | `firma:empresa:anexos` | **Cliente** (la key de **su** Empresa) | `GET /internal/empresa/anexos` | No | El estado de los anexos de la empresa activa |
 | `firma:config:admin-diag` | Diagnóstico | (ninguno: no sale a la red) | No | Dice si hay admin key configurada y **de dónde** |
 
-> 📦1047 · punto 3 (9-nov-2026) **La contrafirma del Anexo de Nube NO tiene canal
-> IPC todavía.** Las dos rutas del servicio existen y funcionan
-> (`POST .../anexo-nube/contrafirmar/codigo` y `POST .../anexo-nube/contrafirmar`),
-> pero **la app de escritorio no las expone**: no hay handler en
-> `main/firma-bridge.js` ni método en `preload.js`. El segundo acto se hace
-> **por HTTP contra el servicio**, con la admin key, y está escrito paso a paso
-> en `contrafirma-anexo-nube-v1-2.md` (§3.2).
+> 📦1082 (16-nov-2026) **La contrafirma del Anexo de Nube YA tiene canal IPC.**
+> Las dos rutas del service (`POST .../anexo-nube/contrafirmar/codigo` y
+> `POST .../anexo-nube/contrafirmar`) existen y funcionan desde el 9-nov-2026;
+> lo que faltaba era el camino en la app. Ahora hay handler en
+> `main/firma-bridge.js`, métodos en `preload.js` y los dos botones en el panel
+> del operador. El segundo acto del Nube se hace **desde la vista**, como el
+> del Anexo de Encargo, y ya no por HTTP a mano.
 >
-> Antes esta tabla listaba dos canales (`firma:anexo:nube-contrafirma-codigo` y
-> `firma:anexo:nube-contrafirmar`) que **nunca se escribieron**: el documento
-> afirmaba una capacidad que el código no tenía, y el título del apartado
-> ("los once canales") era el que sí cuadraba. Un canal documentado que no
-> existe es un verde falso por la vía del documento.
+> Lo que **NO** cambió: el Anexo de Nube **no tiene** el paso de
+> `verificar-representante` que tiene el Encargo. Ese cotejo (el firmante de
+> la suscripción contra el representante legal de la ficha, y la faculty de
+> quien contrafirma por Gesstiar) lo hace el propio service, con
+> `FIRMANTE_NO_COINCIDE` y `FACULTAD_NO_ACREDITADA`. Un botón de "verificar"
+> para el Nube apuntaría a un paso que no existe.
 >
-> Lo que **sí** hace la app es **mostrar** el estado de los dos actos del
-> Anexo de Nube: la columna del listado dice "Suscrito · falta contrafirma" o
-> "Ejecutado", y el detalle trae la fecha de la contrafirma.
+> **El historial de este apartado.** El 📦1047 (9-nov-2026) lo había corregido:
+> esta tabla listaba dos canales (`firma:anexo:nube-contrafirma-codigo` y
+> `firma:anexo:nube-contrafirmar`) que **nunca se escribieron** —el documento
+> afirmaba una capacidad que el código no tenía—. Ese era un verde falso por la
+> vía del documento. El 📦1082 no lo deshace: **escribe los dos canales que la
+> tabla nombraba**, y con eso el documento y el código vuelven a quadrar.
 
 **El motivo va en `X-Admin-Motivo`, no en el body.** Los cuatro canales que lo
 exigen (`verificar-representante`, `contrafirmar`, `anular` y `nube-anular`) lo

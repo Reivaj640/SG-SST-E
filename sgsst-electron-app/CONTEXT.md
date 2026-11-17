@@ -69,6 +69,21 @@
 > **Las reglas nuevas.** `PROMPT.md` §5.56 + trampa 186: el mensaje de un commit es un archivo, y `Set-Content -Encoding UTF8` le pone BOM; un commit ya publicado se corrige con `--amend` + `--force-with-lease`, verificando que lo que se pisa es propio y que el árbol no cambia. Entrada en `BITACORA.md`.
 >
 > **Pendiente del owner.** Comunicar el cambio sustancial a las empresas clientes por el canal de atención (lo exige el §9 de la Política de la firma) y limpiar `/tmp` del servidor (778 MB, con `sudo`).
+> **🆕 16-nov-2026 (tarde, decimoctava parte) — EL SEGUNDO ACTO DEL ANEXO DE NUBE YA SE HACE DESDE LA APP: HANDLER, PRELOAD, BOTONES Y PRUEBAS**
+>
+> **El hueco.** El **segundo acto** del Anexo de Nube (la contrafirma de K+AIR) tenía sus dos rutas en el servicio desde el 9-nov-2026, pero en la app **no había camino**: ni handler en `main/firma-bridge.js`, ni método en `preload.js`, ni botón en el panel del operador. El operador lo hacía **por HTTP a mano**. Un carril paralelo no se mide, y el que faltaba era justo el segundo acto: el que hace que el instrumento quede **EJECUTADO**.
+>
+> **Lo que se hizo (📦1082).** `firma-client.js` (`adminPedirCodigoContrafirmaNube`, `adminContrafirmarNube`), `firma-bridge.js` (`firma:anexo:nube-contrafirma-codigo`, `firma:anexo:nube-contrafirmar`), `preload.js` (`firmaAnexoNubeContrafirmaCodigo`, `firmaAnexoNubeContrafirmar`) y el panel del operador (los dos botones + el `_modo` que decide el instrumento).
+>
+> **La invariante.** El modal tiene que saber de qué instrumento es: sin eso contrafirma el equivocado, y el service lo acepta. Los guards son de comportamiento. Y el Nube **no** tiene el paso `verificar-representante` (lo coteja el service): un guard **prohíbe** ese botón.
+>
+> **El check invertido.** El del 📦1038 prohibía el botón del Nube porque no había canal; se invirtió (§7.3) después de escribir los handlers.
+>
+> **Medido.** Suite de la app **153/153 en verde**; test nuevo **14/14**; anexos que ya existían **27/27**; cliente y bridge **141/141**. `?v=` del panel bumpeado a `GH-20261116-contrafirma-nube`.
+>
+> **Reglas nuevas.** `PROMPT.md` §5.57 + trampa 187.
+>
+> **Pendiente del owner.** Comunicar el cambio sustancial a las empresas clientes (§9 de la Política de la firma), limpiar `/tmp` del servidor (778 MB, con `sudo`) y probar el botón en la app instalada: **esto no toca el servicio**, así que no hay nada que redesplegar.
 > **🆕 16-nov-2026 (tarde, decimosexta parte) — EL SITIO PÚBLICO AFIRMABA UN MUNDO VIEJO EN CUATRO DOCUMENTOS Y ADEMÁS LO SERVÍA DESDE OTRA RAMA: SE CORRIGIERON LOS CINCO Y SE PUBLICÓ `gh-pages`**
 >
 > **Lo que pedía el owner.** `sitio/index.html` → Anexo de Nube v1.4 y la cuenta de correo vigente. La cuenta vigente, medida en el manifiesto (`canales.transaccional`) y en el Anexo de Nube v1.4: **`kair@gesstiar.com`**, cuenta **empresarial de Google Workspace** con el CDPA aceptado el 10-nov-2026 (P2, P4 y P5 cerrados ese día: verificación en dos pasos, SPF/DKIM/DMARC publicados, envío real con `dkim=pass; spf=pass; dmarc=pass`).

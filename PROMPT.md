@@ -1775,6 +1775,40 @@ que compare el mensaje byte a byte.
 4. **La publicación se verifica después del `--amend` y del push**, igual que antes: un force-push puede
    dejar la rama en un estado que nadie miró.
 
+### 5.57 🔴 Un acto que el SERVICIO tiene y la APP no expone se hace a mano, por HTTP: es un carril que nadie mide. El segundo acto de un instrumento bilateral tiene que ser alcanzable desde la vista donde se abre el primero
+
+**El caso real (16-nov-2026), ronda 24.** El **segundo acto** del Anexo de Nube —la contrafirma de K+AIR— tenía
+sus dos rutas en el servicio desde el 9-nov-2026 (`POST .../anexo-nube/contrafirmar/codigo` y
+`POST .../anexo-nube/contrafirmar`), con sus actas, su rastro y su cotejo de faculty. En la app **no había
+camino**: ni handler en `main/firma-bridge.js`, ni método en `preload.js`, ni botón en el panel del operador. El
+operador lo hacía **por HTTP a mano**, con el paso a paso escrito en un documento del expediente
+(`contrafirma-anexo-nube-v1-2.md` §3.2). El gemelo del Anexo de Encargo, en cambio, sí tenía los tres botones.
+
+**Por qué eso es un defecto y no una manía.** Un carril paralelo **no se mide**: nadie lo corre en la suite, nadie
+lo ve en la vista, y el acto queda atribuido a quien lo ejecutó, sin que el panel diga que faltaba. Y el que
+faltaba era justo el segundo acto: el que hace que un instrumento bilateral quede **EJECUTADO**. La primera
+corrida real de la v1.4 (14-nov-2026) salió por ese carril.
+
+**Reglas:**
+
+1. **Si el servicio tiene el acto y la app no lo expone, el acto se hace a mano**: eso es una señal de que falta
+   el camino, no una forma de trabajar. Un documento del expediente con el paso a paso del `curl` es la huella
+   de un camino que falta.
+2. **Cuando el canal existe, el botón tiene que existir.** Un botón que no hace nada es peor que un botón que no
+   existe —regla que ya estaba en el test del 📦1038, que **prohibía** el botón del Nube porque no había canal—.
+   El 📦1082 invirtió ese check (§7.3) después de escribir los dos canales: el hueco que el 📦1047 abrió (la tabla
+   de canales listaba dos que nunca se escribieron) se cerraba **escribiendo los canales**, no borrando la
+   advertencia.
+3. **Un modal que ejecuta un acto tiene que saber DE QUÉ INSTRUMENTO es.** El `_modo` lo decide. Sin eso, el
+   botón contrafirma el instrumento equivocado: es un acto a ciegas, y el service lo aceptaría sin quejarse.
+4. **Los dos instrumentos se parecen, pero NO son el mismo.** El Anexo de Encargo tiene el paso de
+   `verificar-representante`; el Anexo de Nube **no lo tiene** (el cotejo lo hace el propio service). Un botón
+   de "verificar" para el Nube apuntaría a un paso que no existe. Y las rutas se parecen pero no son la misma:
+   `anexo-encargo/contrafirmar` contra `anexo-nube/contrafirmar`. Pegar a la ruta del gemelo escribe el segundo
+   acto en el instrumento que no es.
+5. **El guard que cruza las tres capas** (bridge, preload y vista) es el que muerde: un método en el preload sin
+   handler en el bridge es un botón que no hace nada, y el service ni se entera.
+
 ### 6.1 Backend — bridges
 
 Sufijo **`-bridge.js`** (no `bridge-*.js`). Hay 30 en `main/`.
@@ -2600,6 +2634,7 @@ Caso real (31-oct-2026): al corregir el único rojo de la suite del `firma-servi
 | 184 | 🔴 **Una copia de la base hecha con `cp` del archivo principal mide un mundo viejo (WAL): el gate inventa bloqueantes que ya se resolvieron, y el trabajo que generan ya estaba hecho** | `PROMPT.md` (§5.37, §5.54), `sgsst-electron-app/firma-service/src/services/readinessLegal.js` (`_acuerdoActivo`, `_aprobacionOperativaVigente`) | Caso real (14-nov-2026), la ronda 24: el gate medido dio 5 bloqueantes, uno de ellos «la versión activa es v1.5, pero el manifiesto declara v1.6», y de ahí salió la tarea de registrar la v1.6 en la base y su aprobación operativa. **Las dos ya estaban hechas desde el 11-nov-2026**: la v1.6 activa (`id 5`, `activa = 1`, desde `2026-11-11T19:51:42Z`) y su autorización operativa (`gh_firma_aprobaciones_publicacion` `id 4`, `OPERATIVA`, 2026-11-11, la huella `08e1eb8b…` que declara el manifiesto). La medición había copiado el archivo principal con `cp`: en WAL, ese archivo tiene el estado del último checkpoint (11-nov 12:13), donde la v1.5 seguía vigente. Reglas: (1) la copia se hace con `sqlite3 .backup` (§5.37) — la regla ya existía y se violó; (2) **un bloqueante medido contra una copia no se ejecuta: primero se reproduce** contra la base viva o contra una copia consistente; (3) la prueba del diagnóstico es **reproducir el número viejo**: la copia sin WAL devolvió exactamente `42 items · OK 35 · Pendientes 4 · Avisos 2 · 5 bloqueantes` con el detalle «la versión activa es v1.5», y la copia consistente devolvió `OK 41 · 0 pendientes · 0 bloqueantes` con el manifiesto nuevo; (4) toda afirmación «en producción pasa X» dice contra qué base y con qué copia se midió |
 | 185 | 🔴 **El sitio público se publica desde OTRA rama: corregir `sitio/` no cambia lo que el mundo ve, y publicar es un segundo commit, con su `CNAME` y su verificación por HTTP** | `sitio/` (la raíz del repo), la rama `gh-pages` (`CNAME` = `kair.fyi`), `sgsst-electron-app/legal/` | Caso real (16-nov-2026), la ronda 24: el `sitio/index.html` apuntaba al Anexo de Nube v1.1 y decía «cuenta gratuita de Gmail (cuenta de consumidor)», y la rama `gh-pages` publicaba el Anexo de Nube **v1.3** y el Anexo de Encargo **2026-11-11**, con el índice viejo: el mundo llevaba tres documentos atrás del repo, y un commit en `Dev` no cambia ni un byte de lo que se sirve. Reglas: (1) `gh-pages` es un **segundo árbol**, con su `CNAME` que no está en `sitio/`: copiar `sitio/` encima sin él rompe el dominio; (2) publicar es un commit en esa rama más su push, con su mensaje y su **verificación por HTTP**; (3) corregir un documento público obliga a corregir **todos** los que afirman el mismo hecho (aquí, cuatro), y las copias de `legal/` y `sitio/` quedan byte a byte idénticas; (4) los anexos ya suscritos **no se tocan**: son instrumentos de su época, aunque hoy describan un mundo viejo |
 | 186 | 🔴 **El mensaje de un commit es un archivo, y `Set-Content -Encoding UTF8` de PowerShell 5.1 le pone BOM: el defecto sale publicado en la rama, y se corrige con `--amend` + `--force-with-lease` (nunca `--force`)** | `PROMPT.md` (§5.31, §5.56), la rama `gh-pages` (`CNAME` = `kair.fyi`) | Caso real (16-nov-2026), la ronda 24: el commit de publicación de `gh-pages` (`cb4fadc`) salió con **BOM (U+FEFF) al inicio del mensaje**, porque el archivo del mensaje se escribió con `Set-Content -Encoding UTF8`, que en PowerShell 5.1 **escribe BOM** (trampa 159, el mismo hecho por el otro lado). El árbol publicado estaba **correcto** —las siete rutas servían byte a byte igual al repo—, así que el defecto **no se veía en el sitio**: estaba en el texto, y `git log --oneline` se lo come. Reglas: (1) el mensaje se escribe con la herramienta de archivos o con Node y **se mide antes de commitear** (sin BOM, sin CR, solo `📦` y `§` como no-ASCII); (2) **el BOM de un mensaje es invisible en `git log`**: se lee con `git cat-file commit <hash>` y se comparan bytes; (3) **un commit ya publicado se corrige con `--amend` + `--force-with-lease=<rama>:<hash-esperado>`**, verificando antes que lo que se pisa es **el commit propio** (mismo padre, mismo autor, nadie más publica esa rama) y que **el árbol no cambia** (si el árbol cambia, ya no es una corrección del texto); (4) **después del force-push se vuelve a verificar lo que se sirve** |
+| 187 | 🔴 **Una ruta del SERVICIO que la APP no expone deja el acto en un carril que nadie mide: el operador lo hace a mano por HTTP, y el botón que lo haría no puede existir** | `sgsst-electron-app/main/firma-bridge.js`, `sgsst-electron-app/preload.js`, `sgsst-electron-app/modules/gestion-humana/firma-operador/index.js`, `sgsst-electron-app/docs/gestion-humana/firma-electronica/contrafirma-anexo-nube-v1-2.md` (§3.2) | Caso real (16-nov-2026), ronda 24: el **segundo acto** del Anexo de Nube (la contrafirma de K+AIR) tenía sus dos rutas en el service desde el 9-nov-2026, con actas, rastro y cotejo de faculty, pero **en la app no había camino**: ni handler en el bridge, ni método en el preload, ni botón en el panel del operador. El operador lo ejecutaba **por HTTP a mano**, con el paso a paso escrito en un documento del expediente, y la primera corrida real de la v1.4 (14-nov-2026) salió por ese carril. El gemelo del Anexo de Encargo sí tenía los tres botones. Reglas: (1) **si el service tiene el acto y la app no lo expone, el acto se hace a mano**: es la señal de que falta el camino, no una forma de trabajar — un documento con el paso a paso del `curl` es la huella de un camino que falta; (2) **cuando el canal existe, el botón tiene que existir**: el test del 📦1038 *prohibía* el botón del Nube porque no había canal, y el 📦1082 lo **invirtió** (§7.3) después de escribir los dos handlers; (3) **un modal que ejecuta un acto tiene que saber de qué instrumento es** (el `_modo`): sin eso el botón contrafirma el instrumento equivocado y el service lo acepta sin quejarse; (4) **los dos instrumentos se parecen pero no son el mismo**: el Encargo tiene `verificar-representante` y el Nube **no** (lo coteja el service), y las rutas `anexo-encargo/contrafirmar` y `anexo-nube/contrafirmar` no son la misma; (5) **el guard que cruza bridge, preload y vista** es el que muerde: un método en el preload sin handler en el bridge es un botón que no hace nada |
 
 
 **Formato de commit real** (verificá con `git log` antes de cada uno, la convención migró varias veces):
