@@ -10884,3 +10884,27 @@ Firma Electrónica manda `revokeRemote: true`, y `_handlerEmpresaRevokeApiKey`
 **zombi**: el botón no la borra y «Recrear vínculo» no sirve (crea un cliente nuevo en el servidor, que es
 justo lo contrario de lo que se quiere). El arreglo —borrar lo local aunque el servidor ya no tenga la
 empresa— está pendiente de que el owner lo pida.
+
+**El botón «Eliminar» dejaba la configuración local zombi (📦1089).** El caso se destapó cuando la empresa de
+prueba se borró del servidor: el botón manda `revokeRemote: true`, el bridge llama `adminRotateClient`, el
+servidor responde `404 CLIENT_NOT_FOUND` (ya no hay cliente activo para esa empresa) y
+`_handlerEmpresaRevokeApiKey` (`main/firma-bridge.js:2067-2095`) hacía `if (!r.success) return r;` — **aborta
+antes de borrar la entrada local**. La configuración quedaba **zombi**: presente en la app, inservible (su key
+ya no existe en el servidor) y **que ningún botón podía quitar**. «Recrear vínculo» tampoco servía de salida:
+crea un cliente **nuevo** en el servidor, o sea lo contrario de lo que se quería.
+
+**Lo que se corrigió.** Un `404 CLIENT_NOT_FOUND` se trata como un **estado**, no como un fallo: si el
+servidor ya no tiene la empresa, **no hay nada que revocar allá y la configuración local se borra igual**. La
+respuesta lo dice (`revokedRemote: false`, `alreadyGoneOnServer: true`), y el cliente se invalida igual que en
+el camino normal. **Un error que NO es ese (un `500`, un timeout) NO borra nada local**: si la red falla, la
+configuración sigue valiendo y no se pierde sin necesidad.
+
+**Medido.** `main/test-firma-bridge.js`: **69/69** (eran 67), con **dos** tests nuevos: el del `404` (borra lo
+local) y el del error de red (**no** borra lo local). El **mutante**: deshacer el fix deja la suite en **68/69**
+— el test nuevo **muerde**. `main/test-firma-client.js`: **74/74**, y el guard del modal «Recrear vínculo»
+(`main/test-firma-modal-recreate.js`): **21/21 OK**.
+
+**Lo que este fix NO arregla todavía.** El cambio está en el **código fuente**: la app instalada (0.1.253) no
+lo tiene hasta que salga una release nueva. No es urgente —la entrada local de la empresa de prueba ya se
+borró del `secrets.enc`—, pero el botón «Eliminar» de la app instalada sigue sin efecto contra un
+`404 CLIENT_NOT_FOUND`.

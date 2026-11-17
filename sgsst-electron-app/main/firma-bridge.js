@@ -2076,7 +2076,31 @@ function _handlerEmpresaRevokeApiKey(args) {
       motivo: args.motivo || 'Revocación manual desde K+AIR',
       actor: args.actor || 'kair-bridge'
     })).then(function (r) {
-      if (!r.success) return r;
+      if (!r.success) {
+        // 📦1089 · Si el servidor YA NO tiene cliente activo para esta empresa
+        // (404 CLIENT_NOT_FOUND), no hay nada que revocar allá: la
+        // configuracion local se borra IGUAL. Antes el boton «Eliminar» se
+        // quedaba sin efecto (el 404 cortaba el flujo antes de borrar) y la
+        // app quedaba con una configuracion zombi que ningun boton podia
+        // quitar. «Recrear vinculo» no servia de salida: crea un cliente
+        // NUEVO en el servidor, que es lo contrario de lo que se quiere.
+        var code = (r && r.error && r.error.code) || '';
+        if (code !== 'CLIENT_NOT_FOUND') return r;
+        delete s2.empresas[companyKeyToRemove];
+        var w0 = _writeSecrets(s2);
+        if (!w0.ok) {
+          return _err('INTERNAL', 'Error guardando secrets.enc post-revoke: ' + (w0.error || 'unknown'));
+        }
+        _invalidateAllClients();
+        return _ok({
+          revoked: true,
+          companyKey: companyKeyToRemove,
+          idEmpresa: found.entry.idEmpresa,
+          revokedRemote: false,
+          alreadyGoneOnServer: true,
+          motivo: args.motivo || 'Revocación manual desde K+AIR'
+        });
+      }
       // Borrar entrada local
       delete s2.empresas[companyKeyToRemove];
       var w = _writeSecrets(s2);

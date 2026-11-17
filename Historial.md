@@ -10078,3 +10078,33 @@ politica de la sesion dejo bloqueadas. **Sin push**: `origin/Dev` no se mueve ha
 > empresa— queda pendiente de que el owner lo pida.
 >
 > **Lo que queda pendiente.** (1) **Traer el respaldo al PC** (`scp javier@192.168.1.11:/opt/kair-firma/data/backups/firma-antes-limpieza-900829731-2026-11-17T18-56-41-114Z.sqlite .`): el agente lo abre y demuestra con números qué se borró y qué no. (2) El **📦1087 y el 📦1088, sin push**: esperando la palabra del owner. (3) Publicar la **v1.5** del Anexo de Nube, sin nombrar a la empresa de prueba. (4) **Comunicar el cambio sustancial** a las empresas clientes (§9 de la Política). (5) **Limpiar `/tmp`** del servidor (778 MB, `sudo`). (6) Borrar el **borrador duplicado** de la v0.1.252. (7) Liberar los **677 MB** de `dist/` que no sirven.
+
+> **Actualización 2026-11-17 (tarde, vigésima tercera parte) — EL BOTÓN «ELIMINAR» DEJABA LA CONFIGURACIÓN LOCAL ZOMBI CUANDO EL SERVIDOR YA NO TENÍA LA EMPRESA: UN 404 QUE SE IBA POR EL CAMINO Y DEJABA UNA EMPRESA QUE NADIE PODÍA QUITAR**
+>
+> **Lo que se pidió.** Que se corrigiera el botón «Eliminar» de Configuración → Firma Electrónica, que con la
+> empresa de prueba ya borrada del servidor se quedaba **sin efecto**: la configuración local seguía ahí y
+> ningún botón la quitaba.
+>
+> **La causa, medida en el código.** El botón manda `revokeRemote: true`; `_handlerEmpresaRevokeApiKey`
+> (`main/firma-bridge.js:2067-2095`) llama `adminRotateClient` y, si la respuesta no es exitosa, hacía
+> `if (!r.success) return r;` — **aborta antes de borrar la entrada local**. El servidor responde
+> `404 CLIENT_NOT_FOUND` cuando **ya no hay cliente activo** para esa empresa (`firma-service/src/services/
+> internalClient.js:524-538`), que es exactamente el caso de una empresa borrada: **no hay nada que revocar
+> allá**, pero la app se quedaba con una configuración **zombi** (presente, inservible y **quitable por
+> ningún botón**). «Recrear vínculo» tampoco era salida: **crea** un cliente nuevo en el servidor.
+>
+> **Lo que se corrigió (📦1089).** El `404 CLIENT_NOT_FOUND` se trata como un **estado**: se borra igual la
+> configuración local, se invalidan los clientes y la respuesta lo dice (`revokedRemote: false`,
+> `alreadyGoneOnServer: true`). **Un error que NO es ese (un `500`, un timeout) NO borra nada local**: si la red
+> falla, la configuración sigue valiendo.
+>
+> **Medido.** `main/test-firma-bridge.js`: **69/69** (eran 67), con dos tests nuevos —el del `404` (borra lo local)
+> y el del error de red (**no** borra lo local)—. El **mutante**: con el fix deshecho la suite queda en **68/69**,
+> o sea el test nuevo **muerde**. `main/test-firma-client.js`: **74/74**. El guard del modal «Recrear vínculo»
+> (`main/test-firma-modal-recreate.js`): **21/21 OK**. La regla nueva queda en `PROMPT.md` como **trampa 195**.
+>
+> **Lo que este fix NO arregla todavía.** El cambio está en el **código fuente**: la app instalada (0.1.253) no
+> lo tiene hasta que salga una release nueva. No es urgente, porque la entrada local de la empresa de prueba ya
+> se borró del `secrets.enc`, pero el botón de la app instalada sigue sin efecto contra un `404`.
+>
+> **Lo que sigue pendiente.** (1) **Traer el respaldo al PC** (`scp javier@192.168.1.11:/opt/kair-firma/data/backups/firma-antes-limpieza-900829731-2026-11-17T18-56-41-114Z.sqlite .`): el agente lo abre y demuestra con números qué se borró y qué no. (2) La **release nueva** que incluya el fix del botón «Eliminar» (y la v1.5 del Anexo de Nube, sin nombrar a la empresa de prueba), cuando entre la primera empresa real. (3) **Comunicar el cambio sustancial** a las empresas clientes (§9 de la Política). (4) **Limpiar `/tmp`** del servidor (778 MB, `sudo`). (5) Borrar el **borrador duplicado** de la v0.1.252. (6) Liberar los **677 MB** de `dist/` que no sirven.

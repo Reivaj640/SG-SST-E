@@ -1131,6 +1131,78 @@ test('empresa:revoke-api-key CON revokeRemote=true llama a adminRotateClient', a
   teardown();
 });
 
+test('empresa:revoke-api-key con CLIENT_NOT_FOUND borra la entrada local (la empresa ya no esta en el servidor)', async function () {
+  setup();
+  _setMockClientWithAdmin();
+  _setSecretsV2({}, { url: 'https://firma.test.k-air.com' });
+  _mockIpcHandlers['firma:config:set-admin-key']({}, {
+    adminApiKey: 'test-admin-api-key-32-chars-minimum-padding!!!'
+  });
+  _mockIpcHandlers['firma:empresa:set-api-key']({}, {
+    companyName: 'TEMPOACTIVA EST S.A.S.',
+    idEmpresa: '900123456',
+    firmaApiKey: 'kair_live_OLD_key_32chars_padding_padding_pad!'
+  });
+  // El servidor ya no tiene cliente activo para esa empresa: esa es la
+  // respuesta REAL del firma-service (404 con CLIENT_NOT_FOUND), y es lo que
+  // dejo la configuracion local zombi el 17-nov-2026.
+  _lastMockedClient.adminRotateClient = function (id, args) {
+    _clientCallLog.push({ m: 'adminRotateClient', id: id, args: args });
+    return Promise.resolve({
+      success: false,
+      error: { code: 'CLIENT_NOT_FOUND', message: 'No hay cliente activo para la empresa ' + id }
+    });
+  };
+  _clientCallLog = [];
+  var r = await _call('firma:empresa:revoke-api-key', {
+    companyName: 'TEMPOACTIVA EST S.A.S.',
+    revokeRemote: true
+  });
+  assert.equal(r.success, true, 'la borrada local tiene que salir bien');
+  assert.equal(r.data.revokedRemote, false, 'no se revoco nada en el servidor');
+  assert.equal(r.data.alreadyGoneOnServer, true);
+  var calls = _clientCallLog.filter(function (c) { return c.m === 'adminRotateClient'; });
+  assert.equal(calls.length, 1, 'si se intento revocar en el servidor');
+  // Y lo importante: la entrada local quedo BORRADA.
+  var list = _mockIpcHandlers['firma:empresa:list']({}, {});
+  assert.equal(list.data.configured.length, 0, 'la entrada local tiene que estar borrada');
+  teardown();
+});
+
+test('empresa:revoke-api-key con un error que NO es CLIENT_NOT_FOUND NO borra la entrada local', async function () {
+  setup();
+  _setMockClientWithAdmin();
+  _setSecretsV2({}, { url: 'https://firma.test.k-air.com' });
+  _mockIpcHandlers['firma:config:set-admin-key']({}, {
+    adminApiKey: 'test-admin-api-key-32-chars-minimum-padding!!!'
+  });
+  _mockIpcHandlers['firma:empresa:set-api-key']({}, {
+    companyName: 'TEMPOACTIVA EST S.A.S.',
+    idEmpresa: '900123456',
+    firmaApiKey: 'kair_live_OLD_key_32chars_padding_padding_pad!'
+  });
+  // Un 500 (o un timeout) NO es lo mismo que «el servidor no tiene la
+  // empresa»: si se borra lo local ahi, se pierde la configuracion con un
+  // error de red de por medio.
+  _lastMockedClient.adminRotateClient = function (id, args) {
+    _clientCallLog.push({ m: 'adminRotateClient', id: id, args: args });
+    return Promise.resolve({
+      success: false,
+      error: { code: 'INTERNAL', message: 'firma-service no responde' }
+    });
+  };
+  _clientCallLog = [];
+  var r = await _call('firma:empresa:revoke-api-key', {
+    companyName: 'TEMPOACTIVA EST S.A.S.',
+    revokeRemote: true
+  });
+  assert.equal(r.success, false, 'el error tiene que llegar al usuario');
+  assert.equal(r.error.code, 'INTERNAL');
+  var list = _mockIpcHandlers['firma:empresa:list']({}, {});
+  assert.equal(list.data.configured.length, 1, 'la entrada local NO se puede borrar con un error de red');
+  teardown();
+});
+
 // ---------- list ----------
 test('empresa:list retorna configured + hasLegacyKey', function () {
   setup();
