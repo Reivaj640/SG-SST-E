@@ -69,6 +69,17 @@
 > **Las reglas nuevas.** `PROMPT.md` §5.56 + trampa 186: el mensaje de un commit es un archivo, y `Set-Content -Encoding UTF8` le pone BOM; un commit ya publicado se corrige con `--amend` + `--force-with-lease`, verificando que lo que se pisa es propio y que el árbol no cambia. Entrada en `BITACORA.md`.
 >
 > **Pendiente del owner.** Comunicar el cambio sustancial a las empresas clientes por el canal de atención (lo exige el §9 de la Política de la firma) y limpiar `/tmp` del servidor (778 MB, con `sudo`).
+> **🆕 16-nov-2026 (noche, decimonovena parte) — LA APP INSTALADA ERA LA RELEASE DEL 28-OCT, Y EL CACHE-BUST DE LA VISTA DE ANEXOS IBA A DOS VELOCES**
+>
+> **El hallazgo.** La app instalada (`C:\Program Files\K+AIR`) es la release **`v0.1.252` del 28-oct-2026**: **98 commits** atrás del repo. El trabajo de anexos en la app es del 7-nov en adelante (📦1037, 📦1038, 📦1039/1041/1047, 📦1082). Escaneando el `app.asar` instalado: **0 apariciones** del panel del operador, de `firma:anexo:contrafirmar` y de `firma:empresa:anexos`. `npm run dev` corre el working tree, que sí los tiene. Para ver los botones en la app instalada hay que **reconstruir el instalador**, y hay que **subir la versión** antes (`artifactName` lleva el número: si no, el instalador nuevo se llama igual al viejo y el auto-updater no lo ve).
+>
+> **El defecto encontrado al medir (📦1083).** El 📦1082 bumpeó el `?v=` del script del panel y dejó el de la hoja y el del iframe con los tokens viejos: el panel del operador **no aparecía** con cache, y la causa estaba en un archivo que nadie había tocado. Los tres tokens van ahora al compás: `GH-20261116-contrafirma-nube` (hoja y script) y `20261116-contrafirma-nube` (el iframe).
+>
+> **Medido.** Guard nuevo `main/test-cache-bust-anexos-1083.js` **6/6** con **3 mutaciones que mueren**. Suite de la app **154/154 en verde**. `renderer.js` parcheado por bytes (CRLF puro) y `config-viewer.html` en LF.
+>
+> **Riesgo abierto.** El 📦1042 (panel embebido en Configuración) **nunca se ha probado en un `.exe`**: `components/config/**` va en `asarUnpack` y el panel vive en el asar, con ruta relativa. Hay que medirlo en el build.
+>
+> **Reglas nuevas.** `PROMPT.md` trampa 188.
 > **🆕 16-nov-2026 (tarde, decimoctava parte) — EL SEGUNDO ACTO DEL ANEXO DE NUBE YA SE HACE DESDE LA APP: HANDLER, PRELOAD, BOTONES Y PRUEBAS**
 >
 > **El hueco.** El **segundo acto** del Anexo de Nube (la contrafirma de K+AIR) tenía sus dos rutas en el servicio desde el 9-nov-2026, pero en la app **no había camino**: ni handler en `main/firma-bridge.js`, ni método en `preload.js`, ni botón en el panel del operador. El operador lo hacía **por HTTP a mano**. Un carril paralelo no se mide, y el que faltaba era justo el segundo acto: el que hace que el instrumento quede **EJECUTADO**.

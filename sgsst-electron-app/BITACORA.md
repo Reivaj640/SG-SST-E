@@ -10686,3 +10686,45 @@ dos canales que nunca se escribieron) se cerraba **escribiendo los canales**, no
 Test nuevo `main/test-anexos-nube-contrafirma-1082.js`: **14/14**. Los tests de anexos que ya existían
 (`test-anexos-1038.js`, `1039`, `1041`): **27/27**. Los del cliente y el bridge: **141/141**. El `?v=` del panel del
 operador se bumpeó a `GH-20261116-contrafirma-nube`, porque sin eso el navegador sirve la versión vieja.
+
+### 16-nov-2026 (noche) — LA APP INSTALADA ERA LA RELEASE DEL 28-OCT (98 COMMITS ATRÁS) Y, ADEMÁS, EL CACHE-BUST DE LA VISTA DE ANEXOS IBA A DOS VELOCES
+
+**Lo que abrió la conversación.** El owner preguntó: en la app **instalada** (`C:\Program Files\K+AIR`) la
+configuración de la firma se ve distinta de la que se ve con `npm run dev`. La pregunta era por qué.
+
+**La causa, medida (no deducida).** La app instalada es la release **`v0.1.252`**, publicada el **28-oct-2026**: los
+archivos del `.exe` y del `app.asar` son de esa fecha, y `git rev-list --count v0.1.252..Dev` da **98 commits**. El
+trabajo de anexos en la app es **del 7-nov en adelante**: 📦1037 (los handlers IPC de anexos) y 📦1038 (el panel del
+operador), más 📦1039/1041/1047 y el 📦1082. Escaneando el `app.asar` instalado (1,4 GB) con marcas: **0 apariciones**
+de `modules/gestion-humana/firma-operador`, de `firma:anexo:contrafirmar` y de `firma:empresa:anexos`. La app
+instalada **no tiene ninguna parte** del trabajo de anexos — y por eso el modal «Configurar Firma Electrónica» no
+tiene el panel de anexos al final. `npm run dev` corre el **working tree** (`electron .`), que sí lo tiene.
+
+**El segundo defecto, encontrado al medir.** El 📦1082 bumpeó el `?v=` del **script** del panel y dejó el de la
+**hoja** del mismo panel y el del **iframe** (`renderer.js`, `components/config/config-viewer.html?v=…`) con los
+tokens viejos. El código estaba bien y el botón del Nube existía, pero el panel del operador **no aparecía** en un
+navegador con cache. El síntoma era «no hay nada», y la causa estaba en un archivo que **nadie había tocado**.
+
+**Lo que se corrigió (📦1083).** Los tres `?v=` de la vista de anexos van al compás: `GH-20261116-contrafirma-nube`
+en la hoja y el script del panel, y `20261116-contrafirma-nube` en el iframe (el del panel sin el prefijo `GH-`,
+porque el test del 📦751 exige el formato `\d{8}-[\w-]+`). `renderer.js` se parcheó **por bytes**: es CRLF puro
+(8069 CRLF, 0 LF) y el editor de texto no encuentra la línea.
+
+**Reglas que salieron de aquí.**
+
+1. **Un `?v=` nombra UN archivo**: tocar un archivo obliga a subir su `?v=` **y el de quien lo carga**.
+2. **Si una vista tiene hoja y script, los dos tokens son EL MISMO** (si no, la página carga dos versiones).
+3. **El token del documento y el de la vista van al compás**, y no puede retroceder.
+4. **La app instalada es una release, no el repo**: para ver lo último hay que **reconstruir el instalador**, y
+   como `artifactName` es `K-AIR-Setup-${version}.${ext}`, hay que **subir la versión** antes (si no, el
+   instalador nuevo se llama igual al viejo y el auto-updater no lo ve).
+
+**El riesgo que queda abierto (y NO se puede resolver sin medir).** El 📦1042 —el panel embebido al final del modal
+de Configuración— **nunca se ha probado en un `.exe`**: la release publicada es anterior. Y el empaque es delicado:
+`components/config/**` está en `asarUnpack` (fuera del asar) mientras el panel vive **dentro** del asar, y se carga
+por ruta relativa (`../../modules/gestion-humana/firma-operador/index.js`). Que esa ruta resuelva en el asar hay que
+**medirlo en el build**, no suponerlo.
+
+**Medido.** Guard nuevo `main/test-cache-bust-anexos-1083.js`: **6/6**, con **3 mutaciones que mueren** (dejar la hoja
+con el token viejo, dejar el iframe con el token viejo, y dejar el script con un token distinto del de la hoja). El
+EOL de `renderer.js` sigue CRLF puro y el de `config-viewer.html` sigue LF puro, con su propio check.

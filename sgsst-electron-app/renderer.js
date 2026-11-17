@@ -7411,7 +7411,12 @@ if (mainContainerView) mainContainerView.classList.remove('vanta-fullscreen');
     // `overflow-x: auto` sin declarar `overflow-y`: CSS convierte el `visible`
     // del eje Y en `auto`, y cualquier desborde de un píxel dibujaba la barrita.
     // Sin el bump el navegador sigue mostrando la versión anterior.
-iframe.src = 'components/config/config-viewer.html?v=20261107-anexos-operador';
+    // 📦1083 · Bump de nuevo: el documento `config-viewer.html` cambio (el
+    // panel del operador de anexos, con la contrafirma del Anexo de Nube), y
+    // este `?v=` es el cache-bust DEL DOCUMENTO. Sin bumpearlo, el iframe puede
+    // servir la version vieja de `config-viewer.html` y el panel del operador no
+    // aparece. El token es el del panel, sin el prefijo `GH-`.
+iframe.src = 'components/config/config-viewer.html?v=20261116-contrafirma-nube';
     iframe.style.width = '100%';
     iframe.style.height = '100%';
     iframe.style.border = 'none';
