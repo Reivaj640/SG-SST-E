@@ -10784,3 +10784,66 @@ guard se **ejecuta** contra un runtime inexistente, contra uno con el `.pth` com
 dependencias y contra el runtime bueno. End-to-end: `npx electron-builder --win` **se detiene** con el runtime
 vacío (*"Build detenido: el runtime de Python no esta preparado (MOTIVO: SIN_RUNTIME)"*), y **pasa** con el runtime
 real.
+
+
+**Lo que abrió la conversación.** El owner actualizó la app de escritorio y vio la sección de firma con una
+empresa ya firmada y contrafirmada. Preguntó si la firma electrónica estaba lista, y su respuesta fue que
+**ASEPLUS era una empresa de prueba** (los correos se pusieron a propósito porque estaban disponibles) y que había
+que **limpiarla del servidor: las firmas, todo**, para que quedara limpio para cuando vinieran las empresas
+reales.
+
+**El inventario, medido antes de tocar nada.** (1) La base de la **app de escritorio** (`kair.db`, 6,8 MB) está
+**limpia**: 0 filas con `900829731`, `Aseplus`, `Lilia` o `jrf2011` en sus 60 tablas. (2) En el **servidor** están
+la ficha, **2+2 suscripciones** de anexos con sus eventos, **5 firmas** con sus eventos y sesiones, los
+consentimientos, los holds, 2 solicitudes de titular, la **client key** y las **actas PDF**. (3) El **sitio
+público** (kair.fyi) publica cuatro páginas que nombran a ASEPLUS con su NIT 900.829.731-1, el firmante y su
+IP: el texto del anexo es de K+AIR y ya está suscrito, así que **no se reescribe**; eso se resuelve con la
+**v1.5** del Anexo de Nube, que hay que publicar de todos modos para la primera empresa real.
+
+**La decisión (del owner, medida con `ask_user`).** *Borrado físico* de todo en el servidor, y **el sitio público
+no se toca**. Con una consecuencia que conviene tener presente: el código de contrafirma sale al buzón **fijo**
+de K+AIR (`privacidad.kair@gmail.com`) y el de suscripción al correo del firmante (`jrf2011@live.com`) — los dos
+buzones son del owner—, así que el botón de contrafirma del 📦1082 **podía** estrenarse con la misma empresa de
+prueba. Se decidió **borrar ya**: que lo estrene la primera empresa real, que es el escenario real, y no dejar
+más rastro de prueba en el servidor.
+
+**Lo que se construyó (📦1087): `scripts/limpiar-empresa-prueba.js`.** Descubre las tablas **por el esquema
+real** (`PRAGMA table_info` + `PRAGMA foreign_key_list`), no por una lista escrita a mano: una lista se queda
+corta en cuanto alguien agrega una migración, y el script "limpia" y deja la fila. Cascada **por FK y por
+convención del nombre de la columna** (las tres que cuelgan sin FK declarada: `gh_firma_holds`,
+`gh_consentimientos_eventos`, `gh_solicitudes_titular_eventos`). Respaldo con `VACUUM INTO` antes de la primera
+escritura. Triggers append-only **bajados y re-puestos textualmente** con lo que hay en `sqlite_master`. Borrado
+en una transacción, hijos antes que padres. Archivos (actas PDF, PDF de firmas, constancias) borrados **dentro del
+árbol de almacenamiento**: un archivo fuera del árbol no se toca. Recibo escrito en `gh_firma_purga_log` (los
+recibos no se borran: son la prueba). Al final, `integrity_check`, `foreign_key_check` y re-inventario de la
+empresa: tiene que dar **0**.
+
+**Lo que el agente NO pudo hacer.** El servidor **no tiene SSH para el agente** (`Permission denied
+(publickey,password)`) y la base es del usuario `kairfirma`: el borrado lo corre el owner con `sudo`, en seis
+pasos que están escritos en la cabecera del script (subirlo con `scp`, parar el servicio, simulación, borrado
+real, copiar el respaldo, reiniciar y verificar). El script **no adivina la ruta** de la base —la sale del `.env`,
+root 600—, mira candidatos, **dice cuál usó** y se niega en vez de crear una base vacía donde no es.
+
+**Los tres bugs que cazó el propio test (y que habrían sido errores en producción).** (1) `Object.keys(map)` sobre
+un `Map` devuelve **vacío**: la cascada por convención no encontraba **nada** —ni los holds, ni los consentimientos,
+ni las solicitudes— y el script "limpia" y dejaba huérfanos. (2) Un trigger `BEFORE DELETE` **no se dispara** si la
+fila no existe: el check de "el trigger sigue puesto" borraba un id inexistente y **pasaba sin comprobar nada**.
+(3) La base de pruebas **no tiene** los triggers append-only (los helpers los quitan a propósito, porque los tests
+limpian esas tablas entre casos): el test tiene que ponérselos para probar el script y quitárselos al final, o
+rompe el `resetDb` del archivo siguiente.
+
+**Reglas que salieron de aquí.**
+
+1. **Una empresa de prueba se borra COMPLETA o no se borra.**
+2. **Las tablas se descubren por el esquema real.**
+3. **La cascada es por FK y por convención del nombre de la columna.**
+4. **Los triggers se reponen textualmente, con lo que hay instalado.**
+5. **Los recibos no se borran: se escriben.**
+6. **Antes de escribir, un respaldo; al final, las verificaciones.**
+7. **Un script que borra en producción no adivina la ruta: dice la que usó.**
+8. **El servicio se para antes de borrar, y el script corre como el usuario del servicio.**
+9. **El sitio público y la base son dos capas.**
+
+**Medido.** El test propio `tests/scripts/limpiar-empresa-prueba.test.js`: **14/14**, con **4 mutaciones que
+mueren** (que no reponga los triggers, que no borre los archivos, que no haga el respaldo, que borre de más). Y la
+suite completa del service: **2 723 tests, 2 721 pasan, 0 fallan, 2 skip**.

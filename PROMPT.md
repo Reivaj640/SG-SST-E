@@ -1849,6 +1849,47 @@ Word/Excel → PDF, **sin un solo aviso**.
    con `require.resolve` y cuyo export `beforePack` llama. Ponerle un comando de shell ahí no falla al leer el
    `package.json`: falla cuando el build arranca. **El enganche se prueba con un build de verdad.**
 
+### 5.59 🔴 Una empresa de PRUEBA se borra COMPLETA (ficha, anexos, firmas, eventos, consentimientos, holds, key y archivos) o no se borra: y las tablas se descubren por el ESQUEMA REAL, porque no todas las que cuelgan tienen FK declarada
+
+**El caso real (17-nov-2026), ronda 24.** En producción había UNA sola Empresa: ASEPLUS CARIBE S.A.S.
+(NIT 900829731), creada para ensayar el ciclo de suscripción, verificación del representante y contrafirma. Con
+ella en la base, la primera Empresa REAL hereda una ficha ajena, un client key vivo y cinco firmas de ensayo. El
+owner lo dijo así: *"debemos limpiar esa empresa del servidor, las firmas, todo, para que quede limpio para
+cuando vengan las nuevas empresas con su respectiva información"*.
+
+**Reglas:**
+
+1. **Una empresa de prueba se borra COMPLETA.** La ficha, sus suscripciones de anexos con sus eventos, sus
+   firmas con sus eventos y sus sesiones, sus consentimientos (con sus datos sensibles y sus eventos), sus
+   holds, sus solicitudes de titular (con sus eventos), su client key en `gh_internal_clients` y los archivos
+   que colgaban de esas filas (las actas PDF de las suscripciones y de las contrafirmas, los PDF de las firmas y
+   sus constancias). **Nada a medias**: una fila de la empresa que sobrevive es una empresa que sigue viva.
+2. **Las tablas se descubren por el ESQUEMA REAL**, no por una lista escrita a mano: `PRAGMA table_info` y
+   `PRAGMA foreign_key_list` sobre la base. Una lista escrita a mano se queda corta en cuanto alguien agrega una
+   migración, y el script "limpia" y deja la fila.
+3. **No toda tabla que cuelga tiene FK declarada.** `gh_firma_holds` (`firma_id`), `gh_consentimientos_eventos`
+   (`consent_id`) y `gh_solicitudes_titular_eventos` (`solicitud_id`) apuntan a su padre SIN declaración de FK: se
+   llega a ellas por la **convención del nombre de la columna**. Sin esa cascada, el script borra la firma y deja
+   el hold y los eventos colgando de una fila que ya no existe.
+4. **Los triggers append-only se QUITAN y se PONEN**, y se reponen **textualmente** con lo que hay en
+   `sqlite_master` (que es lo instalado de verdad, no lo que el script cree que debería estar). Sin esto, el
+   `DELETE` es rechazado y la limpieza entera falla a la mitad.
+5. **Los recibos no se borran.** `gh_firma_purga_log`, `gh_firma_purga_registro`, `gh_firma_purga_lote`,
+   `gh_firma_purga_control` y `gh_firma_purgadas` son la PRUEBA de lo que se hizo: están protegidos por triggers y
+   el script se negaría. El recibo de esta limpieza se **ESCRIBE** (INSERT) en `gh_firma_purga_log`.
+6. **Antes de la primera escritura, un RESPALDO** (`VACUUM INTO`, que es una copia consistente aunque la base
+   esté en WAL) y, al final, las **verificaciones**: `integrity_check`, `foreign_key_check` y "no queda ninguna fila
+   de la empresa".
+7. **Un script que borra en producción NO adivina la ruta:** la ruta sale del `.env` (root 600, ilegible sin
+   sudo), así que el script mira una lista de candidatos, **DICE cuál usó** y se niega en vez de crear una base
+   vacía en el lugar equivocado.
+8. **El servicio se para antes de borrar, y el script se corre como el usuario del servicio** (`kairfirma`), no
+   como root: si root deja el `-wal` con dueño root, el servicio no arranca después (no puede escribir en su
+   propia base).
+9. **El sitio público y la base son dos capas.** Limpiar la base no despublica el texto: las páginas del anexo
+   que nombran a la empresa de prueba se quedan, y eso se resuelve publicando la versión siguiente del anexo
+   (la v1.5), **no** reescribiendo un texto ya suscrito y publicado.
+
 ### 6.1 Backend — bridges
 
 Sufijo **`-bridge.js`** (no `bridge-*.js`). Hay 30 en `main/`.
@@ -2678,6 +2719,8 @@ Caso real (31-oct-2026): al corregir el único rojo de la suite del `firma-servi
 | 188 | 🔴 **Un `?v=` es el cache-bust de UN archivo: tocar un archivo obliga a subir SU `?v=` y el de QUIEN LO CARGA, y si una vista tiene hoja y script los dos tokens tienen que ser EL MISMO** | `sgsst-electron-app/renderer.js` (el `?v=` del iframe), `sgsst-electron-app/components/config/config-viewer.html` (los `?v=` de la hoja y del script del panel) | Caso real (16-nov-2026), la ronda 24: el 📦1082 bumpeó el `?v=` del **script** del panel de anexos (dentro de `config-viewer.html`) y dejó el de la **hoja** del mismo panel y el del **iframe** (en `renderer.js`, `components/config/config-viewer.html?v=…`) con los tokens viejos. El código estaba bien y el botón del Nube existía, pero el panel del operador no aparecía en un navegador con cache: el síntoma era "no hay nada", y la causa estaba en un archivo que **nadie había tocado**. Reglas: (1) **un `?v=` nombra UN archivo**: tocar un archivo obliga a subir su `?v=`, y también el de quien lo carga (el iframe), porque el token del documento es el que decide qué versión se pide; (2) **si una vista tiene hoja y script, los dos `?v=` llevan el MISMO token**: si no, la página carga dos versiones de la vista — es la clase de bug que se persigue como si fuera de estilos (HTML nuevo con CSS viejo); (3) **el token del iframe y el de la vista van al compás** (el del panel lleva el prefijo `GH-`, el del iframe no, porque el test del 📦751 exige el formato `\d{8}-[\w-]+`); (4) **el token es la fecha del paquete que tocó esa vista**, no un número de versión del repo: por eso no puede retroceder (el test del 📦1042) |
 | 189 | 🔴 **Un `.bat` con LF solo no lo ejecuta `cmd.exe`, y un script de preparación que termina con "OK" sin verificar nada esconde el defecto: lo que NO viaja con el repo hay que PREPARARLO, y el build tiene que CORTAR si no sirve** | `sgsst-electron-app/scripts/prepare-python-embed.bat`, `sgsst-electron-app/build-and-publish.bat` (los seis `.bat` versionados), `sgsst-electron-app/main/_verificar-runtime-python.js`, `sgsst-electron-app/package.json` (`build.beforePack`) | Caso real (17-nov-2026), la ronda 24: los seis `.bat` del repo estaban con **LF solo** y `cmd.exe` los desarmaba (`"ipt"` en vez de `"script"`). Y `prepare-python-embed.bat` **terminaba con "OK"** sin que nada hubiera pasado: calculaba el `.pth` con `%PYTHON_VERSION:~2,1%` (`python31._pth` en vez de `python311._pth`), el paso fallaba en silencio, `import site` nunca se activaba y las dependencias **nunca** se instalaban. El instalador salió **sin el runtime**: 360 606 327 B contra los 488 539 521 B de la v0.1.252 publicada. Reglas: (1) **un `.bat` va en CRLF**, y se mide (con `core.autocrlf=false`, git guarda los bytes tal cual); (2) **un script que dice "OK" tiene que IMPORTAR lo que la app importa**, no mirar que el archivo exista; (3) **un archivo de configuración se busca, no se calcula**; (4) **lo que no viaja con el repo se comprueba en el build, y el build CORTA**; (5) **un guard se prueba corriéndolo**, y su motivo de fallo es un **código**, no una frase; (6) **un hook de build es un módulo**: `build.beforePack` con un path, no un comando |
 | 190 | 🔴 **Un hook de build tiene que estar donde electron-builder lo ejecute SIEMPRE: `build.beforePack` (un módulo que exporta la función), no `prebuild` (un hook de npm que el flujo de release no toca)** | `sgsst-electron-app/package.json` (`build.beforePack`), `sgsst-electron-app/main/_verificar-runtime-python.js` | Caso real (17-nov-2026), la ronda 24: el guard del runtime de Python se puso primero en `scripts.prebuild` —el hook de npm—, y el flujo de release es `npx electron-builder --win --publish=always`, que **no pasa por npm**: el guard se habría saltado en todas las publicaciones. Y el enganche primero se puso como `build.scripts.beforePack`, que **no existe** en el esquema de electron-builder 26: el build ni siquiera arrancaba ("configuration has an unknown property 'scripts'"). Reglas: (1) **`prebuild` es de npm**: solo corre con `npm run build`; (2) **`build.beforePack` es de electron-builder**: lo corre siempre, y lo resuelve con `require.resolve` → es un **módulo** cuyo export se llama `beforePack`, no un comando de shell; (3) **el enganche se prueba con un build de verdad** (un test que solo mira el texto del `package.json` no ve que la propiedad no existe); (4) **el hook corta tirando una excepción**: un guard que devuelve un código de error sin tirar deja el build adelante |
+| 191 | 🔴 **Un trigger `BEFORE DELETE` solo se dispara sobre una fila que SE VA A BORRAR: el check que borra un id inexistente pasa sin error y no prueba nada** | `sgsst-electron-app/firma-service/scripts/limpiar-empresa-prueba.js`, `sgsst-electron-app/firma-service/tests/scripts/limpiar-empresa-prueba.test.js` | Caso real (17-nov-2026), la ronda 24: el check de "el trigger append-only sigue puesto" hacía `DELETE FROM gh_firma_eventos WHERE id = 999999` — una fila que no existía — y el trigger nunca se disparaba: **el check pasaba sin comprobar nada**, y el script podía dejar la base sin la protección con el test en verde. Reglas: (1) **un trigger de fila se prueba con una fila que EXISTE** (el `DELETE` tiene que matchear algo); (2) **el check se hace contra la fila que el script acaba de tocar**, no contra un id inventado; (3) **un check que no puede fallar no es un check**: si el `assert.throws` nunca encuentra su excepción, hay que ver POR QUÉ no la encontró |
+| 192 | 🔴 **Una limpieza de producción se borra COMPLETA o no se borra: `integrity_check` y `foreign_key_check` en verde NO prueban que no quedaran filas, y las que cuelgan SIN FK declarada ni siquiera las ven** | `sgsst-electron-app/firma-service/scripts/limpiar-empresa-prueba.js` | Caso real (17-nov-2026), la ronda 24: al borrar la empresa de prueba (ASEPLUS, 900829731) del servidor, `gh_firma_holds` (`firma_id`), `gh_consentimientos_eventos` (`consent_id`) y `gh_solicitudes_titular_eventos` (`solicitud_id`) apuntan a su padre **sin FK declarada**: la cascada por clave foránea no las alcanzaba, y el script borraba la firma y dejaba el hold y los eventos colgando de una fila que ya no existía. Reglas: (1) **la cascada es por FK Y por convención del nombre de la columna** (las dos, o la limpieza deja huérfanos); (2) **`foreign_key_check` vacío no prueba que no queden filas**: las huérfanas sin FK no las ve; el que lo prueba es re-inventariar la empresa y ver **0**; (3) **nada a medias**: una fila de la empresa que sobrevive es una empresa que sigue viva, y una empresa a medias es una empresa que vuelve |
 
 
 **Formato de commit real** (verificá con `git log` antes de cada uno, la convención migró varias veces):
