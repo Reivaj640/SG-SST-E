@@ -56,6 +56,19 @@
 > **El bloque 3, medido: la ventana está lista (y el runbook tenía un rollback peligroso, ya corregido).** El verificador de runtime ya está en el servidor (`/opt/kair-firma/app/deploy/verificar-runtime-node.sh`, idéntico al repo) y su **preflight de solo lectura da exit 0, 0 fallos**: Node 20.20.2 ABI 115, `better-sqlite3` 11.10.0 cargando y respondiendo `SELECT 1`, `/health` 200. Los dos insumos de la ventana se **descargaron y verificaron por SHA-256** (el runtime `v22.23.5 ABI 127` y el prebuild ABI 127, cuyo binario da `d7d9272b…da37`) y quedaron cacheados en `/tmp`. El runbook pedía `systemctl revert` para el rollback, y **la unidad de este servidor es local**: ese comando la habría **borrado**, dejando el servidor sin servicio. Corregido en el repo (el rollback ahora quita el drop-in a mano) y escrito como **trampa 177**.
 >
 > **Lo que sigue.** Abrir la ventana de Node 22 (script en el servidor, con rollback automático), el resto de la ronda 23 (bloque 4) y **firmar la v1.4** (`55a58967…46fc9`) en el bloque 5.
+> **🆕 16-nov-2026 (tarde, decimoseptima parte) — EL MENSAJE DEL COMMIT DE PUBLICACIÓN DE `gh-pages` SALIÓ CON BOM, Y UN COMMIT YA PUBLICADO SE CORRIGE CON `--amend` + `--force-with-lease`**
+>
+> **El defecto.** El commit de publicación (`cb4fadc`) salió con el **BOM (U+FEFF) al inicio del mensaje**: el archivo del mensaje se escribió con `Set-Content -Encoding UTF8`, y en PowerShell 5.1 eso **escribe BOM**. El árbol publicado estaba **correcto** —las siete rutas servían byte a byte igual al repo—, así que el defecto **no se veía en el sitio**: estaba en el texto, y `git log --oneline` se lo come.
+>
+> **Lo que se comprobó antes de pisar.** Que el commit era **propio** (padre `f99a686f`, autor `K+AIR Dev`, nadie más publica la rama), que el **árbol no cambiaba** (`e7e7c2ccc50fc5e34eed95f121316a7390df39b9` antes y después) y que el remoto estaba en `cb4fadc631c5453fa55049c754ee5b16925d2b35`.
+>
+> **Lo que se hizo.** Mensaje reescrito y **medido antes de commitear** (217 B, sin BOM, sin CR, 0 no-ASCII) → `git commit --amend -F` → `a7a4097c`, árbol idéntico. Push con `--force-with-lease=gh-pages:cb4fadc…` — **nunca `--force` a secas** (§5.31). Remoto: `origin/gh-pages = a7a4097ccdec983b2a5970e4931c93f87c32c52c`.
+>
+> **La verificación.** Las siete rutas públicas respondieron **200** y son **byte a byte idénticas** al repo: `index.html` (4 651 B, `c7347599f316`), `anexo-nube-v1.4.html` (111 462 B, `57983e54ffd2`), `anexo-encargo.html` (100 787 B, `a3014202ed81`), `politica-firma.html` (15 729 B, `671c432bbb17`), `privacidad.html` (28 100 B, `87c2f8db82e4`), `terminos.html` (21 317 B, `7f59d3dc8412`), `autorizacion-trabajadores.html` (12 734 B, `e4fb6e44ca2a`).
+>
+> **Las reglas nuevas.** `PROMPT.md` §5.56 + trampa 186: el mensaje de un commit es un archivo, y `Set-Content -Encoding UTF8` le pone BOM; un commit ya publicado se corrige con `--amend` + `--force-with-lease`, verificando que lo que se pisa es propio y que el árbol no cambia. Entrada en `BITACORA.md`.
+>
+> **Pendiente del owner.** Comunicar el cambio sustancial a las empresas clientes por el canal de atención (lo exige el §9 de la Política de la firma) y limpiar `/tmp` del servidor (778 MB, con `sudo`).
 > **🆕 16-nov-2026 (tarde, decimosexta parte) — EL SITIO PÚBLICO AFIRMABA UN MUNDO VIEJO EN CUATRO DOCUMENTOS Y ADEMÁS LO SERVÍA DESDE OTRA RAMA: SE CORRIGIERON LOS CINCO Y SE PUBLICÓ `gh-pages`**
 >
 > **Lo que pedía el owner.** `sitio/index.html` → Anexo de Nube v1.4 y la cuenta de correo vigente. La cuenta vigente, medida en el manifiesto (`canales.transaccional`) y en el Anexo de Nube v1.4: **`kair@gesstiar.com`**, cuenta **empresarial de Google Workspace** con el CDPA aceptado el 10-nov-2026 (P2, P4 y P5 cerrados ese día: verificación en dos pasos, SPF/DKIM/DMARC publicados, envío real con `dkim=pass; spf=pass; dmarc=pass`).

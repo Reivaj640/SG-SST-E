@@ -10597,3 +10597,37 @@ páginas vivas.
 **Medido.** Barrido de afirmaciones vencidas sobre los documentos públicos vivos: **0**. Copias `legal/`/`sitio/`:
 **idénticas byte a byte** en los cuatro documentos. EOL LF sin BOM en los ocho archivos. Test de readiness que ata el
 canal de PQRS a los documentos publicados: **63/63**.
+
+### 16-nov-2026 (tarde) — El mensaje del commit de publicación de `gh-pages` salió con BOM, y un commit ya publicado se corrige con `--amend` + `--force-with-lease`
+
+**El defecto.** El commit que publica el sitio (`gh-pages`, `cb4fadc`) salió con el **BOM (U+FEFF) al inicio del
+mensaje**: el archivo del mensaje se escribió con `Set-Content -Encoding UTF8`, y en PowerShell 5.1 esa codificación
+**escribe BOM**. El árbol publicado estaba **correcto** —las siete rutas de kair.fyi servían byte a byte igual al
+repo—, así que el defecto **no se veía en el sitio**: estaba en el texto del mensaje, y `git log --oneline` se lo
+come (el terminal traga el carácter invisible).
+
+**Por qué importa.** Un mensaje de commit es **un archivo**, y se mide como cualquier otro del repo: sin BOM, sin CR,
+con solo `📦` y `§` como no-ASCII. Un BOM ahí es un defecto real que sale publicado en la rama y rompe cualquier
+verificación que compare el mensaje byte a byte. Y, ya publicado, no se puede corregir con un push normal: el
+commit viejo no está en la punta y el push se rechaza sin decir por qué.
+
+**Lo que se hizo.** Se comprobó **antes de pisar** que el commit a corregir era **propio** (mismo padre `f99a686f`,
+mismo autor `K+AIR Dev`, y nadie más publica esa rama) y que el **árbol no cambiaba** (`e7e7c2ccc50fc5e34eed95f121316a7390df39b9`
+antes y después): el `--amend` era una corrección del texto, no del contenido. Se escribió el mensaje con la
+herramienta de archivos, se midió (217 B, sin BOM, sin CR, 0 bytes no-ASCII) y se enmendó: `a7a4097c`. El push fue
+`--force-with-lease=gh-pages:cb4fadc631c5453fa55049c754ee5b16925d2b35`, **nunca `--force` a secas** (§5.31).
+
+**Reglas que salieron de aquí.**
+
+1. **El mensaje de un commit se escribe con la herramienta de archivos o con Node**, y se mide antes de commitear.
+   `Set-Content -Encoding UTF8` **no sirve** para eso en PowerShell 5.1: deja BOM.
+2. **El BOM de un mensaje es invisible en `git log`**: se lee con `git cat-file commit <hash>` y se comparan bytes.
+3. **Un commit ya publicado se corrige con `--amend` + `--force-with-lease=<rama>:<hash-esperado>`**, previa
+   verificación de que lo que se pisa es el commit propio y de que **el árbol no cambia**.
+4. **Después del force-push se vuelve a verificar lo que se sirve**: las siete rutas de kair.fyi, por HTTP.
+
+**Medido.** Mensaje del commit: 217 B, **sin BOM**, sin CR, 0 bytes no-ASCII. Árbol `e7e7c2cc…` idéntico antes y
+después del `--amend`. Remoto: `origin/gh-pages = a7a4097ccdec983b2a5970e4931c93f87c32c52c`. Por HTTP, las siete
+rutas (`index.html`, `anexo-nube-v1.4.html`, `anexo-encargo.html`, `politica-firma.html`, `privacidad.html`,
+`terminos.html`, `autorizacion-trabajadores.html`) respondieron **200** y son **byte a byte idénticas** a los
+archivos del repo.
