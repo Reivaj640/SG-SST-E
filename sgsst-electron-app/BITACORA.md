@@ -10908,3 +10908,36 @@ local) y el del error de red (**no** borra lo local). El **mutante**: deshacer e
 lo tiene hasta que salga una release nueva. No es urgente —la entrada local de la empresa de prueba ya se
 borró del `secrets.enc`—, pero el botón «Eliminar» de la app instalada sigue sin efecto contra un
 `404 CLIENT_NOT_FOUND`.
+
+**Lo que quedaba en el PC (📦1090): los trabajadores de prueba y sus firmas en la base local de la app.** El
+owner vio en la pestaña «Firma electr.» tres personas de prueba con sus firmas («PRUEBA FIRMA», 3 documentos;
+«PRUEBA 2 FIRMA», 1; «Prueba 3 Firma», 1) y pidió que también se limpiaran, porque también eran pruebas. La
+pestaña **no consulta el servidor**: lee la base local (`gh_documentos` + `gh_personal`,
+`modules/gestion-humana/firma-electronica/index.js`: «NO consulta firma-service en Fase 1. Solo lee datos
+locales de K+AIR»).
+
+**El peligro real, medido antes de tocar nada.** `empresa_id` **no es el dueño de la fila**: es el **sello de la
+empresa activa**. Con ASEPLUS configurada como empresa activa, **209 empleados REALES y 26 sedes REALES** del
+owner quedaron con `empresa_id = 'Aseplus'` (los 2 603 registros de personal, menos 209, son de otras
+empresas). Borrar «todo lo de la empresa de prueba» por `empresa_id` se llevaba al cliente entero. Por eso el
+script borra a las personas **por cédula** (explícita en la línea de comandos) y solo purga por empresa las
+tablas donde la fila **es** de la empresa: `empresa_datos_firma`, `empresa_representante_legal`, `companies`,
+`gh_templates`, `gh_carpetas_categorias`, `notificaciones`.
+
+**Lo que se construyó: `scripts/limpiar-empresa-prueba-local.js`.** Descubre el esquema real (la tabla de
+personal es la que tiene `cedula` y `nombres` **y** es destino de una FK; las hijas se alcanzan por FK y por
+convención del nombre de la columna, incluidas las que no tienen FK declarada). Respaldo con `VACUUM INTO`
+antes de la primera escritura. Los archivos se borran **dentro del árbol del `userData`** y después se quitan
+las carpetas que quedaron vacías. Al final: `integrity_check`, `foreign_key_check`, re-inventario en 0 y el
+**guard** (cuántos empleados reales quedan con el sello de la empresa y cuántas filas hay de otras empresas: si
+un número se movió, la limpieza **falla** con código 4). Simulación por defecto; pide `--actor` y `--motivo`.
+
+**Medido (y ejecutado en el PC del owner).** Test propio `scripts/test-limpiar-empresa-prueba-local.js`:
+**9/9**, con **2 mutaciones que mueren** (que el script borre por `empresa_id`, y que se apague el guard que
+avisa del exceso de borrado). En la base real: **31 filas borradas en 12 tablas** y **11 archivos** (5 PDF de
+firmas, 3 PDF de plantillas, 1 JPEG del expediente, 2 PNG de soportes de contratación). Verificación
+independiente: **0** personas de prueba, **0** documentos firmados, **0** filas de ASEPLUS en sus tablas; y
+siguen ahí los **206** empleados reales con el sello de la empresa, los **2 394** de otras empresas, las **26**
+sedes, las otras 3 empresas y los **266** correos de la bandeja (no se tocan: el owner los dejó fuera a
+propósito). Respaldo: `%APPDATA%\sgsst-electron-app\backups\kair-antes-limpieza-Aseplus-<sello>.sqlite`
+(6 799 360 B, con los 2 603 de personal y los 5 documentos de antes).

@@ -10108,3 +10108,41 @@ politica de la sesion dejo bloqueadas. **Sin push**: `origin/Dev` no se mueve ha
 > se borró del `secrets.enc`, pero el botón de la app instalada sigue sin efecto contra un `404`.
 >
 > **Lo que sigue pendiente.** (1) **Traer el respaldo al PC** (`scp javier@192.168.1.11:/opt/kair-firma/data/backups/firma-antes-limpieza-900829731-2026-11-17T18-56-41-114Z.sqlite .`): el agente lo abre y demuestra con números qué se borró y qué no. (2) La **release nueva** que incluya el fix del botón «Eliminar» (y la v1.5 del Anexo de Nube, sin nombrar a la empresa de prueba), cuando entre la primera empresa real. (3) **Comunicar el cambio sustancial** a las empresas clientes (§9 de la Política). (4) **Limpiar `/tmp`** del servidor (778 MB, `sudo`). (5) Borrar el **borrador duplicado** de la v0.1.252. (6) Liberar los **677 MB** de `dist/` que no sirven.
+> **Actualización 2026-11-17 (tarde, vigésima cuarta parte) — EN LA APP QUEDABAN TRES PERSONAS DE PRUEBA CON SUS CINCO FIRMAS, Y BORRARLAS POR EMPRESA SE LLEVABA 209 EMPLEADOS REALES DEL CLIENTE**
+>
+> **Lo que se pidió.** Que también se limpiara «las firmas realizadas», porque también eran pruebas: en la
+> pestaña «Firma electr.» salían tres personas de prueba con sus documentos firmados.
+>
+> **Dónde estaban.** La pestaña **no consulta el servidor**: lee la base local de la app (`gh_documentos` y
+> `gh_personal` — `modules/gestion-humana/firma-electronica/index.js`: «NO consulta firma-service en Fase 1»).
+> Medido: **3** personas de prueba (`PRUEBA FIRMA` cc 9999999999, `PRUEBA 2 FIRMA` cc 1111111111, `Prueba 3
+> Firma` cc 6666666666), **3** contrataciones, **5** documentos firmados (con sus PDF), **1** expediente con su
+> JPEG, **2** soportes de contratación (con sus PNG), la identidad de ASEPLUS (ficha en `companies`,
+> representante legal, `empresa_datos_firma` con el NIT 900829731 y la política `http://www.prueba.kair.com`),
+> **3** plantillas PDF, **6** carpetas y **4** notificaciones.
+>
+> **La trampa que casi hace un daño grande (📦1090).** `empresa_id` **no es el dueño de la fila**: es el sello
+> de la empresa que estaba activa. Con ASEPLUS configurada, **209 empleados REALES y 26 sedes REALES** del
+> owner quedaron con `empresa_id = 'Aseplus'`. Un «borra lo de la empresa de prueba» por ese campo se llevaba
+> al cliente entero. Por eso: las personas se borran **por cédula** (explícita) y por empresa solo se purgan
+> las tablas donde la fila **es** de la empresa, con una lista explícita y razonada.
+>
+> **Lo que se construyó.** `sgsst-electron-app/scripts/limpiar-empresa-prueba-local.js` (como el 📦1087 del
+> servidor): descubre el esquema real, respaldo con `VACUUM INTO` antes de escribir, borra los archivos solo
+> dentro del `userData` y limpia las carpetas que quedan vacías, y al final `integrity_check`,
+> `foreign_key_check`, re-inventario en 0 y el **guard**: cuántos empleados reales quedan con el sello de la
+> empresa y cuántas filas hay de otras empresas. Si un número se movió, la limpieza **falla** (código 4).
+>
+> **Medido y ejecutado en el PC del owner.** Test propio: **9/9**, con **2 mutaciones que mueren** (borrar por
+> `empresa_id`, y apagar el guard). En la base real: **31 filas en 12 tablas** y **11 archivos** borrados.
+> Verificación independiente: **0** personas de prueba, **0** firmas, **0** filas de ASEPLUS; y siguen ahí los
+> **206** empleados reales con el sello de la empresa, los **2 394** de otras empresas, las **26** sedes, las
+> otras **3** empresas y los **266** correos de la bandeja (fuera del alcance, por decisión del owner).
+> Respaldo: `%APPDATA%\sgsst-electron-app\backups\kair-antes-limpieza-Aseplus-2026-11-17T20-37-02-316Z.sqlite`
+> (6 799 360 B, con los 2 603 de personal y los 5 documentos de antes).
+>
+> **Lo que sigue pendiente.** (1) **Traer el respaldo del servidor al PC** para demostrar con números qué se
+> borró allá. (2) La **release nueva** con el fix del botón «Eliminar» y la v1.5 del Anexo de Nube. (3)
+> **Comunicar el cambio sustancial** a las empresas clientes (§9 de la Política). (4) **Limpiar `/tmp`** del
+> servidor (778 MB, `sudo`). (5) Borrar el **borrador duplicado** de la v0.1.252. (6) Liberar los **677 MB** de
+> `dist/`.
