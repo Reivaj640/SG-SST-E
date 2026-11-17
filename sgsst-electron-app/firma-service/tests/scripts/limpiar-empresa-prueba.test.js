@@ -614,6 +614,45 @@ test('es idempotente: correrlo otra vez no rompe', () => {
   assert.equal(filasDe('gh_firma_empresas', EMPRESA_PRUEBA), 0);
 });
 
+test('la corrida dice en la pantalla si borra o simula', () => {
+  sembrar();
+  // El defecto real (17-nov-2026, la ronda 24): la corrida con `--ejecutar`
+  // imprimia el encabezado de SIMULACION y la frase "SIN --ejecutar no se
+  // toca nada" justo antes de BORRAR 243 filas en produccion. La pantalla
+  // decia una cosa y el script hacia otra.
+  const sim = capturarSalida(() => {
+    script.main(['--empresa=' + EMPRESA_PRUEBA,
+      '--actor=Javier Robles Fontalvo', '--motivo=Prueba']);
+  });
+  assert.ok(sim.includes('(SIMULACION)'), 'la simulacion se anuncia como simulacion');
+  assert.ok(sim.includes('no se toca nada'), 'la simulacion avisa que no toca nada');
+
+  sembrar();
+  const eje = capturarSalida(() => {
+    script.main(argsLimpieza(['--ejecutar']));
+  });
+  assert.ok(eje.includes('(EJECUCION)'), 'la ejecucion se anuncia como ejecucion');
+  assert.ok(!eje.includes('no se toca nada'),
+    'la ejecucion NO puede decir que no se toca nada: esta borrando');
+});
+
+/**
+ * Corre una funcion guardando lo que escribe en stdout.
+ * @param {function} fn
+ * @returns {string} lo escrito
+ */
+function capturarSalida(fn) {
+  const original = process.stdout.write;
+  let texto = '';
+  process.stdout.write = function (chunk) { texto += chunk; return true; };
+  try {
+    fn();
+  } finally {
+    process.stdout.write = original;
+  }
+  return texto;
+}
+
 // ---------------------------------------------------------------------------
 // Las mutaciones: cada una tiene que MORIR
 // ---------------------------------------------------------------------------

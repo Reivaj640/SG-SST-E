@@ -10043,3 +10043,38 @@ politica de la sesion dejo bloqueadas. **Sin push**: `origin/Dev` no se mueve ha
 > **Medido.** El test propio `tests/scripts/limpiar-empresa-prueba.test.js`: **14/14**, con **4 mutaciones que mueren** (que no reponga los triggers, que no borre los archivos, que no haga el respaldo, que borre de más). Y la suite completa del service: **2 723 tests, 2 721 pasan, 0 fallan, 2 skip**. Los dos archivos nuevos: **LF puro, sin BOM, sin CJK**.
 >
 > **La cola del owner, en orden.** (1) En la **app**: Configuración → Firma Electrónica → ASEPLUS → **"Eliminar"**, que borra la configuración local y **revoca la key**; eso va **antes** de la limpieza, porque si la base se borra primero la revocación no tiene a quién hablar. (2) Los **seis pasos** del runbook en el servidor. (3) Traer el **respaldo** al PC: el agente lo abre y demuestra qué se borró y qué **no** se tocó. (4) Publicar la **v1.5** del Anexo de Nube, sin nombrar a la empresa de prueba. (5) **Comunicar el cambio sustancial** a las empresas clientes (§9 de la Política). (6) **Limpiar `/tmp`** del servidor (778 MB, `sudo`). (7) Borrar el **borrador duplicado** de la v0.1.252. (8) Liberar los **677 MB** de `dist/` que no sirven.
+
+> **Actualización 2026-11-17 (tarde, vigésima segunda parte) — LA EMPRESA DE PRUEBA YA NO ESTÁ EN EL SERVIDOR: 243 FILAS Y 19 ARCHIVOS BORRADOS, Y EL SCRIPT QUE LO HIZO DECÍA EN PANTALLA QUE NO IBA A TOCAR NADA**
+>
+> **Lo que pasó.** El owner corrió el script del 📦1087 en producción (con el servicio parado, como `kairfirma`) y pegó la salida: **243 filas borradas en 18 tablas**, **19 archivos borrados**, recibo escrito en `gh_firma_purga_log`, **5 triggers append-only bajados y 31 re-puestos**, `integrity_check: ok`, `foreign_key_check: 0` y **re-inventario de la empresa: 0 filas**. El respaldo quedó en `/opt/kair-firma/data/backups/firma-antes-limpieza-900829731-2026-11-17T18-56-41-114Z.sqlite`. Servicio reiniciado y sano (`/health`: `ok`, `db ok`, `smtp configured`, commit `23b32835`, árbol `5d651446b9f5`).
+>
+> **El defecto que encontró esa salida (📦1088).** El script imprimía el encabezado `=== LIMPIEZA DE EMPRESA DE PRUEBA (SIMULACION) ===` y la frase `SIN --ejecutar no se toca nada.` **también en la corrida con `--ejecutar`**, que es la que borra. La pantalla decía una cosa y el script hacía otra: el owner leyó «no se toca nada» y, debajo, tenía **243 filas borradas y 19 archivos**. **Ningún test lo vio**, porque todos miraban el estado de la base, que estaba bien; ninguno miraba lo que el script imprime. Lo delató la salida real, que se pegó después de que el borrado ya estuviera hecho y con todas las verificaciones en verde.
+>
+> **Lo que se corrigió.** El encabezado dice `(EJECUCION)` o `(SIMULACION)` según el modo, y la frase «no se toca nada» se imprime **solo** en la simulación. Se agrega el **check nº 11** (`la corrida dice en la pantalla si borra o simula`), que **captura el `stdout`** del script en las dos corridas y falla si la ejecución vuelve a decir «no se toca nada». También se corrigieron dos erratas de la cabecera del script (`Including` → `incluso`, `sePONEN` → `se PONEN`).
+>
+> **Medido.** El test propio `tests/scripts/limpiar-empresa-prueba.test.js`: **15/15** (era 14/14). La suite completa del service: **2 724 tests, 2 722 pasan, 0 fallan, 2 skip** (era 2 723/2 721/0/2: exactamente el check nuevo). El EOL de los cinco archivos, medido por bytes: el script y el test **LF puro**, `PROMPT.md` y `BITACORA.md` **LF puro**, y el `Historial.md` **sigue con sus 7 684 CRLF** (su zona LF creció, la de CRLF no se movió). Sin BOM y sin CJK.
+>
+> **La regla que sale de ahí.** `PROMPT.md` §5.59, **regla 10**, y la **trampa 193**: **un script que borra en producción no puede decir en pantalla lo contrario de lo que hace.** La pantalla es la única interfaz del script con el operador, y lo que el operador lee es lo que decide si sigue o corta.
+>
+> **La entrada local de ASEPLUS (RESUELTA, con un hallazgo que vale una trampa).** El `secrets.enc` de la app
+> (`%APPDATA%\sgsst-electron-app\secrets.enc`) **sí** está cifrado con el `safeStorage` de Electron (prefijo
+> `v10`): la afirmación anterior de que «no está cifrado con `safeStorage`» **era falsa** y salió de medir mal
+> (los primeros bytes del archivo se leyeron como `F1 C2 F7 E5…` cuando son `76 31 30…` = `v10`). La causa real del
+> fallo de descifrado: **`safeStorage` en Windows usa como clave el master key que Chromium guarda en el
+> `Local State` del `userData` de la app**; un Electron lanzado sin `--user-data-dir` usa **otro** `userData`
+> con **otra** clave, y falla con el mismo error que un archivo corrupto. > La prueba de ida y vuelta lo marcó: en esta máquina `encryptString`/`decryptString` funcionan, así que el cifrado estaba bien y lo que
+> estaba mal era la clave. Con una **copia aislada** del `Local State` de la app el archivo descifra: tenía
+> **una sola empresa** (`Aseplus`, NIT 900829731) y, además, la URL del servicio, el `clientInstanceId` y el
+> `adminApiKey`. Con la app **cerrada** (verificado: no había ningún proceso K+AIR corriendo) se quitó **solo**
+> esa entrada y se reescribió el archivo con el mismo cifrado, de forma atómica (tmp + rename): **421 B → 252 B**.
+> La verificación vuelve a leer el archivo del disco y confirma **0 empresas**, URL y `adminApiKey` intactos. El
+> respaldo quedó **verificado restaurable** (421 B, descifra y trae la entrada).
+>
+> **El defecto que queda en la app (no corregido en esta ronda).** El botón «Eliminar» manda `revokeRemote: true`,
+> y `_handlerEmpresaRevokeApiKey` (`main/firma-bridge.js:2067-2095`) **aborta sin borrar lo local** cuando el
+> backend responde `404` (`if (!r.success) return r;`). Con la empresa ya borrada del servidor, la configuración
+> local queda **zombi**, y «Recrear vínculo» no sirve de salida porque **crea** un cliente nuevo en el servidor, que
+> es justo lo contrario de lo que se quiere. El arreglo —borrar lo local aunque el servidor ya no tenga la
+> empresa— queda pendiente de que el owner lo pida.
+>
+> **Lo que queda pendiente.** (1) **Traer el respaldo al PC** (`scp javier@192.168.1.11:/opt/kair-firma/data/backups/firma-antes-limpieza-900829731-2026-11-17T18-56-41-114Z.sqlite .`): el agente lo abre y demuestra con números qué se borró y qué no. (2) El **📦1087 y el 📦1088, sin push**: esperando la palabra del owner. (3) Publicar la **v1.5** del Anexo de Nube, sin nombrar a la empresa de prueba. (4) **Comunicar el cambio sustancial** a las empresas clientes (§9 de la Política). (5) **Limpiar `/tmp`** del servidor (778 MB, `sudo`). (6) Borrar el **borrador duplicado** de la v0.1.252. (7) Liberar los **677 MB** de `dist/` que no sirven.

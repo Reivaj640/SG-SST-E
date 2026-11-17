@@ -10847,3 +10847,40 @@ rompe el `resetDb` del archivo siguiente.
 **Medido.** El test propio `tests/scripts/limpiar-empresa-prueba.test.js`: **14/14**, con **4 mutaciones que
 mueren** (que no reponga los triggers, que no borre los archivos, que no haga el respaldo, que borre de más). Y la
 suite completa del service: **2 723 tests, 2 721 pasan, 0 fallan, 2 skip**.
+
+**El defecto que encontró la corrida en producción (📦1088).** El script del 📦1087 imprimía el encabezado
+`=== LIMPIEZA DE EMPRESA DE PRUEBA (SIMULACION) ===` y la frase `SIN --ejecutar no se toca nada.` **también en la
+corrida con `--ejecutar`**, que es la que borra. La pantalla decía una cosa y el script hacía otra: el owner leyó
+«no se toca nada» y, debajo, tenía **243 filas borradas en 18 tablas y 19 archivos borrados**. **Ningún test lo
+vio**, porque todos los tests miraban el estado de la base, que estaba bien; ninguno miraba lo que el script
+imprime. Lo delató la salida real que el owner pegó, después de que el borrado ya estuviera hecho y con todas las
+verificaciones en verde (`integrity_check: ok`, `foreign_key_check: 0`, re-inventario: 0).
+
+**Lo que se corrigió.** El encabezado dice `(EJECUCION)` o `(SIMULACION)` según el modo, y la frase «no se toca
+nada» se imprime **solo** en la simulación. Con la corrección se agrega el **check nº 11** del test propio
+(`la corrida dice en la pantalla si borra o simula`): **captura el `stdout`** del script en las dos corridas y falla
+si la ejecución vuelve a decir «no se toca nada». También se corrigieron dos erratas en la cabecera del script
+(`Including` → `incluso`, `sePONEN` → `se PONEN`).
+
+**Regla que sale de ahí.** **Un script que borra en producción no puede decir en pantalla lo contrario de lo que
+hace.** La pantalla es la única interfaz del script con el operador, y lo que el operador lee es lo que decide si
+sigue o corta. Queda en `PROMPT.md` §5.59 (regla 10) y en la trampa 193.
+
+**La entrada local que quedaba (resuelta, y con un hallazgo que quedó en la trampa 194).** El
+`secrets.enc` de la app (`%APPDATA%\sgsst-electron-app\secrets.enc`) sí está cifrado con el
+`safeStorage` de Electron (prefijo `v10`), pero **no lo descifra un Electron cualquiera**: el master key
+que usa `safeStorage` en Windows vive en el **`Local State` del `userData` de la app**, y un Electron
+lanzado sin `--user-data-dir` usa otro `userData` con otra clave — y falla con el mismo error de un
+archivo corrupto. Con una **copia aislada** del `Local State` de la app el archivo descifra: tenía
+**una sola empresa** (`Aseplus`, NIT 900829731) y, además, la URL del servicio, el `clientInstanceId` y
+el `adminApiKey`. Con la app cerrada se quitó **solo** esa entrada y se reescribió el archivo con el
+mismo cifrado (421 B → 252 B); la verificación vuelve a leer el archivo y confirma **0 empresas**, URL y
+`adminApiKey` intactos. El respaldo quedó restaurable y verificado (descifra y trae la entrada).
+
+**El defecto que queda en la app (no corregido en esta ronda).** El botón «Eliminar» de Configuración →
+Firma Electrónica manda `revokeRemote: true`, y `_handlerEmpresaRevokeApiKey`
+(`main/firma-bridge.js:2067-2095`) **aborta sin borrar lo local** cuando el backend responde `404`:
+`if (!r.success) return r;`. Con la empresa ya borrada del servidor, la configuración local queda
+**zombi**: el botón no la borra y «Recrear vínculo» no sirve (crea un cliente nuevo en el servidor, que es
+justo lo contrario de lo que se quiere). El arreglo —borrar lo local aunque el servidor ya no tenga la
+empresa— está pendiente de que el owner lo pida.

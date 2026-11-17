@@ -55,10 +55,10 @@
  *      filas, que archivos) y no toca nada.
  *   3. `--hasta=YYYY-MM-DD` (opcional) acota el borrado: ninguna fila mas
  *      nueva que esa fecha se toca. Sin esta bandera, el script borra TODO
- *      lo de la Empresa,Including lo que se haya creado despues.
+ *      lo de la Empresa, incluso lo que se haya creado despues.
  *   4. Respaldo con `VACUUM INTO` antes de la primera escritura: una copia
  *      consistente aunque la base este en WAL.
- *   5. Los triggers append-only se QUITAN y sePONEN (se leen de
+ *   5. Los triggers append-only se QUITAN y se PONEN (se leen de
  *      `sqlite_master`, que es lo que esta instalado de verdad) y al final se
  *      verifica que quedaron los mismos.
  *
@@ -885,7 +885,12 @@ function main(argv) {
     const plan = armarPlan(db, esq, affected, raizPdf);
 
     if (!opts.quiet) {
-      process.stdout.write('\n=== LIMPIEZA DE EMPRESA DE PRUEBA (SIMULACION) ===\n');
+      // El encabezado dice lo que la corrida es: la SIMULACION imprime el
+      // plan y no toca nada; la EJECUCION borra. Decir "no se toca nada"
+      // en una corrida que borra todo es una mentira en la pantalla (y lo
+      // que se leyo en produccion el 17-nov-2026, justo antes de borrar).
+      process.stdout.write('\n=== LIMPIEZA DE EMPRESA DE PRUEBA ('
+        + (opts.ejecutar ? 'EJECUCION' : 'SIMULACION') + ') ===\n');
       process.stdout.write('Empresa: ' + opts.empresa
         + (ficha ? ' (' + ficha.razon_social + ', NIT ' + (ficha.nit || '-') + ')' : '')
         + '\n');
@@ -904,7 +909,9 @@ function main(argv) {
       } else {
         process.stdout.write('\n-- Archivos a borrar: 0\n');
       }
-      process.stdout.write('\nSIN --ejecutar no se toca nada.\n');
+      if (!opts.ejecutar) {
+        process.stdout.write('\nSIN --ejecutar no se toca nada.\n');
+      }
     }
 
     if (!opts.ejecutar) return 0;
