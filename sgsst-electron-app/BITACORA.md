@@ -10728,3 +10728,59 @@ por ruta relativa (`../../modules/gestion-humana/firma-operador/index.js`). Que 
 **Medido.** Guard nuevo `main/test-cache-bust-anexos-1083.js`: **6/6**, con **3 mutaciones que mueren** (dejar la hoja
 con el token viejo, dejar el iframe con el token viejo, y dejar el script con un token distinto del de la hoja). El
 EOL de `renderer.js` sigue CRLF puro y el de `config-viewer.html` sigue LF puro, con su propio check.
+
+
+**Lo que abrió la conversación.** El owner autorizó corregir los `.bat` del repo después de que se probara que
+**no funcionan**: los seis estaban con LF solo y `cmd.exe` los desarma. Y de paso, que el runtime de Python se
+comprobara en el build.
+
+**Los tres defectos, medidos.** (1) **EOL**: los seis `.bat` versionados estaban con LF solo (172 LF, 0 CRLF, sin
+BOM). Con LF, `cmd.exe` lee cada comando perdiendo sus primeros caracteres: `"ipt"` en vez de `"script"`,
+`"ython"` en vez de `"python"`, `"N_EMBED_URL"` en vez de `"PYTHON_EMBED_URL"`. `build-and-publish.bat` tenía lo
+mismo. (2) **El cálculo del `.pth`**: `prepare-python-embed.bat` buscaba
+`python%PYTHON_VERSION:~0,1%%PYTHON_VERSION:~2,1%._pth`, que con 3.11.9 da `python31._pth` y no `python311._pth`.
+El paso 4 fallaba con *"No se encontró el archivo .pth"*, `import site` nunca se activaba, y los dos pasos de pip
+morían con *"No module named pip"*: **las dependencias nunca se instalaban**. (3) **El script mentía**: terminaba con
+`✓ pip`, `✓ site-packages` y *"¡Python Embeddable listo!"* sin que nada hubiera pasado, porque los `✓` solo
+miraban que el archivo existiera. Se midió: quedaron **10 paquetes y 19 MB** (pip, setuptools, wheel, packaging) en
+vez de los 48 que necesitan.
+
+**El defecto de fondo, y lo que dejó fuera de la release.** `Portear/python-embed/` está en `.gitignore`: el
+runtime no viaja en el repo y `extraResources` lo copia **si existe**. No existía en la máquina que compiló, así
+que el instalador salió **sin el runtime**: 360 606 327 B al lado de los 488 539 521 B de la v0.1.252 publicada.
+Los 128 MB de diferencia eran el runtime entero. En la PC del cliente quedan muertas el registro de incapacidades,
+las actas COPASST y de comité, los indicadores y la conversión Word/Excel → PDF, sin un solo aviso.
+
+**Lo que se corrigió (📦1085).** Los seis `.bat` a CRLF (por bytes, sin BOM). `prepare-python-embed.bat`: el `.pth`
+se **busca** por patrón, `import site` se activa con `findstr` + `echo` (nunca con `Set-Content`, que en
+PowerShell 5.1 escribe BOM y rompe el `.pth`), se comprueba que el intérprete **vea pip** antes de instalar, y la
+verificación final **importa pandas y openpyxl** y sale con código 1 si no. Y un guard nuevo,
+`main/_verificar-runtime-python.js`, enganchado en `build.beforePack`: sin runtime, sin `.pth`, con `import site`
+comentado o sin dependencias, **el build se detiene** con un motivo que dice qué hacer. Los motivos son **códigos**
+(`SIN_RUNTIME`, `SIN_PTH`, `PTH_SIN_IMPORT_SITE`, `SIN_DEPENDENCIAS`), no frases: el texto libre no distingue un
+fallo de otro.
+
+**El enganche, dos veces mal, y las dos veces lo cazó una medición.** Primero se puso en `scripts.prebuild`, que
+es un hook de **npm**: el flujo de release es `npx electron-builder --win --publish=always`, que no pasa por npm
+y se habría saltado el guard en todas las publicaciones. Después se puso como `build.scripts.beforePack`, que
+**no existe** en el esquema de electron-builder 26: el build ni siquiera arrancaba (*"configuration has an unknown
+property 'scripts'"*). La forma correcta es `build.beforePack` con un **path a un módulo** que exporta la
+función: electron-builder lo resuelve con `require.resolve` y llama a su export `beforePack`.
+
+**Reglas que salieron de aquí.**
+
+1. **Un `.bat` es un archivo de Windows: CRLF.** No es estilo, es requisito de `cmd.exe`.
+2. **Un script que dice "OK" tiene que IMPORTAR lo que la app importa**, no mirar que el archivo exista.
+3. **Un archivo de configuración se busca, no se calcula.**
+4. **Lo que no viaja con el repo se comprueba en el build, y el build CORTA.**
+5. **Un guard se prueba corriéndolo**, y su motivo de fallo es un código.
+6. **Un hook de build es un módulo**, y el enganche se prueba con un build de verdad.
+
+**Medido.** Guard nuevo `main/test-scripts-batch-1085.js`: **18/18**, con **9 mutaciones que mueren** (volver el
+`.bat` a LF, volver al cálculo del `.pth`, quitar la línea de `import site`, quitar la comprobación de pip, volver
+a `Set-Content`, quitar el enganche en `beforePack`, dejar el guard solo en npm, y dos que tocan el guard: que no
+compruebe el `.pth` y que no compruebe las dependencias). Los cuatro escenarios de comportamiento son reales: el
+guard se **ejecuta** contra un runtime inexistente, contra uno con el `.pth` comentado, contra uno sin
+dependencias y contra el runtime bueno. End-to-end: `npx electron-builder --win` **se detiene** con el runtime
+vacío (*"Build detenido: el runtime de Python no esta preparado (MOTIVO: SIN_RUNTIME)"*), y **pasa** con el runtime
+real.

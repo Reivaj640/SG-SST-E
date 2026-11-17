@@ -2642,7 +2642,7 @@ Esperado: `OK 37.10.3 3.49.2`.
 |---|---|---|
 | `kair.db` | `%APPDATA%\sgsst-electron-app\` (**fuera** del repo, se crea sola la primera vez) | La app abre pero **vacía**. Los datos no se recuperan del repo: hay que copiar un backup |
 | `.env` | `sgsst-electron-app\.env` (gitignored) | Solo falla el OAuth de Google Calendar. El resto de la app arranca |
-| `python-embed/` | `Portear/` (no se sube al repo) | Hay fallback al Python del sistema (`main.js` → `findPython`). Afecta el análisis de 5 Porqués y accidentes |
+| `python-embed/` | `Portear/python-embed/` (no se sube al repo; se prepara con `scripts\prepare-python-embed.bat`) | **El build se detiene** si no está o no sirve: `build.beforePack` → `main/_verificar-runtime-python.js`. Sin runtime, el instalador sale sin él y quedan muertas las incapacidades, las actas y los indicadores |
 | `INTERNAL_API_KEY` | variable de entorno del `firma-service` | Los tests de firma fallan al levantarse |
 
 ---
