@@ -1,64 +1,48 @@
-# K+AIR v0.1.252
+# K+AIR v0.1.253
 
 > Esto es para el **usuario final**. Para trabajar sobre la aplicación, ver
 > [`PROMPT.md`](../PROMPT.md) y [`Historial.md`](../Historial.md).
 
-## Volvió a verse el historial de incapacidades
+## Los anexos de cada empresa, y su contrafirma, en un solo lugar
 
-La pantalla de **Registros de Ausentismo** salía vacía, con los filtros de año y de tipo
-de incapacidad quedados en "Cargando años..." sin terminar nunca. Y el formulario para
-registrar una incapacidad tampoco lograba guardarla.
+Dentro de **Configuración**, en la ficha de cada empresa, hay ahora un panel con los dos anexos:
+el **Anexo de Encargo** y el **Anexo de Nube**. Ahí se ve en qué punto está cada uno, y ahí se
+hacen las dos cosas que el operador tenía que hacer por otros lados:
 
-Los datos **nunca se habían perdido**: el archivo de la carpeta 3.3.6 estaba ahí, con sus
-1.275 registros de Tempoactiva. Lo que pasaba es que la app no lo estaba buscando donde
-estaba, así que no lo encontraba.
+1. **Abrir la suscripción** y mandar el enlace a la Empresa.
+2. **Verificar a quien firmó** por la Empresa (solo en el Anexo de Encargo: el Anexo de Nube lo
+   coteja el servicio solo).
+3. **Pedir el código de contrafirma** y **contrafirmar**.
 
-Ahora la pantalla vuelve a mostrar los **1.275 registros**, con los filtros de año y de
-clase funcionando, y el formulario de registro vuelve a guardar.
+Hasta ahora, la contrafirma del Anexo de Encargo se hacía desde la app, pero la del **Anexo de
+Nube** —la que deja el instrumento realmente ejecutado— no: las rutas existían en el servidor,
+pero en la aplicación no había ningún camino, y había que ejecutarla a mano, por consola, con un
+paso a paso escrito. Eso era una fuente de errores y de actos sin rastro claro.
 
-**Lo que esto corrige, en dos partes:**
+Ahora **los dos anexos se hacen igual, desde el mismo lugar**. El código de la contrafirma sigue
+salendo al buzón de protección de datos de K+AIR —nunca al de la Empresa— y el motivo del acto
+sigue siendo obligatorio: es lo que queda escrito en el expediente de por qué se contrafirmó.
 
-1. **El buscador.** La app se apoyaba en una lista de archivos que se guardaba en su configuración
-   interna. Cuando una empresa se vuelve a vincular (que es lo que se hizo con Tempoactiva),
-   esa lista se rehace desde cero y la app se quedaba sin forma de encontrar el archivo. Ahora
-   lo busca directamente en la carpeta, así que da lo mismo se haya vinculado la empresa hoy o
-   hace seis meses.
+## El panel de anexos ya no desaparece
 
-2. **La pantalla ya no miente.** Cuando algo falla, los filtros quedaban congelados en "Cargando
-   años..." para siempre, y eso hacía ver que faltaban los datos. Ahora, cuando no hay nada
-   que mostrar, los filtros se ponen en "Todos" y el aviso dice qué pasó.
+Un defecto molesto: el panel de los anexos **a veces no aparecía**, aunque todo estuviera bien.
+La causa era el *cache-bust* (el `?v=`) de la vista: la hoja y el iframe se habían quedado con el
+token viejo, así que el navegador pedía una versión anterior del documento. El síntoma era "no
+hay nada", y el problema estaba en un archivo que nadie había tocado.
 
-## K+AIR ahora avisa si le falta algo para poder trabajar
+Los tres tokens van ahora al compás, y hay una comprobación automática que lo verifica en cada
+corrida de las pruebas.
 
-El registro de incapacidades usa unos programas de Python que vienen con la aplicación. En
-este computador faltaba una parte de esa instalación, y el síntoma era un error técnico
-(`ModuleNotFoundError: No module named 'pandas'`) que aparecía a mitad de uso, cuando el
-usuario ya había llenado el formulario.
+## La tanda de la firma electrónica
 
-Ahora, si a K+AIR le falta esa pieza, **te lo dice al abrir la aplicación**, con un mensaje
-claro que dice qué se debe ejecutar y dónde está el instalador de esa pieza. No hace falta
-descubrirlo en el peor momento.
+Esta versión también recoge lo que se hizo en el servicio de firma durante estas semanas: se
+firmaron y contrafirmaron el **Anexo de Nube v1.4** y el **Anexo de Encargo 2026-11-12** (con sus
+actas), se regeneró el manifiesto de preparación legal y se actualizaron los documentos públicos
+para que digan lo que ahora es cierto. Ese trabajo no cambia lo que se ve en pantalla: cambia lo
+que el sistema puede demostrar. El detalle está en [`Historial.md`](../Historial.md).
 
-## Los documentos legales y el sitio público se actualizaron
+## Si usabas la app instalada
 
-Los documentos legales de K+AIR (privacidad, términos, anexo de encargo, autorización de
-los trabajadores y soporte) se volvieron a publicar con el texto al día, y el sitio público
-los muestra con su fecha de versión correcta. Antes, dos de esas páginas seguían anunciando
-una versión vieja.
-
-## La firma electrónica sigue en preparación
-
-El módulo de firma eléctrica está casi listo: el Acuerdo de uso ya va por su **versión 1.2**,
-revisada por el abogado, y los tres anexos que acompañan a la firma se publicaron con el
-cambio del canal de correo.
-
-Todavía **no está en operación para las empresas**: falta el despliegue final en el servidor
-y la rotación de las llaves de cada empresa. En cuanto eso pase, se avisa. Esta nota no
-promete una fecha, porque esa decisión no es del desarrollo.
-
-## Lo que cambió por dentro
-
-Para quien quiera el detalle técnico, el `CHANGELOG.md` de esta versión trae los tres
-paquetes completos: 📦985 (el buscador de archivos y los filtros), 📦986 (el aviso de
-dependencias de Python) y 📦987 (la documentación). Cada uno con su defecto, su arreglo y
-cómo se verificó.
+Esta versión es una instalación nueva. Si tienes la anterior, **actualiza con el instalador**
+(`K-AIR-Setup-0.1.253.exe`): la anterior era de finales de octubre y no tenía el panel de los
+anexos ni ninguna parte del trabajo de firma electrónica.

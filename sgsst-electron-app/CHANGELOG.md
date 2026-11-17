@@ -10,6 +10,55 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0/).
 
+## [0.1.253] - 2026-11-16
+
+> 🔴 **Esta versión recoge diecinueve días de trabajo** (del 28-oct al 16-nov-2026). La 0.1.252
+> salió el 28 de octubre; desde entonces la app recibió la tanda de la **firma electrónica** (los
+> anexos de Encargo y de Nube, sus actas y su contrafirma) y la corrección del cache-bust de la
+> vista de anexos. El detalle paquete por paquete está en [`Historial.md`](../Historial.md).
+
+### 📦1082 · La contrafirma del Anexo de Nube se hace desde la app
+
+El **segundo acto** del Anexo de Nube (la contrafirma de K+AIR, con la que el instrumento queda
+ejecutado) tenía sus rutas en el servicio desde el 9-nov-2026, pero **en la app no había camino**:
+ni handler en el puente, ni método en el preload, ni botón en el panel del operador. El operador
+tenía que ejecutarlo a mano, por HTTP, con el paso a paso escrito en un documento del expediente.
+
+Ahora el panel del operador tiene los dos botones —**Pedir código de contrafirma** y
+**Contrafirmar**— en el detalle del Anexo de Nube, con el mismo camino que su gemelo, el Anexo de
+Encargo. El código de la contrafirma sigue saliendo al buzón de protección de datos de K+AIR, nunca
+al de la Empresa, y el motivo del acto sigue siendo obligatorio: queda en el rastro.
+
+Lo que **no** cambió, y es importante: el Anexo de Nube no tiene el paso de
+`verificar-representante` que tiene el Encargo. Ese cotejo —el firmante de la suscripción contra el
+representante legal de la ficha, y la faculty de quien contrafirma por Gesstiar— lo hace el
+propio servicio, con `FIRMANTE_NO_COINCIDE` y `FACULTAD_NO_ACREDITADA`.
+
+### 📦1083 · El panel de anexos ya no se esconde detrás de la cache
+
+El `?v=` (el cache-bust) de la vista de anexos iba **a dos velocidades**: el del script del panel
+era nuevo, pero el de su hoja y el del iframe se habían quedado con el token viejo. El código
+estaba bien y el botón existía, pero el panel del operador **no aparecía** en un navegador con
+cache. El síntoma era "no hay nada", y la causa estaba en un archivo que nadie había tocado.
+
+Los tres tokens van ahora al compás, y hay un guard nuevo (`main/test-cache-bust-anexos-1083.js`,
+con sus mutaciones) que lo verifica: el de la hoja y el del script tienen que ser **el mismo**, y
+el del iframe tiene que ir al compás con ellos.
+
+### 📦1038 · 📦1042 · El panel del operador de los anexos, dentro de Configuración
+
+El panel de los anexos (Anexo de Encargo y Anexo de Nube de cada empresa) vive al final del modal
+de configuración de la empresa, en la pestaña de **Configuración**. Ahí se abre la suscripción, se
+manda el enlace a la Empresa, se verifica a quien firmó por ella y se contrafirma.
+
+### La tanda de la firma electrónica
+
+Entre la 0.1.252 y esta versión se firmó y contrafirmó la **v1.4 del Anexo de Nube** y el
+**Anexo de Encargo 2026-11-12** (con sus actas), se regeneró el manifiesto de readiness y se
+publicó el sitio público con los documentos alineados a lo realmente firmado. Eso es trabajo del
+servicio de firma y del expediente, no de la app de escritorio: el detalle está en
+[`Historial.md`](../Historial.md).
+
 ## [0.1.252] - 2026-10-28
 
 > 🔴 **Nota sobre el reparto con la 0.1.251:** esta versión recoge los tres paquetes de la
