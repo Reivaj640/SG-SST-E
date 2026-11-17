@@ -10544,3 +10544,56 @@ falso del servidor es peor que un registro que falta.
 **Medido.** Suite completa de `firma-service`: **2 709 tests · 2 707 pass · 0 fail · 2 skipped** (Node 22,
 en solitario). Manifiesto regenerado desde la base viva: `115a94e7…58d72`. Sello del despliegue vivo:
 `2a48678f4656` (255 archivos).
+
+## 🐗 El sitio que servía tres documentos atrás del repo (📦1080, 2026-11-16)
+
+### El `index.html` que nadie miraba porque "el repo ya estaba al día"
+
+**El encargo.** El owner pidió actualizar `sitio/index.html` para que apuntara al Anexo de Nube v1.4 y usara la
+cuenta de correo vigente. La tarea parecía de tres líneas. Era de cinco documentos y una rama.
+
+**El hallazgo.** Al medir de dónde salía la cuenta "vigente" (el manifiesto `canales.transaccional` y el Anexo de
+Nube v1.4: la **cuenta empresarial `kair@gesstiar.com`**, con el CDPA aceptado el 10-nov-2026) y al medir
+también **dónde se publica el sitio**, salieron dos cosas:
+
+1. **Cuatro documentos públicos afirmaban el mundo viejo.** El `index.html` decía «cuenta gratuita de Gmail
+   (cuenta de consumidor)» y apuntaba al Anexo de Nube **v1.1**. La Política de la firma decía «**No se utiliza
+   Google Workspace**», «Google no ofrece un DPA empresarial… **no actúa como encargado**» y que el envío es una
+   «**transferencia internacional del artículo 26**… pendiente de revisión jurídica». `privacidad.html`,
+   `terminos.html` y `autorizacion-trabajadores.html` repetían lo mismo. Los instrumentos **ya firmados** (el
+   Anexo de Nube v1.4 y el Anexo de Encargo 2026-11-12) decían lo contrario: la cuenta empresarial con CDPA,
+   Google como subencargado y una **transmisión internacional a un Encargado** (artículo 3, numeral 5, del Decreto
+   1377 de 2013), por lo que el artículo 26 de la Ley 1581 de 2012 **no se activa**. Y la **trampa 143** ya decía
+   lo que pasa si se toca solo el enlace: «cambiar el enlace sin cambiar el texto deja el sitio PEOR».
+
+2. **El sitio no sale de `Dev`.** kair.fyi se publica desde la rama **`gh-pages`**, y esa rama iba **más atrás que
+   el repo**: publicaba el Anexo de Nube **v1.3** y el Anexo de Encargo **2026-11-11**, con el `index.html` viejo.
+   Tres documentos de atraso, y **un commit en `Dev` no cambia ni un byte de lo que el mundo ve**. Peor: la rama
+   tiene un `CNAME` (`kair.fyi`) que **no está en `sitio/`**: "copiar `sitio/` encima" sin él rompe el dominio.
+
+**Por qué se rompió.** El repo se mantuvo al día (la v1.4 se publicó, se firmó y se contrafirmó) y cada
+verificación daba en verde porque todas miraban **el repo y el servidor**. El sitio es un **tercer árbol**, con su
+propia rama y su propio ciclo de publicación, y nadie lo midió: no estaba en el checklist. Un documento público
+describe el servicio y se vuelve falso **solo**, sin que nadie lo toque (trampa 89), y esta vez el que se quedó
+viejo fue **el conjunto**: cuatro documentos que nadie releyó cuando la migración del 10-nov se ejecutó.
+
+**Lo que se hizo.** Con el **acto expreso del owner** y sobre los **hechos verificados** (P1, P2 y P5 cerrados el
+10-nov-2026, con su evidencia en el manifiesto), se corrigieron los cinco documentos con el texto tomado de los
+instrumentos firmados —no de una decisión de redacción—, y se regeneró la rama `gh-pages` **conservando el
+`CNAME`**, con su commit, su push y su verificación por HTTP. Las cuatro copias de `legal/` quedaron byte a byte
+idénticas a las de `sitio/` (trampa 81), y **los anexos ya suscritos no se tocaron**: el v1.0, el v1.1, el v1.2, el
+v1.3, el Anexo de Encargo del 6-nov y el del 11-nov conservan el contenido de su época, porque son instrumentos, no
+páginas vivas.
+
+**Reglas que salieron de aquí.**
+
+1. **El sitio público se mide como un árbol más.** Rama propia (`gh-pages`), `CNAME` propio, y su verificación es
+   por HTTP contra el mundo real, no por el estado del repo.
+2. **Publicar es un acto, no un efecto secundario.** Commit en la rama, push, y comprobación de lo que se sirve.
+3. **Un hecho del servicio se corrige en todos los documentos que lo afirman**, y las copias de `legal/` y `sitio/`
+   quedan byte a byte idénticas.
+4. **Un instrumento suscrito no se reescribe** por estar viejo: se conserva, y el texto vigente va aparte.
+
+**Medido.** Barrido de afirmaciones vencidas sobre los documentos públicos vivos: **0**. Copias `legal/`/`sitio/`:
+**idénticas byte a byte** en los cuatro documentos. EOL LF sin BOM en los ocho archivos. Test de readiness que ata el
+canal de PQRS a los documentos publicados: **63/63**.
