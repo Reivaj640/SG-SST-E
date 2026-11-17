@@ -169,7 +169,8 @@
       "provider": "github",
       "owner": "Reivaj640",
       "repo": "SG-SST-E"
-    }
+    },
+    "beforePack": "./main/_verificar-runtime-python.js"
   },
   "devDependencies": {
     "conventional-changelog-cli": "^5.0.0",

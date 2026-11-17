@@ -82,6 +82,10 @@ _*.js
 # ese script es código de producto. Sin él, `npm run build` muere en el hook `pre` en
 # cualquier clon, porque los cuatro `prebuild*` de package.json lo invocan (PROMPT.md §5.5).
 !main/_verificar-credenciales-build.js
+# 📦1085 · El segundo guardia de build: el del runtime de Python. Mismo motivo que
+# el de arriba: es codigo de producto, y sin el el build se puede publicar sin el
+# runtime (360 MB en vez de 488 MB) sin que nadie se entere.
+!main/_verificar-runtime-python.js
 # Las pruebas reales del firma-service que empiezan con guion bajo NO son scripts
 # temporales: se ejecutan en la suite y tienen que viajar con el repo (37 casos).
 # Sin esta excepcion, `git diff` de esos archivos sale vacio y parece que nadie los toco.
