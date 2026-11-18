@@ -1920,6 +1920,43 @@ un dueño. Un «borra lo de la empresa de prueba» por `empresa_id` se llevaba l
    mutaciones que tienen que morir**: que el script borre por `empresa_id`, y que el guard que avisa del
    exceso de borrado se apague.
 
+### 5.61 🔴 Un export que usa la plantilla del cliente se prueba con la plantilla del cliente, y el archivo que la app produce tiene que ser releíble por la app
+
+**El caso real (17-nov-2026, 📦1091).** El botón «Exportar» del presupuesto SG-SST **guardaba** el archivo y
+**no le decía a nadie dónde**: el evento de resultado caía dentro del iframe del modal, que solo lo cerraba y
+lo reabría. Y el archivo que se guardaba **nunca tenía el formato oficial**: la UI no pasaba `plantillaPath`
+y el exportador tampoco miraba `archivo_origen`, así que salía un `.xlsx` «pelado» —sin encabezado del
+sistema, sin merges de categoría y sin pie de firmas—, inservible para auditoría o ARL. Eran **tres fallos
+encadenados** y **ninguno era la escritura**: el exportador sí escribía donde se le pedía.
+
+**Reglas:**
+
+1. **La plantilla de un export es el archivo del cliente, no un modelo del repo.** Cada cliente diligencia
+   su propio ACT-FO-043 —distintas filas, distintos merges, distintos formatos—, así que el export tiene que
+   usar `archivo_origen` (el archivo del que se importó el presupuesto). Un test que exporta con el modelo de
+   `utils/` **no prueba** que el archivo del cliente salga bien.
+2. **Si la plantilla falla, el export NO se pierde y AVISA.** Se reintenta sin ella y la respuesta lleva
+   `plantillaUsada` y `avisoPlantilla`: la UI dice la ruta exacta y si salió con formato oficial o sin él. Un
+   export que falla en silencio deja al usuario creyendo que tiene un documento entregable.
+3. **La plantilla trae filas de más, y sus fórmulas compartidas rompen la escritura.** Si el presupuesto tiene
+   menos partidas que la plantilla, las filas viejas (datos del año anterior, el TOTAL viejo, el IPC viejo) se
+   quedan en el archivo, y las fórmulas compartidas de ExcelJS hacen que `writeBuffer` reviente con
+   `Shared Formula master must exist above and or left of clone`. Hay que **limpiar esas filas antes** de
+   escribir el TOTAL y el IPC.
+4. **Un valor que la app escribe tiene que ser un valor que la app sabe leer.** El archivo oficial guarda el
+   IPC como **número** (`0.052`) y el export lo escribía como **texto** en formato español (`5,2%`); el
+   importador lo leía con el parser de dinero —que solo quita las comas— y devolvía **52**: al reimportar el
+   propio export, la base quedaba con un IPC de **5200 %**. Un texto «bonito para el ojo» no es un dato.
+5. **El round-trip se prueba con el archivo que sale, no con uno de prueba.** Y se lee **con el rango forzado
+   `A1:R`**, como hace el importador: con `ws['!ref']`, SheetJS arranca en `B1` (porque ExcelJS escribe el
+   `<dimension>` sin la columna A) y se pierde la columna del N y el TOTAL.
+6. **La fecha del encabezado se pone a la de hoy.** El archivo oficial del cliente decía «12 de Diciembre de
+   2024» con los datos de hoy: un documento que se contradice a sí mismo.
+7. **Un `EXIT=1` en la suite no siempre es un test rojo: clasificá el fallo por causa** (§7.7 y §7.8). Los 4
+   tests de presupuesto que fallaban morían en `ERR_DLOPEN_FAILED` porque el `better-sqlite3` de la app es
+   **ABI 136** (Electron) y se estaban corriendo con node 22 (**ABI 127**). Se corren con
+   `ELECTRON_RUN_AS_NODE=1`, y `NODE_PATH` **no** sirve: el `require` resuelve primero al `node_modules` de la app.
+
 ### 6.1 Backend — bridges
 
 Sufijo **`-bridge.js`** (no `bridge-*.js`). Hay 30 en `main/`.

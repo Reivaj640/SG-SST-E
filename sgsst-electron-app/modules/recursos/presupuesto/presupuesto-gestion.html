@@ -1132,7 +1132,14 @@ function parseFormattedNumber(value) {
             if (!data || !data.type) return;
             if (data.type === 'bd-status') {
                 _renderBDModalBody(data);
-            } else if (data.type === 'bd-meta-updated' || data.type === 'bd-partida-added' || data.type === 'bd-export-result') {
+            } else if (data.type === 'bd-export-result') {
+                // 📦1091 — El export SÍ escribe el archivo, pero desde este modal el
+                // resultado no se mostraba nunca: el mensaje llegaba a este iframe y
+                // la única reacción era cerrar y reabrir el modal. El aviso con la
+                // ruta (y el error, si hubo) vivía en el HOME, que no recibe este
+                // mensaje. Ahora se avisa acá.
+                _manejarResultadoExport(data);
+            } else if (data.type === 'bd-meta-updated' || data.type === 'bd-partida-added') {
                 // Si el modal está abierto, cerrarlo y refrescar (re-abrirlo para ver data actualizada)
                 if (document.getElementById('bd-info-modal')) {
                     _closeBDInfoModal();
@@ -1145,6 +1152,44 @@ function parseFormattedNumber(value) {
                 }
             }
         });
+
+        /**
+         * 📦1091 — Avisa el resultado del export a Excel.
+         *
+         * Antes este mensaje solo cerraba y reabría el modal: el usuario se
+         * quedaba sin saber dónde quedó el archivo —o sin enterarse de que la
+         * escritura había fallado— porque el aviso con la ruta vivía en el HOME,
+         * que nunca recibe este mensaje. Ahora se dice la ruta exacta, y si el
+         * archivo salió con la plantilla oficial GI-FO-043, se dice eso también.
+         */
+        function _manejarResultadoExport(data) {
+            var ok = !!(data && data.success);
+            var ruta = ok && data.data ? data.data.path : null;
+            if (ok && ruta) {
+                var conOficial = data.data.plantillaUsada
+                    ? ' — con el formato oficial GI-FO-043'
+                    : ' — SIN el formato oficial (no se pudo usar la plantilla)';
+                _showToast('Excel exportado en: ' + ruta + conOficial, 'success');
+                if (data.data.avisoPlantilla) {
+                    _showToast(data.data.avisoPlantilla, 'warning');
+                }
+            } else {
+                var code = (data && data.error && data.error.code) || 'INTERNAL';
+                var msg = (data && data.error && data.error.message) || 'Error desconocido';
+                if (code === 'CANCELLED') {
+                    _showToast('Exportación cancelada: no se guardó ningún archivo', 'warning');
+                } else {
+                    _showToast('No se pudo exportar el Excel: ' + msg, 'error');
+                }
+            }
+            // Si el modal sigue abierto, cerrarlo y reabrirlo para refrescar los
+            // datos del período (el export no cambia la BD, pero el modal
+            // muestra la fecha de última actualización).
+            if (document.getElementById('bd-info-modal')) {
+                _closeBDInfoModal();
+                setTimeout(openBDInfoModal, 250);
+            }
+        }
 
         /**
          * Muestra el resumen detallado (lista de partidas) en un sub-modal

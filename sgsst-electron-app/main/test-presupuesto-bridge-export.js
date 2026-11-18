@@ -253,6 +253,157 @@ async function run() {
   _assert(resumen.data.resumen.totalEjecutado >= 0, 'totalEjecutado presente');
 
   // ============================================================
+  // TEST 6: 📦1091 — el export usa el archivo OFICIAL por defecto
+  //
+  // El defecto: la UI nunca pasaba `plantillaPath`, así que el export salía
+  // "pelado" (sin encabezado GI-FO-043, sin merges de categoría y sin pie de
+  // firmas). Ahora, si el presupuesto tiene `archivo_origen`, ese archivo es la
+  // plantilla.
+  //
+  // Este test usa el ACT-FO-043 real del repo como plantilla.
+  // ============================================================
+  console.log('');
+  console.log('[6] export-excel usa el archivo oficial (plantilla) por defecto');
+
+  var plantillaReal = path.join(__dirname, '..', 'utils', 'ACT-FO-043 Presupuesto SG-SST 2025 Tempoactiva.xlsx');
+  var hayPlantilla = fs.existsSync(plantillaReal);
+  _assert(hayPlantilla, 'existe la plantilla ACT-FO-043 del repo');
+  var oficialTxt = '';
+  var peladoTxt = '';
+
+  if (hayPlantilla) {
+    // El presupuesto sembrado queda apuntando al archivo oficial.
+    rawDb.exec("UPDATE presupuestos SET archivo_origen = '" + plantillaReal.replace(/'/g, "''") +
+      "' WHERE id = '" + presupuestoId + "'");
+
+    var salidaOficial = path.join(tempDir, 'export-con-oficial.xlsx');
+    var resOficial = await _mockIpcHandlers['presupuesto:export-excel']({}, {
+      presupuestoId: presupuestoId,
+      outputPath: salidaOficial
+    });
+    _assert(resOficial.success === true, 'export con archivo_origen OK');
+    _assertEq(resOficial.data.plantillaUsada, plantillaReal, 'la plantilla usada es el archivo oficial');
+    _assert(fs.existsSync(salidaOficial), 'el archivo oficial se escribió');
+
+    var wbOficial = xlsx.readFile(salidaOficial);
+    _assert(/PRESUP/i.test(wbOficial.SheetNames[0]), 'conserva la hoja oficial (' + wbOficial.SheetNames[0] + ')');
+    // OJO: se lee con el rango CORREGIDO (A1..R), como hace el importador de la
+    // app (`_parsePresupuestoXLSX`). SheetJS, si se lee con `ws['!ref']`,
+    // arranca en B1 —porque ExcelJS escribe el <dimension> sin la columna A— y
+    // se pierde la columna del N y el TOTAL. La app no sufre eso porque su
+    // lector fuerza el rango; el test tampoco debe sufrirlo.
+    var wsOficial = wbOficial.Sheets[wbOficial.SheetNames[0]];
+    var rangoOficial = xlsx.utils.decode_range(wsOficial['!ref']);
+    var rangoCorregido = { s: { c: 0, r: 0 }, e: { c: 17, r: rangoOficial.e.r } };
+    var filasOficial = xlsx.utils.sheet_to_json(wsOficial, {
+      header: 1, raw: true, defval: null, range: xlsx.utils.encode_range(rangoCorregido)
+    });
+    oficialTxt = JSON.stringify(filasOficial);
+    _assert(/ASIGNACION PRESUPUESTO ANUAL/i.test(oficialTxt), 'el archivo sale con el encabezado oficial ASIGNACION PRESUPUESTO ANUAL');
+    _assert(/DETALLE/i.test(oficialTxt), 'el archivo sale con la columna DETALLE del formato oficial');
+    _assert(/ACT-FO-043/i.test(oficialTxt), 'el archivo conserva el codigo ACT-FO-043 de la plantilla');
+    _assert(!/"Detalle","Asignaci/.test(oficialTxt), 'NO sale el encabezado pelado (Detalle/Asignación)');
+    _assert(/Fecha de actualizacion: *\d+ de \w+ de \d{4}/i.test(oficialTxt), 'la fecha de actualizacion del encabezado es la de hoy');
+    _assert(filasOficial[9] && filasOficial[9][0] === 1, 'la columna N quedo con el numero de partida (col A)');
+    _assert(filasOficial[12] && filasOficial[12][0] === 'TOTAL AÑO', 'el TOTAL AÑO quedo en su fila');
+
+    // Lo que de verdad importa: que la app pueda RE-IMPORTAR su propio export
+    // oficial. Si el importador no lo lee, el archivo no sirve para nada.
+    var reimportOficial = _mockIpcHandlers['presupuesto:import-from-excel']({}, {
+      filePath: salidaOficial,
+      companyName: 'Tempoactiva',
+      anio: 2026,
+      options: { overwrite: true }
+    });
+    _assert(reimportOficial.success === true, 'la app re-importa su propio export oficial');
+    _assertEq(reimportOficial.data.inserted, 3, 're-import del export oficial: 3 partidas');
+    var resumenOficial = _mockIpcHandlers['presupuesto:calcular-resumen']({}, {
+      presupuestoId: reimportOficial.data.presupuestoId
+    });
+    _assertEq(resumenOficial.data.resumen.totalAsignado, 9554724, 'el total se preserva en el round-trip del export oficial');
+
+    // CONTRASTE — el equivalente del mutante: sin archivo_origen el export SÍ sale
+    // pelado. Si el fallback al archivo oficial se rompiera, la assertion de
+    // arriba (que exige el encabezado oficial) se caería. Esto es lo que prueba
+    // que el test muerde.
+    rawDb.exec("UPDATE presupuestos SET archivo_origen = NULL WHERE id = '" + presupuestoId + "'");
+    var salidaPelada = path.join(tempDir, 'export-sin-oficial.xlsx');
+    await _mockIpcHandlers['presupuesto:export-excel']({}, {
+      presupuestoId: presupuestoId,
+      outputPath: salidaPelada
+    });
+    var wbPelado = xlsx.readFile(salidaPelada);
+    var rangoPelado = xlsx.utils.decode_range(wbPelado.Sheets[wbPelado.SheetNames[0]]['!ref']);
+    var filasPelado = xlsx.utils.sheet_to_json(wbPelado.Sheets[wbPelado.SheetNames[0]], {
+      header: 1, raw: true, defval: null,
+      range: xlsx.utils.encode_range({ s: { c: 0, r: 0 }, e: { c: 17, r: rangoPelado.e.r } })
+    });
+    peladoTxt = JSON.stringify(filasPelado);
+    _assert(!/ASIGNACION PRESUPUESTO ANUAL/i.test(peladoTxt), 'sin archivo_origen el export sale pelado (sin encabezado oficial)');
+    _assert(/"Detalle","Asignaci/.test(peladoTxt), 'sin archivo_origen el export sale con el encabezado pelado');
+
+    try { fs.unlinkSync(salidaOficial); } catch (e) {}
+    try { fs.unlinkSync(salidaPelada); } catch (e) {}
+  }
+
+  // ============================================================
+  // TEST 7: 📦1091 — el IPC sobrevive la ida y vuelta
+  //
+  // El archivo oficial guarda el IPC como NÚMERO (0.052) y el export lo
+  // escribe como texto con formato español ("5,2%"). El importador lo leía
+  // con el parser de dinero ("5,2%" -> 52, que solo quita las comas) y
+  // guardaba 52 en vez de 0.052: al reimportar el propio export, la BD
+  // quedaba con un IPC de 5200%. Este test muerde ese error.
+  // ============================================================
+  console.log('');
+  console.log('[7] el IPC sobrevive el round-trip del export');
+
+  if (hayPlantilla) {
+    rawDb.exec("UPDATE presupuestos SET archivo_origen = '" + plantillaReal.replace(/'/g, "''") +
+      "', ipc = 0.052 WHERE id = '" + presupuestoId + "'");
+
+    var salidaIpc = path.join(tempDir, 'export-con-ipc.xlsx');
+    var resIpc = await _mockIpcHandlers['presupuesto:export-excel']({}, {
+      presupuestoId: presupuestoId,
+      outputPath: salidaIpc
+    });
+    _assert(resIpc.success === true, 'export con IPC OK');
+
+    var wbIpc = xlsx.readFile(salidaIpc);
+    var wsIpc = wbIpc.Sheets[wbIpc.SheetNames[0]];
+    var rIpc = xlsx.utils.decode_range(wsIpc['!ref']);
+    var filasIpc = xlsx.utils.sheet_to_json(wsIpc, {
+      header: 1, raw: true, defval: null,
+      range: xlsx.utils.encode_range({ s: { c: 0, r: 0 }, e: { c: 17, r: rIpc.e.r } })
+    });
+    var filaIpc = -1;
+    for (var _f = 0; _f < filasIpc.length; _f++) {
+      if (filasIpc[_f] && typeof filasIpc[_f][1] === 'string' &&
+          filasIpc[_f][1].trim().toUpperCase() === 'IPC') { filaIpc = _f; break; }
+    }
+    _assert(filaIpc >= 0, 'el archivo exportado trae la fila IPC');
+    if (filaIpc >= 0) {
+      _assertEq(filasIpc[filaIpc][2], '5,2%', 'la fila IPC se escribe en formato español (5,2%)');
+    }
+
+    // Re-import: el IPC debe volver como fracción, no como 52.
+    var reimportIpc = _mockIpcHandlers['presupuesto:import-from-excel']({}, {
+      filePath: salidaIpc,
+      companyName: 'Tempoactiva',
+      anio: 2026,
+      options: { overwrite: true }
+    });
+    _assert(reimportIpc.success === true, 're-import del export con IPC OK');
+    if (reimportIpc.success) {
+      // Tolerancia: 5,2% no es exactamente 0.052 en coma flotante.
+      var _ipc = reimportIpc.data.ipc;
+      var _ipcOk = typeof _ipc === 'number' && Math.abs(_ipc - 0.052) < 1e-9;
+      _assert(_ipcOk, 'el IPC vuelve como fracción (0.052), no como 52 (= ' + _ipc + ')');
+    }
+    try { fs.unlinkSync(salidaIpc); } catch (e) {}
+  }
+
+  // ============================================================
   console.log('');
   console.log('=====================================================================');
   console.log('  Resumen: ' + _passed + ' OK · ' + _failed + ' FAIL');
@@ -262,6 +413,7 @@ async function run() {
   console.log('     BD → Excel con estructura ACT-FO-043');
   console.log('     Headers correctos, partidas correctas, TOTAL AÑO correcto');
   console.log('     Round-trip (BD → Excel → BD) preserva los datos');
+  console.log('     📦1091: usa el archivo oficial (plantilla) por defecto y avisa la ruta');
   console.log('');
 
   try { fs.unlinkSync(outputPath); } catch (e) {}

@@ -862,6 +862,29 @@ async function _buildPresupuestoXLSXAsync(presupuesto, partidas, plantillaPath) 
     }
   }
 
+  // 📦1091 — La fecha de actualización del archivo oficial.
+  //
+  // El formato GI-FO-043/ACT-FO-043 tiene una celda "Fecha de actualizacion: ..."
+  // en el encabezado. Sin tocarla, el export salía con la fecha que tenía la
+  // plantilla (en el archivo de Aseplus ponía "12 de Diciembre de 2024" con los
+  // datos de hoy): un documento que se contradice a sí mismo.
+  if (usandoPlantilla) {
+    try {
+      var _MESES_ES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+        'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+      for (var _r = 1; _r <= 12; _r++) {
+        var _celda = ws.getRow(_r).getCell(1);
+        var _texto = _celda && _celda.value ? String(_celda.value) : '';
+        if (/^Fecha\s+de\s+actualizacion/i.test(_texto.trim())) {
+          var _hoy = new Date();
+          _celda.value = 'Fecha de actualizacion: ' + _hoy.getDate() + ' de ' +
+            _MESES_ES[_hoy.getMonth()] + ' de ' + _hoy.getFullYear();
+          break;
+        }
+      }
+    } catch (e) { /* la fecha no es crítica: si falla, el archivo sale igual */ }
+  }
+
   // Datos
   // 📦824 — La categoría (col B) se escribe solo en la primera fila de cada
   // bloque; las demás son celdas esclavas del mismo merge (ver arriba).
@@ -933,13 +956,56 @@ async function _buildPresupuestoXLSXAsync(presupuesto, partidas, plantillaPath) 
     }
   }
 
+  // 📦1091 — Limpiar las filas que la plantilla tenía de más.
+  //
+  // El export escribe las partidas desde la fila 10 y el TOTAL justo debajo. Si
+  // el presupuesto tiene MENOS partidas que la plantilla, las filas viejas (datos
+  // del año anterior, el TOTAL viejo y el IPC viejo) se quedaban en el archivo:
+  // un presupuesto que se entregaba con datos que ya no eran del período.
+  //
+  // Se hace ANTES de escribir el TOTAL y el IPC, porque esas dos filas se
+  // escriben después y deben quedar por encima de lo que se limpia.
+  var totalRowIdx = FILA_DATOS_INI + partidas.length;
+  if (usandoPlantilla) {
+    var _filaTotalPlantilla = -1;
+    for (var _r = FILA_DATOS_INI; _r <= FILA_DATOS_INI + 80; _r++) {
+      var _a = ws.getRow(_r).getCell(1).value;
+      var _c = ws.getRow(_r).getCell(3).value;
+      var _esTotal = (typeof _a === 'string' && /^\s*TOTAL\s*A/i.test(_a)) ||
+        (typeof _c === 'string' && /^\s*TOTAL\s*A/i.test(_c));
+      if (_esTotal) { _filaTotalPlantilla = _r; break; }
+    }
+    if (_filaTotalPlantilla > totalRowIdx) {
+      // Datos viejos + el TOTAL viejo + el IPC viejo.
+      var _hasta = _filaTotalPlantilla + 1;
+      try {
+        if (ws.model && ws.model.merges) {
+          ws.model.merges.slice().forEach(function (m) {
+            var mm = String(m).match(/^([A-Z]+)(\d+):([A-Z]+)(\d+)$/);
+            if (!mm) return;
+            var _ini = parseInt(mm[2], 10);
+            var _fin = parseInt(mm[4], 10);
+            if (_fin >= totalRowIdx + 1 && _ini <= _hasta) { try { ws.unMergeCells(m); } catch (e) { } }
+          });
+        }
+      } catch (e) { /* sigue: el limpiado puede fallar sin romper el export */ }
+      for (var _rr = totalRowIdx + 1; _rr <= _hasta; _rr++) {
+        var _fila = ws.getRow(_rr);
+        for (var _cc = 1; _cc <= 18; _cc++) {
+          try { _fila.getCell(_cc).value = null; } catch (e) { }
+        }
+      }
+      console.log('[' + MOD + '][export] Se limpiaron ' + (_hasta - totalRowIdx) +
+        ' fila(s) que la plantilla tenía de más');
+    }
+  }
+
   // Fila TOTAL AÑO
   //
   // 📦824 — Esta fila se escribe con la SUMA REAL de las partidas, no con lo que
   // declaraba el Excel original. El 2026 de Tempoactiva venía con la fórmula
   // mal (contaba cada partida dos veces: declaraba 55.638.568 frente a una suma
   // de 27.819.284) y también mal en la ejecución. Al exportar se corrige.
-  var totalRowIdx = FILA_DATOS_INI + partidas.length;
   var totalRow = ws.getRow(totalRowIdx);
   totalRow.getCell(1).value = 'TOTAL AÑO';
   totalRow.getCell(3).value = 'TOTAL AÑO';
@@ -1062,16 +1128,60 @@ async function _handlerExportExcel(token, presupuestoId, outputPath, plantillaPa
     };
   });
 
+  // 📦1091 — La plantilla del export.
+  //
+  // Si no viene `plantillaPath`, se usa el archivo OFICIAL del que se importó
+  // el presupuesto (`archivo_origen`). Sin esto el export salía "pelado": sin
+  // encabezado GI-FO-043, sin merges de categoría y sin pie de firmas — es decir,
+  // un archivo que no sirve para entregar a auditoría ni a la ARL (lo dice el
+  // propio 📦824). La UI nunca pasaba la plantilla, así que ese archivo pelado
+  // era SIEMPRE lo que se guardaba.
+  var plantillaUsada = null;
+  var _candidatas = [plantillaPath, presRow.archivo_origen];
+  for (var _i = 0; _i < _candidatas.length && !plantillaUsada; _i++) {
+    var _cand = _candidatas[_i];
+    if (!_cand) continue;
+    try {
+      if (require('fs').existsSync(_cand)) {
+        plantillaUsada = _cand;
+        if (!plantillaPath) {
+          console.log('[' + MOD + '][export-excel] sin plantillaPath: se usa el archivo oficial ' + _cand);
+        }
+      } else {
+        console.warn('[' + MOD + '][export-excel] la plantilla no existe: ' + _cand);
+      }
+    } catch (e) { /* se sigue con la siguiente candidata */ }
+  }
+
   // 3. Generar el .xlsx (writeBuffer es async)
   var buffer;
+  var avisoPlantilla = null;
   try {
     // 📦824 — Si se pasa plantilla, se escribe ENCIMA del archivo oficial en vez
     // de generar uno pelado (que pierdo el encabezado del sistema, los merges de
     // categoría y el pie de firmas).
-    buffer = await _buildPresupuestoXLSX(presupuesto, partidas, plantillaPath);
+    buffer = await _buildPresupuestoXLSX(presupuesto, partidas, plantillaUsada);
   } catch (e) {
     console.error('[' + MOD + '][export-excel] build error:', e.message);
-    return _err('BUILD_ERROR', 'Error generando Excel: ' + e.message);
+    if (!plantillaUsada) {
+      return _err('BUILD_ERROR', 'Error generando Excel: ' + e.message);
+    }
+    // 📦1091 — La plantilla oficial no se pudo usar (fórmulas compartidas que el
+    // exportador no sabe reescribir, merges que chocan, el archivo con menos
+    // partidas que la plantilla…). Antes esto devolvía un error y NO se guardaba
+    // nada: el export se perdía sin explicación. Ahora se reintenta SIN la
+    // plantilla para no perder los datos, y se avisa de que el archivo salió
+    // sin el formato oficial.
+    console.warn('[' + MOD + '][export-excel] la plantilla no se pudo usar (' + e.message +
+      '): se genera el archivo sin ella');
+    avisoPlantilla = 'No se pudo usar la plantilla oficial (' + e.message + '): el archivo se generó SIN el formato GI-FO-043.';
+    try {
+      buffer = await _buildPresupuestoXLSX(presupuesto, partidas, null);
+      plantillaUsada = null;
+    } catch (e2) {
+      console.error('[' + MOD + '][export-excel] build error (sin plantilla):', e2.message);
+      return _err('BUILD_ERROR', 'Error generando Excel: ' + e2.message);
+    }
   }
 
   // 4. Si no hay outputPath, abrir dialog "Save As"
@@ -1081,9 +1191,18 @@ async function _handlerExportExcel(token, presupuestoId, outputPath, plantillaPa
       var dialog = require('electron').dialog || (typeof electron !== 'undefined' ? electron.dialog : null);
       // En el contexto del bridge (main process), dialog está disponible
       var electronModule = require('electron');
+      // 📦1091 — El diálogo abría con un nombre pelado ("Aseplus_2026.xlsx") y SIN
+      // carpeta: Windows lo dejaba en la última carpeta usada por el diálogo, que
+      // no es donde vive el presupuesto. Y como la UI no mostraba la ruta final
+      // (ver `presupuesto-gestion.html`), el archivo quedaba "perdido". Ahora el
+      // diálogo arranca en la carpeta del archivo oficial.
+      var defaultPath = (presRow.empresa_id || 'presupuesto') + '_' + presRow.anio + '.xlsx';
+      try {
+        if (plantillaUsada && require('fs').existsSync(plantillaUsada)) defaultPath = plantillaUsada;
+      } catch (e2) { /* se deja el nombre por defecto */ }
       var saveResult = electronModule.dialog.showSaveDialogSync({
         title: 'Exportar presupuesto a Excel',
-        defaultPath: (presRow.empresa_id || 'presupuesto') + '_' + presRow.anio + '.xlsx',
+        defaultPath: defaultPath,
         filters: [{ name: 'Excel', extensions: ['xlsx'] }]
       });
       if (!saveResult || !saveResult.filePath) {
@@ -1107,6 +1226,10 @@ async function _handlerExportExcel(token, presupuestoId, outputPath, plantillaPa
   return _ok({
     path: finalPath,
     size: buffer.length,
+    // 📦1091 — La UI lo muestra para decir si el archivo salió con el formato
+    // oficial GI-FO-043 o pelado (que es cuando no se pudo usar la plantilla).
+    plantillaUsada: plantillaUsada,
+    avisoPlantilla: avisoPlantilla,
     presupuesto: presupuesto,
     partidasCount: partidas.length
   });
@@ -1482,6 +1605,46 @@ function _toNumericValue(value) {
 }
 
 /**
+ * 📦1091 — Lee el factor IPC de la fila "IPC" del Excel.
+ *
+ * El archivo oficial (ACT-FO-043) lo guarda como NÚMERO (0.052), pero el
+ * exportador lo escribe como texto con formato español ("5,2%"). Con el
+ * parser general de dinero ("5,2%" -> 52, porque solo quita las comas) el
+ * IPC quedaba mil veces grande: al reimportar el propio export, la BD
+ * quedaba con IPC = 52 (5200%) en vez de 5,2%.
+ *
+ * Acepta cualquier forma: 0.052, "0.052", "5,2%", "5.2%", 5.2, "5,2".
+ * El resultado SIEMPRE es fracción (0.052), que es como lo guarda la BD.
+ * Si no se puede entender, devuelve null (el IPC queda vacío, no corrupto).
+ */
+function _parseIpcValue(value) {
+  var n = null;
+  if (value === null || value === undefined) return null;
+  if (typeof value === 'number') {
+    n = isNaN(value) ? null : value;
+  } else if (typeof value === 'string') {
+    var clean = value.replace(/\$/g, '').replace(/%/g, '').replace(/\s/g, '');
+    if (clean === '' || clean === '-') return null;
+    if (clean.indexOf(',') >= 0) {
+      // Coma decimal (formato es): "5,2" -> 5.2. Los puntos son separadores
+      // de miles y se quitan.
+      clean = clean.replace(/\./g, '').replace(',', '.');
+    } else {
+      // Punto decimal: "5.2" -> 5.2. Las comas son de miles y se quitan.
+      clean = clean.replace(/,/g, '');
+    }
+    n = parseFloat(clean);
+    if (isNaN(n)) return null;
+  } else {
+    return null;
+  }
+  // La BD guarda el IPC como fracción: 5,2% -> 0.052.
+  if (n > 1) n = n / 100;
+  if (n < 0) return null;
+  return n;
+}
+
+/**
  * Parsea un archivo Excel de presupuesto y devuelve la estructura normalizada.
  * Formato esperado (basado en ACT-FO-043):
  *   - Primera hoja
@@ -1572,7 +1735,7 @@ function _parsePresupuestoXLSX(filePath) {
     // perder el factor, que es justo lo que explica por qué el total del Excel
     // no cuadra con la suma de las partidas.
     if (typeof colB === 'string' && colB.trim().toUpperCase() === 'IPC') {
-      ipc = _toNumericValue(row[2]) || null;
+      ipc = _parseIpcValue(row[2]);
       continue;
     }
 
