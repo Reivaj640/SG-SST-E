@@ -78,8 +78,8 @@ test('script BORRA el tag viejo (remoto) — clave para evitar 422', () => {
   }
 });
 
-test('script hace git pull de origin/Dev-Pc', () => {
-  if (!/git\s+pull\s+origin\s+Dev-Pc/.test(script)) {
+test('script hace git pull de origin/Dev-Port', () => {
+  if (!/git\s+pull\s+origin\s+Dev-Port/.test(script)) {
     throw new Error('El script no hace git pull de los ultimos cambios');
   }
 });

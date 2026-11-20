@@ -8,7 +8,7 @@
 **Para:** cualquier modelo que **extienda, mantenga y evolucione** K+AIR.
 **No es** para prototipar ni reinventar. La arquitectura, los contratos y los patrones ya existen.
 
-**Rama de trabajo:** `Dev-Pc`. El remoto por defecto es `Dev`.
+**Rama de trabajo:** `Dev-Port`. El remoto por defecto es `Dev`.
 **Versión al escribir:** `0.1.238` · 📦858-859 (mini-calendario con filtro por día, compositor en pila).
 
 ---

@@ -2663,7 +2663,7 @@ Si por error commiteás un secret, rotar inmediatamente y usar `git reset + cher
 
 - **Repo:** https://github.com/Reivaj640/SG-SST-E
 - **Releases:** https://github.com/Reivaj640/SG-SST-E/releases
-- **Branch activo:** `Dev-Pc` (production-ready), `Dev` (legacy)
+- **Branch activo:** `Dev-Port` (production-ready), `Dev` (legacy)
 - **Owner:** Javier Robles F. (Prof. SG-SST - Esp. Gerencia de Proyectos)
 
 ---

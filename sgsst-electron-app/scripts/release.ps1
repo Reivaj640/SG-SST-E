@@ -16,13 +16,13 @@
 #
 # Pre-requisitos:
 #   - GH_TOKEN seteado en el environment (export GH_TOKEN=ghp_xxx)
-#   - Estar en la branch correcta (Dev-Pc por default)
+#   - Estar en la branch correcta (Dev-Port por default)
 #   - package.json tiene la version correcta
 # ============================================================================
 
 param(
     [switch]$SkipTests = $false,
-    [string]$Branch = "Dev-Pc"
+    [string]$Branch = "Dev-Port"
 )
 
 $ErrorActionPreference = "Stop"

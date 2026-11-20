@@ -4,7 +4,7 @@ REM build-and-publish.bat — K+AIR auto-updater release script
 REM
 REM USO:
 REM   1. Cambia la version en package.json (ej "0.1.118")
-REM   2. Commitea y pushea los cambios a Dev-Pc
+REM   2. Commitea y pushea los cambios a Dev-Port
 REM   3. Ejecuta este script desde Git Bash o cmd.exe:
 REM        export GH_TOKEN=github_pat_TU_TOKEN_AQUI
 REM        ./build-and-publish.bat
@@ -13,7 +13,7 @@ REM Que hace automaticamente:
 REM   1. Lee la version actual de package.json
 REM   2. Borra el tag viejo v0.1.X (si existe) — local y remoto
 REM      (esto evita el 422 "tag already exists" de electron-builder)
-REM   3. Hace git pull de los ultimos cambios de Dev-Pc
+REM   3. Hace git pull de los ultimos cambios de Dev-Port
 REM   4. Limpia dist/ para evitar assets viejos mezclados
 REM   5. Corre electron-builder con --publish=always
 REM   6. Verifica que se generaron los assets criticos:
@@ -89,9 +89,9 @@ echo.
 
 REM --- 4. git pull de los ultimos cambios ---
 echo ========================================
-echo  [4/6] git pull de origin/Dev-Pc
+echo  [4/6] git pull de origin/Dev-Port
 echo ========================================
-git pull origin Dev-Pc
+git pull origin Dev-Port
 if errorlevel 1 (
     echo [ERROR] git pull fallo. Resolvelo manualmente y volve a correr.
     exit /b 1
