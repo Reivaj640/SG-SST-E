@@ -287,17 +287,19 @@
 .inducciones-container .kair-empty .kair-btn{margin-top:14px}
 
 /* ================= 17. MODALES ================= */
-.inducciones-container .kair-modal{position:fixed;inset:0;z-index:200;display:none;align-items:center;justify-content:center;padding:24px;background:rgba(20,33,61,.46);backdrop-filter:blur(3px)}
+.inducciones-container .kair-modal{position:fixed;inset:0;z-index:500000;display:none;align-items:center;justify-content:center;width:auto;max-width:none;height:auto;max-height:none;margin:0;padding:24px;border-radius:0;box-shadow:none;transform:none;animation:none;flex-direction:row;overflow:visible;background:rgba(20,33,61,.46);backdrop-filter:blur(3px)}
 .inducciones-container .kair-modal.is-open{display:flex}
-.inducciones-container .kair-modal__panel{width:min(560px,94vw);max-height:90vh;overflow:auto;background:var(--kair-surface);border-radius:20px;padding:26px 28px;box-shadow:var(--kair-shadow-pop);animation:kair-pop 180ms cubic-bezier(.34,1.1,.4,1)}
+.inducciones-container.kair-modal-open{overflow:hidden!important}
+.inducciones-container .kair-modal__panel{display:flex;flex-direction:column;width:min(560px,94vw);max-height:calc(100vh - 48px);overflow:hidden;box-sizing:border-box;background:var(--kair-surface);border-radius:20px;padding:26px 28px;box-shadow:var(--kair-shadow-pop);animation:kair-pop 180ms cubic-bezier(.34,1.1,.4,1)}
+.inducciones-container .kair-modal__panel > form{display:flex;flex-direction:column;flex:1;min-height:0;overflow:hidden}
 @keyframes kair-pop{from{opacity:0;transform:scale(.965) translateY(6px)}to{opacity:1;transform:scale(1) translateY(0)}}
-.inducciones-container .kair-modal__head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px}
+.inducciones-container .kair-modal__head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-shrink:0;padding:0;border-bottom:none}
 .inducciones-container .kair-modal__title{font-family:var(--kair-font-title);font-size:17.5px;font-weight:800;letter-spacing:-.01em}
 .inducciones-container .kair-modal__sub{font-size:12.5px;color:var(--kair-text-2);margin-top:4px;line-height:1.45}
-.inducciones-container .kair-modal__close{width:32px;height:32px;border-radius:9px;display:flex;align-items:center;justify-content:center;color:var(--kair-text-3);transition:background var(--kair-t),color var(--kair-t)}
+.inducciones-container .kair-modal__close{width:32px;height:32px;border-radius:9px;display:flex;align-items:center;justify-content:center;padding:0;border:0;background:none;font-size:inherit;line-height:1;color:var(--kair-text-3);cursor:pointer;transition:background var(--kair-t),color var(--kair-t)}
 .inducciones-container .kair-modal__close:hover{background:#F1F4F8;color:var(--kair-text)}
-.inducciones-container .kair-modal__body{margin-top:20px}
-.inducciones-container .kair-modal__foot{display:flex;justify-content:flex-end;gap:10px;margin-top:24px}
+.inducciones-container .kair-modal__body{flex:1;min-height:0;margin-top:20px;padding:0;overflow-y:auto}
+.inducciones-container .kair-modal__foot{display:flex;justify-content:flex-end;gap:10px;flex-shrink:0;margin-top:24px;padding:0;border-top:none}
 .inducciones-container .kair-form-block{background:#FAFBFC;border:1px solid var(--kair-border-soft);border-radius:14px;padding:18px;margin-bottom:14px}
 .inducciones-container .kair-form-block:last-child{margin-bottom:0}
 .inducciones-container .kair-form-block__title{font-size:13px;font-weight:700;color:var(--kair-text)}

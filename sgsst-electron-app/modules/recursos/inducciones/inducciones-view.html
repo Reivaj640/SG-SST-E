@@ -1,4 +1,4 @@
-<link rel="stylesheet" href="./modules/recursos/inducciones/inducciones-view.css?v=INDUCCIONES-20260915-v21-chart-scope-fix">
+<link rel="stylesheet" href="./modules/recursos/inducciones/inducciones-view.css?v=INDUCCIONES-20261120-v22-modal-fix">
   <link rel="stylesheet" href="../../../assets/css/google-fonts.css">
 
 <main class="kair-page">
@@ -324,7 +324,7 @@
 </main>
 
 <!-- ===== MODAL · REGISTRAR / EDITAR INDUCCIÓN ===== -->
-<div class="kair-modal" id="modal-induccion" role="dialog" aria-modal="true" aria-labelledby="modal-ind-title">
+<div class="kair-modal" id="modal-induccion" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="modal-ind-title">
   <div class="kair-modal__panel">
     <div class="kair-modal__head">
       <div>
@@ -343,17 +343,17 @@
           <div class="kair-form-grid">
             <div class="kair-field span-2" id="fw-nombre">
               <label class="kair-field__label" for="ind-nombre">Nombre completo <em>*</em></label>
-              <input type="text" id="ind-nombre" placeholder="Ej.: María Fernanda Ruiz Torres" maxlength="80">
+              <input type="text" id="ind-nombre" spellcheck="false" placeholder="Ej.: María Fernanda Ruiz Torres" maxlength="80">
               <span class="kair-field__error">Ingresa el nombre completo.</span>
             </div>
             <div class="kair-field" id="fw-cedula">
               <label class="kair-field__label" for="ind-cedula">Cédula <em>*</em></label>
-              <input type="text" id="ind-cedula" placeholder="Ej.: 1023456789" inputmode="numeric" maxlength="12">
+              <input type="text" id="ind-cedula" spellcheck="false" placeholder="Ej.: 1023456789" inputmode="numeric" maxlength="12">
               <span class="kair-field__error">Cédula inválida (solo números, 6–12 dígitos).</span>
             </div>
             <div class="kair-field" id="fw-cargo">
               <label class="kair-field__label" for="ind-cargo">Cargo <em>*</em></label>
-              <input type="text" id="ind-cargo" list="cargos-list" placeholder="Ej.: Cocinero" maxlength="60">
+              <input type="text" id="ind-cargo" spellcheck="false" list="cargos-list" placeholder="Ej.: Cocinero" maxlength="60">
               <datalist id="cargos-list"></datalist>
               <span class="kair-field__error">Ingresa el cargo.</span>
             </div>

@@ -8,7 +8,7 @@
    Regla de oro: estado derivado (puntaje>=20 aprueba); refreshAll() único.
    ═══════════════════════════════════════════════════════════════════ */
 
-var INDUC_TOKEN = 'INDUCCIONES-20260915-v21-chart-scope-fix';
+var INDUC_TOKEN = 'INDUCCIONES-20261120-v22-modal-fix';
 console.log('%c[Inducciones] Versión cargada: ' + INDUC_TOKEN, 'color:#2057b8;font-weight:bold');
 
 /* ---------- 0. Logging + helpers puros (sin DOM) ---------- */
@@ -795,7 +795,9 @@ class InduccionesComponent {
     var m = this.q('#' + id);
     if (!m) return;
     this._lastFocus = document.activeElement;
+    this.container.classList.add('kair-modal-open');
     m.classList.add('is-open');
+    m.setAttribute('aria-hidden', 'false');
     indLog('MODAL', 'OPEN', 'OK', id);
     setTimeout(function () {
       var f = m.querySelector('input,select') || m.querySelector('.kair-modal__close');
@@ -806,6 +808,8 @@ class InduccionesComponent {
     if (typeof m === 'string') m = this.q('#' + m);
     if (!m) return;
     m.classList.remove('is-open');
+    m.setAttribute('aria-hidden', 'true');
+    this.container.classList.remove('kair-modal-open');
     if (this._lastFocus && this._lastFocus.focus) this._lastFocus.focus();
     indLog('MODAL', 'CLOSE', 'OK');
   }

@@ -573,7 +573,7 @@ textarea.kair-form-control {
    10. MODAL
    ══════════════════════════════════════════════════════════════════════ */
 
-.kair-modal-backdrop {
+.kair-rad-module .kair-modal-backdrop {
   display: none;
   position: fixed;
   inset: 0;
@@ -584,12 +584,12 @@ textarea.kair-form-control {
   padding: var(--kair-space-6);
 }
 
-.kair-modal-backdrop.is-open {
+.kair-rad-module .kair-modal-backdrop.is-open {
   display: flex;
   animation: kair-fade-in 0.2s ease;
 }
 
-.kair-modal {
+.kair-rad-module .kair-modal {
   background: var(--kair-surface);
   border-radius: var(--kair-radius-lg);
   box-shadow: var(--kair-shadow-lg);
@@ -601,7 +601,7 @@ textarea.kair-form-control {
   animation: kair-slide-up 0.2s ease;
 }
 
-.kair-modal__head {
+.kair-rad-module .kair-modal__head {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -609,12 +609,12 @@ textarea.kair-form-control {
   border-bottom: 1px solid var(--kair-border);
 }
 
-.kair-modal__title {
+.kair-rad-module .kair-modal__title {
   font-size: 16px;
   font-weight: 600;
 }
 
-.kair-modal__close {
+.kair-rad-module .kair-modal__close {
   background: none;
   border: none;
   font-size: 18px;
@@ -624,24 +624,24 @@ textarea.kair-form-control {
   line-height: 1;
 }
 
-.kair-modal__close:hover {
+.kair-rad-module .kair-modal__close:hover {
   color: var(--kair-text);
 }
 
-.kair-modal__body {
+.kair-rad-module .kair-modal__body {
   padding: var(--kair-space-5);
   overflow-y: auto;
   flex: 1;
 }
 
-.kair-modal__body .kair-form-note {
+.kair-rad-module .kair-modal__body .kair-form-note {
   font-size: 12px;
   color: var(--kair-text-muted);
   font-style: italic;
   margin-top: var(--kair-space-3);
 }
 
-.kair-modal__foot {
+.kair-rad-module .kair-modal__foot {
   display: flex;
   justify-content: flex-end;
   gap: var(--kair-space-2);
