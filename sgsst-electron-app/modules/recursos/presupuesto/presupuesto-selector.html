@@ -473,6 +473,13 @@ HEADER ACTION BUTTONS
         .sel-tile__text { min-width: 0; flex: 1; }
         .sel-tile__year { font: 800 0.98rem/1.1 var(--kair-font-display, 'Manrope'); letter-spacing: -0.02em; color: var(--kair-ink, #14213d); font-variant-numeric: tabular-nums; }
         .sel-tile__file { font-size: 10.5px; color: var(--kair-muted, #748096); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .sel-tile__meta { font-size: 10px; color: var(--kair-muted, #748096); margin-top: 1px; opacity: .85; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .sel-tile__badge {
+            display: inline-block; margin-left: 5px; padding: 0 5px; border-radius: 999px;
+            background: var(--surface-card); border: 1px solid var(--hover-line);
+            color: var(--kair-blue-text, #2f6bd8); font: 700 9px/1.6 var(--kair-font-ui, inherit);
+            vertical-align: 1px; white-space: nowrap;
+        }
         .sel-tile__btn {
             flex-shrink: 0; width: 32px; height: 32px; border-radius: 9px;
             display: flex; align-items: center; justify-content: center;
@@ -613,6 +620,50 @@ HEADER ACTION BUTTONS
         // para poder reimportar un período que ya está en la BD.
         let _driveFilesCache = [];
 
+        // 📦1094 — Empresa activa. El selector la recibe del padre (postMessage con
+        // 'company') y la usa para elegir el .xlsx DEL CLIENTE cuando hay más de uno
+        // para el mismo año.
+        let _empresaActual = '';
+
+        /**
+         * 📦1094 — Fecha de un archivo de Drive. `modified` es el mtime (Date).
+         */
+        function _fechaDeArchivo(f) {
+            const m = f && f.modified;
+            if (!m) return 0;
+            const t = m instanceof Date ? m.getTime() : new Date(m).getTime();
+            return isNaN(t) ? 0 : t;
+        }
+
+        /**
+         * 📦1094 — Elige el .xlsx de un año.
+         *
+         * Por qué: en la carpeta de Drive hay años con DOS archivos — uno genérico
+         * ("PRESUPUESTO SST PARA FIRMA 2019.xlsx") y otro del cliente
+         * ("PRESUPUESTO SST PARA FIRMA 2019 Aseplus.xlsx"). El `readdir` no tiene
+         * orden garantizado, así que tomar `files[0]` importaba el equivocado: para
+         * 2019 daba 15.225.132 en vez de 11.425.132, y para 2020, 35.174.761 en
+         * vez de 30.278.471.
+         *
+         * Regla: primero el archivo cuyo nombre trae el nombre de la empresa; si
+         * no hay ninguno, el más reciente. Entre varios candidatos, el más
+         * reciente.
+         *
+         * Función PURA: no toca el DOM ni el disco, para poder probarla sola.
+         */
+        function _elegirArchivoDelAnio(files, empresa) {
+            const lista = (Array.isArray(files) ? files : []).filter(Boolean);
+            if (!lista.length) return null;
+
+            const empresaNorm = String(empresa || '').trim().toLowerCase();
+            const deLaEmpresa = empresaNorm
+                ? lista.filter(f => String(f.name || '').toLowerCase().indexOf(empresaNorm) !== -1)
+                : [];
+            const pool = deLaEmpresa.length ? deLaEmpresa : lista;
+
+            return pool.slice().sort((a, b) => _fechaDeArchivo(b) - _fechaDeArchivo(a))[0];
+        }
+
         // 📦708 (Fase 3.5) — Helper para acceder a KairConfirm del parent (modernos)
         function _confirmDialog() {
             return (window.parent && window.parent.KairConfirm) ? window.parent.KairConfirm : window.KairConfirm;
@@ -665,6 +716,8 @@ HEADER ACTION BUTTONS
     if (event.data.company) {
       const el = document.getElementById('header-company-text');
       if (el) el.textContent = event.data.company;
+      // 📦1094 — La empresa activa decide cuál .xlsx es el del cliente.
+      _empresaActual = event.data.company;
     }
 
     // 📦824 — Llega un objeto con las DOS fuentes: `periodos` (BD, la fuente de
@@ -959,12 +1012,34 @@ HEADER ACTION BUTTONS
         function buildPendienteTile(year, files) {
             const tile = document.createElement('div');
             tile.className = 'sel-tile';
-            const f = files[0];
+            const lista = Array.isArray(files) ? files : [];
+            // 📦1094 — No es `files[0]`: si hay más de un archivo del año, gana el
+            // de la empresa (y si no, el más reciente).
+            const f = _elegirArchivoDelAnio(lista, _empresaActual) || lista[0];
+            if (!f) {
+                tile.innerHTML = `
+                    <div class="sel-tile__icon"><i class="fas fa-file-excel"></i></div>
+                    <div class="sel-tile__text">
+                        <div class="sel-tile__year">${year}</div>
+                        <div class="sel-tile__file">Sin archivo</div>
+                    </div>
+                `;
+                return tile;
+            }
+            const extra = lista.length > 1 ? lista.length - 1 : 0;
+            const ms = _fechaDeArchivo(f);
+            const fechaTxt = ms
+                ? new Date(ms).toLocaleDateString('es-CO', { year: 'numeric', month: 'short', day: 'numeric' })
+                : '';
+            const badge = extra > 0
+                ? `<span class="sel-tile__badge" title="Hay ${lista.length} archivos para ${year}">+${extra}</span>`
+                : '';
             tile.innerHTML = `
                 <div class="sel-tile__icon"><i class="fas fa-file-excel"></i></div>
                 <div class="sel-tile__text">
                     <div class="sel-tile__year">${year}</div>
-                    <div class="sel-tile__file">${_esc(f.name || '')}</div>
+                    <div class="sel-tile__file">${_esc(f.name || '')}${badge}</div>
+                    ${fechaTxt ? `<div class="sel-tile__meta">${_esc(fechaTxt)}</div>` : ''}
                 </div>
                 <button class="sel-tile__btn" data-accion="importar" title="Importar ${year} a la base de datos">
                     <i class="fas fa-download"></i>
@@ -995,8 +1070,14 @@ HEADER ACTION BUTTONS
         function buscarArchivoDelAnio(anio) {
             if (typeof _driveFilesCache === 'undefined') return null;
             const anioStr = String(anio);
-            return _driveFilesCache.find(f => String(f.name || '').match(/(20\d{2})/) &&
-                String(f.name).match(/(20\d{2})/)[1] === anioStr) || null;
+            // 📦1094 — Se juntan TODOS los archivos del año y se elige el correcto
+            // (el de la empresa). Antes se tomaba el primero que aparecía, que
+            // dependía del orden del `readdir` y no del archivo que toca.
+            const delAnio = _driveFilesCache.filter(f => {
+                const m = String(f.name || '').match(/(20\d{2})/);
+                return !!m && m[1] === anioStr;
+            });
+            return _elegirArchivoDelAnio(delAnio, _empresaActual);
         }
 
         function selectYear(year, files) {

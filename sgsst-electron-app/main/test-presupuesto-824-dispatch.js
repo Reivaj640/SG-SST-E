@@ -81,6 +81,24 @@ function casosDelDispatch(cuerpo) {
   return mapa;
 }
 
+// 📦1094 — Extrae una función del HTML del selector para poder EJECUTARLA en este
+// test. Cuenta llaves para achar el cierre del cuerpo.
+function extraerFuncionDelHtml(src, nombre) {
+  const m = new RegExp('function\\s+' + nombre + '\\s*\\(').exec(src);
+  if (!m) return null;
+  const ini = src.indexOf('{', m.index);
+  if (ini < 0) return null;
+  let nivel = 0;
+  for (let i = ini; i < src.length; i++) {
+    if (src[i] === '{') nivel++;
+    else if (src[i] === '}') {
+      nivel--;
+      if (nivel === 0) return src.slice(m.index, i + 1);
+    }
+  }
+  return null;
+}
+
 function main() {
   const logic = leer(LOGIC);
   const definidos = metodosDefinidos(logic);
@@ -132,6 +150,66 @@ function main() {
     casos.get('open-budget-from-db').every(n => definidos.has(n)),
     JSON.stringify(casos.get('open-budget-from-db')));
   ok('5) el método _handleOpenBudgetFromBD existe', definidos.has('_handleOpenBudgetFromBD'));
+
+  // ── 6) 📦1094 — Qué .xlsx se importa cuando el año tiene más de uno ────
+  // En Drive hay años con DOS archivos: uno genérico y otro del cliente. El
+  // `readdir` no tiene orden garantizado, así que tomar `files[0]` importaba el
+  // equivocado (2019: 15.225.132 en vez de 11.425.132). Aquí se EJECUTA la
+  // función real del HTML, no una copia: si alguien la borra o la cambia, el
+  // test se cae.
+  const selectorSrc = leer(SELECTOR);
+  const fnElegir = extraerFuncionDelHtml(selectorSrc, '_elegirArchivoDelAnio');
+  const fnFecha = extraerFuncionDelHtml(selectorSrc, '_fechaDeArchivo');
+  ok('6) el selector trae _elegirArchivoDelAnio', !!fnElegir && !!fnFecha);
+
+  let elegir = null;
+  if (fnElegir && fnFecha) {
+    try {
+      elegir = new Function(fnFecha + '\n' + fnElegir + '\nreturn _elegirArchivoDelAnio;')();
+    } catch (e) {
+      elegir = null;
+    }
+  }
+  ok('6) la función del selector se puede ejecutar', typeof elegir === 'function');
+
+  // Los archivos REALES de Drive: 2019 tiene un genérico y otro del cliente.
+  const arch2019 = [
+    { name: 'PRESUPUESTO SST PARA FIRMA 2019.xlsx', modified: new Date('2020-02-18T10:41:27Z') },
+    { name: 'PRESUPUESTO SST PARA FIRMA 2019 Aseplus.xlsx', modified: new Date('2020-03-05T09:10:17Z') }
+  ];
+
+  if (elegir) {
+    const r1 = elegir(arch2019, 'Aseplus');
+    ok('6) con dos archivos del año gana el de la empresa',
+      !!r1 && /Aseplus/.test(r1.name), r1 ? r1.name : 'null');
+
+    // Caso que separa las dos reglas: el del cliente es MÁS VIEJO que el genérico.
+    const r2 = elegir([
+      { name: 'PRESUPUESTO SST PARA FIRMA 2020 Aseplus.xlsx', modified: new Date('2020-01-01T00:00:00Z') },
+      { name: 'PRESUPUESTO SST PARA FIRMA 2020.xlsx', modified: new Date('2022-02-15T00:00:00Z') }
+    ], 'Aseplus');
+    ok('6) el archivo de la empresa gana aunque sea más viejo',
+      !!r2 && /Aseplus/.test(r2.name), r2 ? r2.name : 'null');
+
+    const r3 = elegir(arch2019, '');
+    ok('6) sin empresa gana el más reciente',
+      !!r3 && /Aseplus/.test(r3.name), r3 ? r3.name : 'null');
+
+    const r4 = elegir([
+      { name: 'PRESUPUESTO SST PARA FIRMA 2021 Aseplus.xlsx', modified: new Date('2021-01-01T00:00:00Z') },
+      { name: 'PRESUPUESTO SST PARA FIRMA 2021.xlsx', modified: new Date('2022-02-15T00:00:00Z') }
+    ], 'Otra Empresa');
+    ok('6) si la empresa no está en ningún nombre, gana el más reciente',
+      !!r4 && /2021\.xlsx/.test(r4.name), r4 ? r4.name : 'null');
+
+    ok('6) una lista vacía devuelve null', elegir([], 'Aseplus') === null);
+  }
+
+  ok('6) la tile usa la función y no files[0]',
+    /_elegirArchivoDelAnio\(lista, _empresaActual\)/.test(selectorSrc) &&
+    !/const f = files\[0\]/.test(selectorSrc));
+  ok('6) reimportar también usa la función',
+    /_elegirArchivoDelAnio\(delAnio, _empresaActual\)/.test(selectorSrc));
 
   let failed = 0;
   console.log('\n=======================================');
