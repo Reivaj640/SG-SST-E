@@ -286,7 +286,8 @@ async function push(companyKey, options) {
         planes: syncData.entities.planes_accion.length,
         gestaciones: syncData.entities.gestaciones.length,
         eventosCumplidos: syncData.entities.eventos_cumplidos.length,
-        eventosRapidos: syncData.entities.eventos_rapidos.length
+        eventosRapidos: syncData.entities.eventos_rapidos.length,
+        ausentismos: syncData.entities.ausentismo_registros.length
       },
       completedAt: new Date().toISOString()
     };

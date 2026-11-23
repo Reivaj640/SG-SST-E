@@ -69,7 +69,7 @@ SG-SST-E/
     ├── renderer.js            ← shell: sidebar, header, routing de módulos (7 500 líneas)
     ├── preload.js             ← ÚNICO contextBridge. Namespaces anidados
     ├── index.html             ← shell. Orden de <link> = orden de cascada
-    ├── main/                  ← 30 bridges (*-bridge.js) + 111 tests + schemas
+    ├── main/                  ← 33 bridges (*-bridge.js) + 158 tests + schemas
     ├── modules/               ← submódulos por dominio (gestion-salud, mejoramiento, …)
     ├── shared/                ← tokens, componentes, calendario, alertas
     ├── renderer/
@@ -1957,6 +1957,57 @@ encadenados** y **ninguno era la escritura**: el exportador sí escribía donde 
    **ABI 136** (Electron) y se estaban corriendo con node 22 (**ABI 127**). Se corren con
    `ELECTRON_RUN_AS_NODE=1`, y `NODE_PATH` **no** sirve: el `require` resuelve primero al `node_modules` de la app.
 
+### 5.62 📦 Una columna que existe en la base real no existe en todas las versiones de la tabla: el SQL se arma contra el ESQUEMA, no contra lo que uno recuerda
+
+**El caso real (23-nov-2026, 📦1095, ausentismo 3.3.6).** La búsqueda de la persona para el
+autollenado del formulario se armó en `main/ausentismo-bridge.js` con un `ORDER BY p.activo DESC` sobre
+`base_personal`. Contra la **base real** la columna `activo` existe (42 columnas, verificado con
+`PRAGMA table_info`), y el script contra la base de producción dio **9/9 OK** con las tres empresas.
+Pero el **test** del bridge arma su propio `base_personal` de 5 columnas (`id`, `cedula`, `nombre`,
+`cargo`, `area`) — **sin `activo`**— y ahí la consulta reventaba con `table base_personal has no column
+named activo`: los **2** checks de la sección 10 pasaron a `FAIL`. O sea: **el bug no lo cazó la base
+real, lo cazó el fixture**, porque el fixture tiene menos columnas que la base.
+
+**Reglas:**
+
+1. **El SQL se arma contra el ESQUEMA REAL de la tabla, no contra el de la base de hoy.** El patrón ya
+   existe en el repo: `PRAGMA table_info` + `ALTER TABLE` (trampa 8 de §9). Una columna puede existir
+   en la base de producción y **no** existir en una instalación vieja ni en el fixture de un test.
+2. **Un `ORDER BY` sobre una columna opcional es un `ORDER BY` condicional.** Si la columna puede
+   faltar, el criterio se agrega solo si `PRAGMA table_info` la reporta; si no, se usa otro (o ninguno).
+   El fix fue de 2 líneas y el ORDER BY dejó de ser una bomba.
+3. **Un feature de datos se prueba contra la base real Y contra el fixture.** Son dos fotos distintas
+   del mismo mundo: la base real dice cómo es HOY, el fixture dice con qué columnas tiene que contar
+   la consulta. El que se rompe primero es el que tiene menos.
+
+### 5.63 📦 En `cmd /c`, `set VAR=%VAR% &&` deja un ESPACIO al final del valor; y `electron.exe` es una app GUI, asi que PowerShell NO la espera
+
+**El caso real (23-nov-2026, 📦1095).** Dos trampas de ambiente, medidas, que costaron una hora
+de "esto no funciona":
+
+**(1) El espacio invisible.** Un script de Node lanzado con `cmd /c "... set KAIR_APP=%KAIR_APP% &&
+node ..."` fallaba con `MODULE_NOT_FOUND` sobre una ruta **que existe**. La ruta del error era
+`...\sgsst-electron-app \node_modules\better-sqlite3`: **con un espacio antes de la barra**. La causa:
+`cmd` **no recorta** el espacio que queda antes del `&&`, asi que el valor de la variable lleva un espacio
+final y no resuelve. Y lo que lo hace confuso es que la ruta lleva "Programación" con tilde, asi que el
+sintoma parece un problema de codificación y uno se va a revisar acentos en vez de espacios.
+
+**(2) La app GUI que nadie espera.** `electron.exe` es una aplicación de subsistema Windows (GUI). Con el
+operador `&` de PowerShell, la consola **no espera** a que termine: `$LASTEXITCODE` queda **VACIO** y
+el runner de la suite marcaba `FAIL` en **los 3** tests de ausentismo **sin que ninguno se hubiera
+ejecutado**. El codigo de salida de un proceso que no corrio no es un codigo de salida: es la ausencia
+del codigo de salida. La salida correcta es `cmd /c "..."` (que si espera) o `Start-Process -Wait`.
+
+**Reglas:**
+
+1. **`set VAR=%VAR% &&` mete un espacio.** Usá `set "VAR=%VAR%"` con comillas, o mejor: **heredá** la
+   variable (ya se hereda del proceso padre: no hace falta redefinirla).
+2. **Una app GUI no la espera PowerShell.** Para correr `electron.exe` y LEER su codigo de salida:
+   `cmd /c`. Un `$LASTEXITCODE` vacio significa "no se ejecuto", no "fallo" — distinguelo antes de
+   reportar un test rojo (§7.7: un `EXIT=1` no siempre es un test rojo).
+3. **Un `MODULE_NOT_FOUND` con una ruta que tiene acentos puede ser un espacio al final.** Antes de
+   culpar a la codificacion, imprimí la ruta: `console.log(JSON.stringify(process.env.KAIR_APP))`.
+
 ### 6.1 Backend — bridges
 
 Sufijo **`-bridge.js`** (no `bridge-*.js`). Hay 30 en `main/`.
@@ -2383,6 +2434,19 @@ Y ojo con el otro falso positivo del mismo día: `npm rebuild better-sqlite3` de
 desde PowerShell **sin haber ejecutado nada** (la Execution Policy bloquea `npm.ps1`; hay que usar
 `npm.cmd`), y ese `0` era el exit de la tubería, no del npm. Un exit 0 sobre un comando que no corrió
 es el peor fallo posible porque no se nota.
+
+#### 📦 Nota (23-nov-2026, 📦1095): un test con base EN MEMORIA no es un test que abre la base
+
+La regla de esta seccion ("los tests que escribas NO abren la base de datos") se cumple igual con
+`better-sqlite3` en `:memory:`: el test **no necesita** la base local del developer, asi que corre en
+cualquier maquina. Lo que **si** rompe es el binding: `better-sqlite3` esta compilado para el runtime
+de Electron (**ABI 136**) y con el `node` de la linea de comandos (**ABI 147**) el `require` **lanza**
+`ERR_DLOPEN_FAILED`. Se corren con `ELECTRON_RUN_AS_NODE=1` (§7.8).
+
+En el 📦1095 (ausentismo 3.3.6) hay **2** tests asi: `main/test-ausentismo-bridge.js` (53/53) y
+`main/test-ausentismo-sync-roundtrip.js` (20/20), los dos con dos bases en memoria para simular las dos
+maquinas del sync. El primero **cazo un bug real** que la base de produccion no iba a ver (ver §5.62):
+el fixture tiene menos columnas que `base_personal`.
 
 ### 7.8 La suite del `firma-service` se corre con el Node de Electron: no hay que recompilar
 

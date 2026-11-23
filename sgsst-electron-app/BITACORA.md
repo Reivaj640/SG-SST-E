@@ -10957,3 +10957,58 @@ propósito). Respaldo: `%APPDATA%\sgsst-electron-app\backups\kair-antes-limpieza
 **La suite, y una trampa de ambiente.** Los **12** archivos `main/test-presupuesto*.js` pasan: **496 aserciones, 0 FAIL**. Los 4 que fallaban al principio (`824-aislamiento`, `824-export-plantilla`, `824-real`, `824-roundtrip`) **no eran el código**: el `better-sqlite3` de la app está compilado para **ABI 136** (Electron) y se estaba corriendo con **node 22** (ABI 127) → `ERR_DLOPEN_FAILED` (§7.7 y §7.8). Con `ELECTRON_RUN_AS_NODE=1` pasan los 12. `NODE_PATH` **no** sirve: el `require` resuelve primero al `node_modules` de la app.
 
 **La pregunta 2, con números.** La pantalla del presupuesto **no lee la base**: `presupuesto-gestion.html` rutea por `source`, y si no es `'BD'` lee el `.xlsx` (`readPresupuestoData(file.path)`). Al abrirla el 17-nov, las tablas `presupuestos` / `presupuesto_partidas` / `presupuesto_valores_mensuales` estaban **en 0 filas**: lo que se veía era la lectura del Excel de G: (17 partidas, 14 625 978 / 13 862 880 / 94,78 %). Hoy el owner lo **importó a la base** (18:42:39) y el período ya se ve en la BD. **Guardar** escribe en **un solo lado**: la ruta **EXCEL** escribe solo el `.xlsx` (`saveBudgetFile`) y la ruta **BD** escribe solo SQLite (`presupuesto:bulk-save`); nunca los dos. Hoy las dos copias están **desincronizadas** (base 17-nov, Excel 7-nov), y sigue **sin definirse cuál es la verdad**.
+
+## 📦 El ausentismo que no tenia duena: SQLite primero, Excel por copia (📦1095, 2026-11-23)
+
+### El Excel oficial tiene DOS formatos de hoja de datos, y las hojas "TD" son pivotes
+
+El PI/PG/GI-FO-076 y el A-FR-31 guardan el historico en hojas con **dos** formatos: `<Empresa> <anio>`
+(25 columnas: `CEDULA`, `N° DIAS DE INCAPACIDAD`, `CODIGO`, `> 10 Dias`, `A. Inc.`, `M. Inc.`…) y
+`<anio>` (13 columnas). El encabezado esta en la **fila 7** en los dos, y hay una tercera clase de hoja:
+`TD <anio>`, que es una **tabla dinamica** de resumen — tiene "N° DIAS DE INCAPACIDAD" pero **no tiene
+columna de cedula**. Un lector que se fija en la posicion de las columnas se equivoca con los dos
+formatos; el que se fija en la posicion se equivoca **con las TD**.
+
+**La regla.** El mapeo es **por NOMBRE de encabezado** (se busca la columna que se llama "dias de
+incapacidad" y la que se llama "cedula", sin importar el orden), y una hoja **sin columna de cedula se
+descarta**. Asi el mismo lector sirve para los 4 formatos y para las 3 empresas, sin tocar un solo
+Excel del cliente.
+
+### `actualizar_ausentismo.py` no servia, y openpyxl perdia los graficos
+
+El Python que ya estaba en el repo tiene dos problemas medidos:
+
+1. **Fija el anio 2024** y su fallback por hoja termina en la **pivote "TD 2024"** — o sea, escribia
+   la tabla dinamica, no la de datos.
+2. **openpyxl reescribe el workbook COMPLETO**, y ahi se pierden imagenes y graficos: el PI-FO-076
+   paso de **969 165 B** a **827 682 B**, y el PRI de **1 539 613 B** a **973 278 B**. Un entregable
+   para el SG-SST que pierde el logo del sistema no es entregable.
+
+**La regla.** El export **copia** el archivo oficial a uno nuevo y anexa las filas **ahi**: el original
+**nunca** se toca (hash verificado). Y el exportador nuevo (`Portear/src/exportar_ausentismo.py`) es un
+**archivo nuevo**: `actualizar_ausentismo.py` queda intacto, por si el cliente lo usa para otra cosa.
+
+### ExcelJS no lee el PI-FO-076, SheetJS si, y openpyxl si escribe
+
+Al intentar leer el PI-FO-076 con ExcelJS: `TypeError: ... reading 'anchors'` — el archivo tiene
+dibujos y ExcelJS no los soporta. Con SheetJS se lee sin problema. Y **solo** openpyxl puede escribir
+ese archivo. O sea: **leer y escribir son herramientas distintas**, y la regla que sale de ahi es que la
+lectura vive en JS (SheetJS) y la escritura vive en Python (openpyxl), con el **mapeo de columnas en un
+solo lado**: en Node. El Python solo escribe celdas.
+
+### La consulta que la base real no iba a cazar
+
+El autollenado del formulario busca a la persona en `base_personal`. La consulta se armó con
+`ORDER BY p.activo DESC`, y contra la base de produccion daba 9/9 OK (la columna `activo` existe).
+El **test** del bridge arma su propio `base_personal` de 5 columnas, **sin `activo`**, y ahi la consulta
+reventaba: `table base_personal has no column named activo`. 2 checks en `FAIL`. El fix: el `ORDER BY`
+se agrega **solo si la columna esta** (ver §5.62 del `PROMPT.md`).
+
+### Dos trampas de ambiente que Nobody suspects
+
+- **`set VAR=%VAR% &&` en `cmd` deja un espacio al final del valor.** El `require` falla con
+  `MODULE_NOT_FOUND` sobre una ruta que **si** existe, y el error muestra una ruta con un espacio
+  antes de la barra. La ruta ademas lleva "Programación" con tilde, asi que el sintoma parece de
+  codificacion (ver §5.63 del `PROMPT.md`).
+- **`electron.exe` es una app GUI: PowerShell con `&` no espera.** `$LASTEXITCODE` queda vacio y el
+  runner marca FAIL en todos los tests **sin ejecutar ninguno**. Con `cmd /c` si se lee el codigo.

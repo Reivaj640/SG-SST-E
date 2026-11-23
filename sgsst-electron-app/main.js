@@ -94,6 +94,10 @@ const { registerAccionesPreventivasCorrectivasHandlers } = require('./main/accio
 const { registerGestacionHandlers, SCHEMA_SQL: GESTACION_SCHEMA_SQL, MIGRATIONS_SQL: GESTACION_MIGRATIONS_SQL } = require('./main/gestacion-bridge');
 // 📦701 (2026-08-11) — Handlers de Seguimiento de Incapacidad (respaldo en SQLite)
 const { registerSeguimientoIncapacidadHandlers, SCHEMA_SQL: SEG_INC_SCHEMA_SQL, MIGRATIONS_SQL: SEG_INC_MIGRATIONS_SQL } = require('./main/seguimiento-incapacidad-bridge');
+// 📦1095 (2026-11-23) — Bridge de ausentismo (3.3.6). SQLite es la fuente de
+// verdad de las incapacidades; el Excel oficial (PI/PG/GI-FO-076) se genera
+// con el boton "Exportar a Excel", que escribe una COPIA.
+const { registerAusentismoHandlers, SCHEMA_SQL: AUSENTISMO_SCHEMA_SQL } = require('./main/ausentismo-bridge');
 const { registerEventosCumplidosHandlers, SCHEMA_SQL: EVENTOS_CUMPLIDOS_SCHEMA_SQL } = require('./main/eventos-cumplidos-bridge');
 // K+AIR Calendar — bridge de eventos rápidos (botón calendario del header)
 const { registerEventosRapidosHandlers } = require('./main/eventos-rapidos-bridge');
@@ -741,6 +745,14 @@ function initDbOnce() {
       console.log('[DB] 📦701 · Tablas de seguimiento_incapacidad creadas/verificadas');
     } catch (segErr) {
       console.error('[DB] 📦701 · Error creando schema de seguimiento_incapacidad:', segErr.message);
+    }
+    // 📦1095 (2026-11-23) — Schema de ausentismo (3.3.6). La tabla
+    // `ausentismo_registros` es la fuente de verdad de las incapacidades.
+    try {
+      db.exec(AUSENTISMO_SCHEMA_SQL);
+      console.log('[DB] 📦1095 · Tabla de ausentismo_registros creada/verificada');
+    } catch (ausErr) {
+      console.error('[DB] 📦1095 · Error creando schema de ausentismo:', ausErr.message);
     }
     // Migraciones (vacías por ahora, el bridge es nuevo, pero dejamos el
     // patrón para futura evolución del schema).
@@ -10904,6 +10916,15 @@ try {
     getPython: getPython,
     obtenerRutaPri: obtenerRutaPri,
     getPythonScriptPath: getPythonScriptPath
+  });
+  // 📦1095 (2026-11-23) — Ausentismo (3.3.6): 7 canales `ausentismo:*`.
+  // El export usa `obtenerRutaAusentismo` (el archivo oficial PI/PG/GI-FO-076)
+  // y el exportador de Python, que escribe SIEMPRE sobre una copia.
+  registerAusentismoHandlers(app, {
+    getDb: getDb,
+    getPython: getPython,
+    getPythonScriptPath: getPythonScriptPath,
+    obtenerRutaAusentismo: obtenerRutaAusentismo
   });
   registerEventosCumplidosHandlers(app, { getDb });
   // 📦705 (2026-08-13) — Roles y Responsabilidades (estándar 1.1.2 Res. 0312 + Dto. 1072).

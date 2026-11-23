@@ -2440,6 +2440,35 @@
 
 
 
+## 📦 Ausentismo (3.3.6) — SQLite es la fuente de verdad, el Excel oficial es el entregable (📦1095)
+
+**El modelo.** La tabla `ausentismo_registros` (SQLite, `kair.db`) es la **fuente de verdad** de las
+incapacidades. El Excel oficial del cliente (PI/PG/GI-FO-076, A-FR-31) es el **entregable** y se genera
+**por copia**: el botón "Exportar a Excel" copia el archivo oficial, anexa las filas nuevas y **nunca
+toca el original**. El histórico entra por el botón "Importar historico", que es **idempotente por
+archivo**.
+
+**Las piezas:**
+
+| Pieza | Archivo | Qué hace |
+|---|---|---|
+| Tabla + IPC | `main/ausentismo-bridge.js` | 9 canales `ausentismo:*`; el schema se aplica en `initDbOnce` |
+| Lector de Excel | `main/ausentismo-import.js` | SheetJS; mapea **por nombre de encabezado** y descarta las hojas TD (pivotes) |
+| Exportador | `Portear/src/exportar_ausentismo.py` | openpyxl; **anexa a una copia** y devuelve `filas_por_id` |
+| UI | `modules/gestion-salud/ausentismo/medicion-ausentismo.js` | Botones "Importar historico" y "Exportar a Excel" (muestran la ruta exacta) |
+| UI | `modules/gestion-salud/ausentismo/registrar-ausentismo.js` | Guarda **siempre en SQLite primero** |
+| Sync | `main/sync-serializer.js` | Entidad `ausentismo_registros` (solo filas `origen='app'`) |
+| Tests | `main/test-ausentismo-bridge.js` (53/53) · `main/test-ausentismo-sync-roundtrip.js` (20/20) | |
+
+**Lo que NO viaja en el sync, y por qué.** Las filas importadas del Excel oficial (5 593 por empresa)
+no viajan: son el mismo archivo para las dos máquinas y el botón de import las trae del mismo lado.
+`exportado_excel_en` tampoco: es un hecho de cada máquina. **Pendiente escrito:** el BORRADO de un
+registro no viaja (no hay tombstone, como el que el 📦827 uso para los programas del 3.1.2).
+
+**Reglas que salieron de este paquete (viven en `PROMPT.md` §5.62 y §5.63):** el SQL se arma contra
+`PRAGMA table_info`, no contra lo que uno recuerda de la base de hoy; y `electron.exe` hay que
+lanzarla por `cmd /c` porque PowerShell no espera a una app GUI.
+
 ## 🖋️ Servicio de firma electrónica (`firma-service`)
 Servicio **separado** del app de escritorio: lo opera Gesstiar S.A.S. y vive en `sgsst-electron-app/firma-service/` (Node, Express, SQLite). Se despliega aparte (tar en `/opt/kair-firma`), expone `https://firma.kair.fyi` por túnel de Cloudflare y tiene su propio manifiesto de evidencias legales (`legal-readiness.json`) y su propio gate de publicación (`scripts/auditar-readiness-legal.js`).
 **Lo que cambió el 27-oct-2026 (📦976), que es lo que hay que tener presente:**- **El remitente del enlace puede ser la Empresa.** Cada Empresa puede registrar una cuenta de envío propia (SMTP) en el servicio; la clave se guarda cifrada con la llave maestra y cada cambio deja rastro. El enlace de acceso y el aviso de la firma salen por esa cuenta. **El código de verificación (OTP) sale SIEMPRE desde la cuenta de K+AIR**, porque es el dato de creación de la firma y su custodia no puede depender de la Empresa (art. 2.2.2.47.4 núm. 1 del Decreto 1074 de 2015).

@@ -450,10 +450,51 @@ class RegistrarAusentismoComponent {
 
         this.updateLoadingProgress(40, 'Guardando en base de datos...');
 
+        // 📦1095 (2026-11-23) — SQLite (kair.db) es la FUENTE DE VERDAD.
+        // Se guarda SIEMPRE alla primero. El Excel oficial se actualiza con el
+        // boton "Exportar a Excel", que escribe una COPIA y nunca toca el
+        // archivo de la empresa.
+        let registro = null;
+        let hayHistorico = false;
+        if (window.electronAPI && window.electronAPI.ausentismoRegistrar) {
+            const res = await window.electronAPI.ausentismoRegistrar({
+                empresaId: this.currentCompany,
+                datos: datos
+            });
+            if (!res || !res.success) {
+                throw new Error(res?.error?.message || 'No se pudo guardar en la base de datos');
+            }
+            registro = res.data;
+            this.logMessage('Incapacidad guardada en la base de datos', 'success');
+
+            // ¿La empresa ya tiene su historico importado? Si lo tiene, el
+            // Excel se actualiza por el boton de exportacion (una sola vez,
+            // sin pisar el original). Si NO lo tiene, se sigue escribiendo
+            // directo en el Excel como antes, para que una empresa nueva
+            // funcione desde el primer dia.
+            try {
+                const hist = await window.electronAPI.ausentismoListar({
+                    empresaId: this.currentCompany,
+                    origen: 'import_excel',
+                    limite: 1
+                });
+                hayHistorico = !!(hist && hist.success && hist.data && hist.data.length);
+            } catch (e) {
+                hayHistorico = false;
+            }
+        }
+
+        this.updateLoadingProgress(70, 'Procesando incapacidad...');
+
         try {
+            if (hayHistorico) {
+                this.updateLoadingProgress(100, 'Completado');
+                this.logMessage('Guardada en la base de datos. Falta exportarla a Excel.', 'info');
+                return { success: true, data: datos, registro: registro, pendienteExportar: true };
+            }
+
             // Llamar al backend usando el contrato existente (procesarAusentismo)
             if (window.electronAPI && window.electronAPI.procesarAusentismo) {
-                this.updateLoadingProgress(70, 'Procesando incapacidad...');
                 const result = await window.electronAPI.procesarAusentismo(
                     this.currentCompany,
                     datos
@@ -463,7 +504,20 @@ class RegistrarAusentismoComponent {
 
                 if (result && result.success) {
                     this.logMessage('Incapacidad guardada exitosamente', 'success');
-                    return result;
+                    // Ya quedo en el Excel: se marca para que el boton de
+                    // exportacion no la anexe otra vez.
+                    if (registro && window.electronAPI.ausentismoMarcarExportado) {
+                        try {
+                            await window.electronAPI.ausentismoMarcarExportado({
+                                empresaId: this.currentCompany,
+                                id: registro.id,
+                                fila: result.fila || null
+                            });
+                        } catch (e) {
+                            console.warn('No se pudo marcar como exportada:', e);
+                        }
+                    }
+                    return { success: true, data: datos, registro: registro };
                 } else {
                     throw new Error(result?.error?.message || 'Error desconocido al guardar');
                 }
@@ -471,7 +525,7 @@ class RegistrarAusentismoComponent {
                 // Modo simulación si no hay backend disponible
                 this.updateLoadingProgress(100, 'Modo simulación');
                 this.logMessage('Modo simulación: incapacidad guardada', 'success');
-                return { success: true, data: datos };
+                return { success: true, data: datos, registro: registro };
             }
         } catch (error) {
             this.updateLoadingProgress(100, 'Error');

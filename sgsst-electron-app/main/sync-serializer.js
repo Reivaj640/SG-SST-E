@@ -14,6 +14,37 @@
  *   - medprev_programas          (??827, 3.1.2) — y TODO su contenido anidado:
  *       secciones, meta, casos, plan PHVA (actividades + meses), indicadores
  *       (definición + valores), morbilidad y análisis.
+ *   - ausentismo_registros       (📦1095, 3.3.6) — SOLO las filas creadas en la
+ *       app (origen='app'). Ver la nota de alcance de abajo.
+ *
+ * 📦1095 — NOTA DE ALCANCE DEL AUSENTISMO (3.3.6). El sync es una lista
+ * explícita de entidades, no un volcado de la base, así que hay que decidir
+ * qué de `ausentismo_registros` viaja. Lo medido:
+ *
+ *   - VIAJAN las filas con `origen = 'app'`: las que alguien digitó. Son las
+ *     únicas que pueden diferir entre equipos (el resto es el mismo Excel
+ *     oficial que las dos máquinas leen del Drive).
+ *   - NO VIAJAN las filas con `origen = 'import_excel'`: son 5 593 por
+ *     empresa (Aseplus 1 102, Tempoactiva 2 325, Temposum 2 166). Meterlas en
+ *     el payload inflaría cada .kairsync a megabytes y duplicaría en cada PC
+ *     lo que el botón "Importar historico" ya trae del MISMO archivo. El
+ *     import es idempotente por archivo, así que basta con que cada PC lo
+ *     ejecute.
+ *   - NO VIAJAN `exportado_excel_en` / `exportado_excel_fila`: son hechos de
+ *     esta máquina ("yo ya volqué esta fila a MI copia del Excel"). Si
+ *     viajaran, la otra PC se saltaría la fila al exportar y su copia
+ *     quedaría incompleta.
+ *   - NO VIAJAN `excel_fila` / `excel_archivo` / `excel_hoja` / `excel_row_json`:
+ *     solo aplican a las filas importadas.
+ *   - `empresa_id` NO viaja: se pone local con el `companyKey` del payload.
+ *
+ * LIMITACIÓN CONOCIDA (📦1095): el BORRADO de un registro NO viaja. El bridge
+ * lo borra en duro (DELETE) y no deja tombstone, así que un registro que se
+ * elimina en la PC 1 sigue existiendo en la PC 2. El paquete 📦827 ya
+ * resolvió esto para los programas del 3.1.2 con `medprev_programas_bajas`;
+ * para ausentismo haría falta una tabla de bajas equivalente, que NO se
+ *agrego porque el contrato de columnas lo fijo el owner. Queda como decisión
+ * pendiente.
  *
  * ??827 — AVISO DE ALCANCE, porque es una sorpresa fea: el sync NO es "la base
  * completa". Es una lista explícita de entidades. Lo que no esté en esa lista
@@ -107,9 +138,11 @@ function serializeEmpresaToSync(db, companyKey, pcId, userName, appVersion) {
       // su baja es el único hecho que hay que comunicar. Sin esta lista,
       // eliminar un programa en una máquina no producía ningún efecto en las
       // demás: se probó con dos bases y el serializer real.
-      medprev_programas_bajas: _serializeMedprevBajas(db, companyKey)
-      // ausentismo: lo agregamos en ??538 cuando veamos la estructura
-      // real del bridge de medición ausentismo
+      medprev_programas_bajas: _serializeMedprevBajas(db, companyKey),
+      // 📦1095 (2026-11-23) — Ausentismo (3.3.6). Solo viajan las filas
+      // que alguien digitó en la app (origen='app'); el histórico importado se
+      // reimporta del Excel oficial (ver la nota de alcance en la cabecera).
+      ausentismo_registros: _serializeAusentismos(db, companyKey)
     }
   };
 }
@@ -212,6 +245,132 @@ function _serializeMedprevBajas(db, companyKey) {
   } catch (e) {
     console.error('[' + MOD + '] Error serializando mp_programas_bajas:', e.message);
     return [];
+  }
+}
+
+
+// =====================================================================
+// 📦1095 (2026-11-23) — Ausentismo (3.3.6): registros de incapacidad
+// =====================================================================
+
+/**
+ * Columnas de `ausentismo_registros` que VIAJAN en el sync.
+ *
+ * Solo el dato de la incapacidad. NO viajan:
+ *   - `empresa_id`: se pone local con el companyKey del payload.
+ *   - `origen`: el registro que llega es siempre de la app.
+ *   - `exportado_excel_en` / `exportado_excel_fila`: son hechos de ESTA
+ *     maquina (yo ya volqué esta fila a MI copia del Excel). Si viajaran,
+ *     la otra PC se saltaria la fila al exportar y su copia quedaria
+ *     incompleta.
+ *   - `excel_fila` / `excel_archivo` / `excel_hoja` / `excel_row_json`:
+ *     solo aplican a las filas importadas del Excel oficial.
+ */
+var COLUMNAS_AUSENTISMO = [
+  'cedula', 'nombre', 'cargo', 'area', 'empresa_usuaria', 'genero',
+  'fecha_inicio', 'fecha_fin', 'dias_incapacidad',
+  'tipo_incapacidad', 'clase_incapacidad', 'entidad', 'codigo',
+  'diagnostico', 'descripcion', 'observaciones', 'concepto',
+  'mas_10_dias', 'anio_incapacidad', 'mes_incapacidad', 'anio', 'mes'
+];
+
+/**
+ * §1–1095 — Serializa las filas de ausentismo de la empresa.
+ *
+ * Solo viajan las filas con `origen = 'app'` (las que alguien digitó).
+ * Las importadas del Excel oficial NO viajan: son el mismo archivo para las
+ * dos máquinas y el botón "Importar historico" las trae del mismo lado.
+ */
+function _serializeAusentismos(db, companyKey) {
+  if (!_existeTabla(db, 'ausentismo_registros')) return [];
+  try {
+    var rows = db.prepare(
+      "SELECT * FROM ausentismo_registros WHERE empresa_id = ? AND origen = 'app' " +
+      'ORDER BY actualizado_en ASC'
+    ).all(companyKey);
+
+    return rows.map(function (r) {
+      var registro = {};
+      for (var i = 0; i < COLUMNAS_AUSENTISMO.length; i++) {
+        var c = COLUMNAS_AUSENTISMO[i];
+        registro[c] = r[c] === undefined ? null : r[c];
+      }
+      return {
+        id: r.id,
+        registro: registro,
+        updatedAt: r.actualizado_en || r.creado_en || new Date().toISOString()
+      };
+    });
+  } catch (e) {
+    console.error('[' + MOD + '] Error serializando ausentismo_registros:', e.message);
+    return [];
+  }
+}
+
+/**
+ * §1–1095 — Aplica las filas de ausentismo que llegan del hub.
+ * Last-write-wins por `actualizado_en`.
+ *
+ * El `exportado_excel_en` local NO se toca: el registro remoto se inserta o
+ * actualiza, pero la marca de "ya lo volqué a mi copia" es de esta PC.
+ */
+function _deserializeAusentismos(db, remoteRecords, companyKey, result, conflictLog) {
+  if (!_existeTabla(db, 'ausentismo_registros')) {
+    console.warn('[' + MOD + '] Tabla ausentismo_registros no existe, saltando merge');
+    return;
+  }
+  var counter = result.byEntity.ausentismo_registros;
+  for (var i = 0; i < remoteRecords.length; i++) {
+    var remote = remoteRecords[i];
+    if (!remote || !remote.id || !remote.registro || !remote.updatedAt) {
+      counter.skipped++;
+      result.skipped++;
+      continue;
+    }
+
+    var local = db.prepare(
+      'SELECT id, actualizado_en FROM ausentismo_registros WHERE id = ?'
+    ).get(remote.id);
+
+    var cols = COLUMNAS_AUSENTISMO.slice();
+    var vals = cols.map(function (c) {
+      var v = remote.registro[c];
+      return v === undefined ? null : v;
+    });
+
+    try {
+      if (!local) {
+        var ins = db.prepare(
+          'INSERT OR REPLACE INTO ausentismo_registros (id, empresa_id, ' + cols.join(', ') +
+          ', origen, creado_en, actualizado_en) VALUES (?, ?, ' +
+          cols.map(function () { return '?'; }).join(', ') + ", 'app', ?, ?)"
+        );
+        ins.run.apply(ins, [remote.id, companyKey].concat(vals, [remote.updatedAt, remote.updatedAt]));
+        counter.applied++;
+        result.applied++;
+      } else if (remote.updatedAt > (local.actualizado_en || '')) {
+        var upd = db.prepare(
+          'UPDATE ausentismo_registros SET ' + cols.map(function (c) { return c + ' = ?'; }).join(', ') +
+          ', actualizado_en = ? WHERE id = ? AND empresa_id = ?'
+        );
+        upd.run.apply(upd, vals.concat([remote.updatedAt, remote.id, companyKey]));
+        counter.applied++;
+        counter.conflicts++;
+        result.applied++;
+        result.conflicts++;
+        conflictLog(
+          { id: remote.id, updatedAt: local.actualizado_en },
+          { id: remote.id, updatedAt: remote.updatedAt }
+        );
+      } else {
+        counter.skipped++;
+        result.skipped++;
+      }
+    } catch (e) {
+      console.error('[' + MOD + '] Error aplicando ausentismo ' + remote.id + ':', e.message);
+      counter.skipped++;
+      result.skipped++;
+    }
   }
 }
 
@@ -595,7 +754,9 @@ function deserializeSyncToDb(db, syncData, options) {
       medprev_programas: { applied: 0, conflicts: 0, skipped: 0 },
       // ??827-fix — Bajas de programas (tombstones): el hecho de que un
       // programa ya no está, que es lo que el soft-delete no comunicaba.
-      medprev_programas_bajas: { applied: 0, conflicts: 0, skipped: 0 }
+      medprev_programas_bajas: { applied: 0, conflicts: 0, skipped: 0 },
+      // 📦1095 (2026-11-23) — Ausentismo (3.3.6)
+      ausentismo_registros: { applied: 0, conflicts: 0, skipped: 0 }
     }
   };
 
@@ -633,6 +794,11 @@ function deserializeSyncToDb(db, syncData, options) {
   // baja es el hecho más reciente y gana.
   if (entities.medprev_programas_bajas) {
     _deserializeMedprevBajas(db, entities.medprev_programas_bajas, syncData.companyKey, result);
+  }
+  // 📦1095 (2026-11-23) — Ausentismo (3.3.6). Va después del resto:
+  // no depende de ninguna otra entidad.
+  if (entities.ausentismo_registros) {
+    _deserializeAusentismos(db, entities.ausentismo_registros, syncData.companyKey, result, conflictLog);
   }
 
   return result;

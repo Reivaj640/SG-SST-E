@@ -752,6 +752,26 @@ contextBridge.exposeInMainWorld('electronAPI', {
   buscarRegistrosCedula: (cedula, companyName) =>
     ipcRenderer.invoke('buscar-registros-cedula', cedula, companyName),
 
+  // --- 📦1095 (2026-11-23) — Ausentismo: SQLite es la fuente de verdad ---
+  ausentismoRegistrar: (params) =>
+    ipcRenderer.invoke('ausentismo:registrar', params),
+  ausentismoListar: (params) =>
+    ipcRenderer.invoke('ausentismo:listar', params),
+  ausentismoBuscarPorCedula: (params) =>
+    ipcRenderer.invoke('ausentismo:buscarPorCedula', params),
+  ausentismoEliminar: (params) =>
+    ipcRenderer.invoke('ausentismo:eliminar', params),
+  ausentismoImportarExcel: (params) =>
+    ipcRenderer.invoke('ausentismo:importarExcel', params),
+  ausentismoExportarExcel: (params) =>
+    ipcRenderer.invoke('ausentismo:exportarExcel', params),
+  ausentismoBuscarEmpleado: (params) =>
+    ipcRenderer.invoke('ausentismo:buscarEmpleado', params),
+  ausentismoMarcarExportado: (params) =>
+    ipcRenderer.invoke('ausentismo:marcarExportado', params),
+  ausentismoImportarOficial: (params) =>
+    ipcRenderer.invoke('ausentismo:importarOficial', params),
+
   // --- Consulta de Trabajadores (Módulo Ausentismo) ---
   consultarTrabajadoresGlobal: (params) =>
     ipcRenderer.invoke('consultar-trabajadores-global', params),

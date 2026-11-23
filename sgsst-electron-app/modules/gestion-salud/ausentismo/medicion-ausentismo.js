@@ -5697,6 +5697,56 @@ class MedicionAusentismoComponent {
         this._datosEmpToken = (this._datosEmpToken || 0) + 1;
         const myToken = this._datosEmpToken;
         try {
+            // 📦1095 (2026-11-23) — SQLite primero (base_personal), Excel de
+            // "BD Personal" como respaldo. El respaldo se queda en el codigo
+            // para que una empresa sin base cargada siga funcionando.
+            if (window.electronAPI && typeof window.electronAPI.ausentismoBuscarEmpleado === 'function') {
+                let bd = null;
+                try {
+                    const resBd = await window.electronAPI.ausentismoBuscarEmpleado({
+                        cedula: String(cedula).trim(),
+                        empresaId: this.currentCompany
+                    });
+                    if (myToken !== this._datosEmpToken) return;
+                    if (resBd && resBd.success && resBd.data) bd = resBd.data;
+                } catch (e) {
+                    console.log('[SEGUIMIENTO] La BD de personal no respondio; se usa el Excel:', e && e.message);
+                }
+
+                if (bd) {
+                    this._setInputValueIfEmpty('sp-cargo', bd.cargo);
+                    this._setInputValueIfEmpty('sp-area', bd.area);
+                    this._setInputValueIfEmpty('sp-eps', bd.eps);
+                    this._setInputValueIfEmpty('sp-afp', bd.pension);
+                    this._setInputValueIfEmpty('sp-empresa-usuaria', bd.empresa_usuaria);
+
+                    const fechaIng = this._parsearFechaNacimiento(bd.fecha_ingreso);
+                    const inputFechaIng = document.getElementById('sp-fecha-ingreso');
+                    if (fechaIng && inputFechaIng && !String(inputFechaIng.value || '').trim()) {
+                        inputFechaIng.value = fechaIng.toISOString().split('T')[0];
+                        this.calcularAntiguedad();
+                    }
+
+                    const inputSalario = document.getElementById('sp-salario');
+                    const salarioStr = bd.salario == null ? '' : String(bd.salario).trim();
+                    if (inputSalario && !String(inputSalario.value || '').trim() && salarioStr !== '' && salarioStr !== '0') {
+                        const salNum = parseFloat(salarioStr.replace(/[^\d.-]/g, ''));
+                        if (!isNaN(salNum) && salNum >= 0) inputSalario.value = salNum;
+                    }
+
+                    const fechaNac = this._parsearFechaNacimiento(bd.fecha_nacimiento);
+                    const inputFechaNac = document.getElementById('sp-fecha-nacimiento');
+                    if (fechaNac && inputFechaNac && !String(inputFechaNac.value || '').trim()) {
+                        inputFechaNac.value = fechaNac.toISOString().split('T')[0];
+                        this.calcularEdad();
+                    }
+
+                    console.log('[SEGUIMIENTO] Datos del empleado auto-cargados desde la BD:', bd.nombre_completo || bd.cedula);
+                    return;
+                }
+                console.log('[SEGUIMIENTO] La persona no esta en base_personal; se usa el Excel de BD Personal.');
+            }
+
             if (!window.electronAPI || typeof window.electronAPI.consultarTrabajadoresGlobal !== 'function') {
                 return;
             }
@@ -7336,6 +7386,84 @@ class MedicionAusentismoComponent {
         leftSection.appendChild(formIcon);
         leftSection.appendChild(formTitleContainer);
 
+        // 📦1095 (2026-11-23) — Botones de historico y exportacion.
+        // "Importar historico" trae el Excel oficial a la base de datos.
+        // "Exportar a Excel" escribe una COPIA del archivo oficial con las
+        // incapacidades nuevas. El archivo de la empresa no se toca nunca.
+        const toolsGroup = document.createElement('div');
+        toolsGroup.className = 'aus-view-head-right';
+        toolsGroup.style.cssText = 'display:flex;gap:8px;align-items:center;flex-wrap:wrap;';
+
+        const btnImportar = document.createElement('button');
+        btnImportar.className = 'aus-btn';
+        btnImportar.id = 'btn-ausentismo-importar';
+        btnImportar.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Importar historico';
+        btnImportar.onclick = async () => {
+            if (!window.electronAPI || !window.electronAPI.ausentismoImportarOficial) {
+                this.showNotification('La importacion no esta disponible', 'error');
+                return;
+            }
+            btnImportar.disabled = true;
+            btnImportar.textContent = 'Importando...';
+            try {
+                const res = await window.electronAPI.ausentismoImportarOficial({
+                    empresaId: this.currentCompany,
+                    empresaNombre: this.currentCompany
+                });
+                if (res && res.success) {
+                    const anios = Object.keys(res.data.por_anio || {}).sort().join(', ');
+                    this.showNotification(
+                        'Historico importado: ' + res.data.importadas + ' registros' +
+                        (anios ? ' (anios: ' + anios + ')' : ''),
+                        'success'
+                    );
+                } else {
+                    this.showNotification('No se pudo importar: ' + ((res && res.error && res.error.message) || 'Error desconocido'), 'error');
+                }
+            } catch (e) {
+                this.showNotification('No se pudo importar: ' + (e.message || 'Error desconocido'), 'error');
+            } finally {
+                btnImportar.disabled = false;
+                btnImportar.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Importar historico';
+            }
+        };
+
+        const btnExportar = document.createElement('button');
+        btnExportar.className = 'aus-btn';
+        btnExportar.id = 'btn-ausentismo-exportar';
+        btnExportar.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg> Exportar a Excel';
+        btnExportar.onclick = async () => {
+            if (!window.electronAPI || !window.electronAPI.ausentismoExportarExcel) {
+                this.showNotification('La exportacion no esta disponible', 'error');
+                return;
+            }
+            btnExportar.disabled = true;
+            btnExportar.textContent = 'Exportando...';
+            try {
+                const res = await window.electronAPI.ausentismoExportarExcel({
+                    empresaId: this.currentCompany,
+                    empresaNombre: this.currentCompany
+                });
+                if (res && res.success) {
+                    this.showNotification(
+                        'Excel generado: ' + res.data.filas + ' fila(s). Se guardo en: ' + res.data.archivo +
+                        '. El archivo original NO se modifico.',
+                        'success'
+                    );
+                } else {
+                    this.showNotification('No se pudo exportar: ' + ((res && res.error && res.error.message) || 'Error desconocido'), 'error');
+                }
+            } catch (e) {
+                this.showNotification('No se pudo exportar: ' + (e.message || 'Error desconocido'), 'error');
+            } finally {
+                btnExportar.disabled = false;
+                btnExportar.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg> Exportar a Excel';
+            }
+        };
+
+        toolsGroup.appendChild(btnImportar);
+        toolsGroup.appendChild(btnExportar);
+
         const backBtn = document.createElement('button');
         backBtn.className = 'aus-btn';
         backBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg> Volver';
@@ -7345,6 +7473,7 @@ class MedicionAusentismoComponent {
         };
 
         formHeader.appendChild(leftSection);
+        formHeader.appendChild(toolsGroup);
         formHeader.appendChild(backBtn);
         formContainer.appendChild(formHeader);
 
