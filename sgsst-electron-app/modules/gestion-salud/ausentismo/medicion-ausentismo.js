@@ -8439,8 +8439,126 @@ class MedicionAusentismoComponent {
         }, 0);
     }
 
+    /**
+     * 📦1096 (2026-11-24) — Lee los registros de ausentismo de SQLite.
+     *
+     * Devuelve null si la empresa NO tiene registros en la base: en ese caso
+     * la vista usa el Excel, que es lo que se hacia antes. Nunca devuelve un
+     * array vacio como senal de "sin datos", porque eso seria indistinguible
+     * de "esta empresa no tiene incapacidades".
+     */
+    async _filasDesdeBd() {
+        if (!window.electronAPI || typeof window.electronAPI.ausentismoListar !== 'function') return null;
+        try {
+            const res = await window.electronAPI.ausentismoListar({ empresaId: this.currentCompany });
+            if (!res || !res.success || !Array.isArray(res.data) || !res.data.length) return null;
+            return this._filasDesdeSqlite(res.data);
+        } catch (e) {
+            console.log('[AUSENTISMO] No se pudo leer de la base; se usa el Excel:', e && e.message);
+            return null;
+        }
+    }
+
+    /**
+     * 📦1096 — Convierte las filas de SQLite al MISMO objeto que producia la
+     * lectura del Excel, para que la tabla, los filtros y las estadisticas
+     * sigan funcionando sin cambiar una sola linea.
+     *
+     * MEDIDO (contra el Excel oficial):
+     *   - Las cabeceras del Excel traen espacios al final ("NOMBRE "), pero el
+     *     main las recorta, asi que las claves son las recortadas.
+     *   - Los indices que usa la UI son 0-based sobre la fila cruda:
+     *     2=NOMBRE 3=CEDULA 9=MES 11=CLASE 14=AÑO 15=F.INICIO 16=F.FIN 17=CODIGO.
+     *   - El MES del Excel es el NOMBRE del mes ("ABRIL"); el AÑO es texto.
+     *   - La columna "No" NO se copia: la UI la calcula como indice+1 sobre el
+     *     arreglo que se esta pintando, asi que se renumera al filtrar, igual
+     *     que con el Excel. Copiarla dejaria numeros con huecos.
+     *   - Las fechas van en ISO ("2024-04-01"). El Excel traia texto M/D/YY
+     *     ("4/1/24"), que ademas tiene typos ("30/10/22018"). El ISO es lo que
+     *     la base guarda y lo que necesitan los calculos: el heatmap por dia
+     *     de la semana y el "ultima incapacidad" comparan fechas.
+     */
+    _filasDesdeSqlite(registros) {
+        const MESES = ['ENERO','FEBRERO','MARZO','ABRIL','MAYO','JUNIO','JULIO','AGOSTO','SEPTIEMBRE','OCTUBRE','NOVIEMBRE','DICIEMBRE'];
+        return (registros || []).map((r, i) => {
+            const nMes = Number(r.mes || r.mes_incapacidad || 0);
+            const mes = (nMes >= 1 && nMes <= 12) ? MESES[nMes - 1] : '';
+            const anio = (r.anio != null && r.anio !== '') ? String(r.anio) : '';
+            const nombre = r.nombre || '';
+            const cedula = r.cedula || '';
+            const cargo = r.cargo || '';
+            const empresaUsuaria = r.empresa_usuaria || '';
+            const area = r.area || '';
+            const genero = r.genero || '';
+            const dias = (r.dias_incapacidad != null) ? String(r.dias_incapacidad) : '0';
+            const clase = r.clase_incapacidad || '';
+            const tipo = r.tipo_incapacidad || '';
+            const entidad = r.entidad || '';
+            const fIni = r.fecha_inicio || '';
+            const fFin = r.fecha_fin || '';
+            const codigo = r.codigo || '';
+            const descripcion = r.diagnostico || '';
+            return {
+                '2': nombre, '3': cedula, '9': mes, '11': clase, '14': anio,
+                '15': fIni, '16': fFin, '17': codigo,
+                'NOMBRE': nombre, 'CEDULA': cedula, 'CARGO': cargo,
+                'EMPRESA USUARIA': empresaUsuaria, 'ÁREA O DPTO': area, 'AREA O DPTO': area,
+                'AREA': area, 'ÁREA': area, 'DEPARTAMENTO': area,
+                'GENERO': genero, 'MES': mes,
+                'N° DIAS DE INCAPACIDAD': dias,
+                'CLASE DE INCAPACIDAD': clase, 'TIPO DE INCAPACIDAD': tipo,
+                'ENTIDAD': entidad, 'AÑO': anio, 'ANO': anio,
+                'F. INICIO': fIni, 'F. FIN': fFin,
+                'CODIGO': codigo, 'CÓDIGO': codigo,
+                'DESCRIPCION': descripcion, 'DESCRIPCIÓN': descripcion,
+                // Alias en minuscula: los usa el wizard de seguimiento y las
+                // cadenas de respaldo de la tabla.
+                'cedula': cedula, 'nombre': nombre, 'cargo': cargo,
+                'area_o_dpto': area, 'area': area, 'departamento': area,
+                'empresa_usuaria': empresaUsuaria, 'genero': genero,
+                'descripcion': descripcion,
+                'fecha_inicio': fIni, 'fecha_fin': fFin,
+                __rowIndex: i,
+                __origen: 'bd',
+                __id: r.id
+            };
+        });
+    }
+
+    /**
+     * 📦1096 — Traduce los campos del modal de edicion (que usan los
+     * NOMBRES DE ENCABEZADO del Excel) a los campos de la tabla.
+     */
+    _camposParaBd(fields) {
+        const mapa = {
+            'GENERO': 'genero',
+            'CLASE DE INCAPACIDAD': 'clase_incapacidad',
+            'TIPO DE INCAPACIDAD': 'tipo_incapacidad',
+            'CODIGO': 'codigo',
+            'DESCRIPCION': 'diagnostico',
+            'F. INICIO': 'fecha_inicio',
+            'F. FIN': 'fecha_fin'
+        };
+        const out = {};
+        Object.keys(fields || {}).forEach((k) => {
+            const destino = mapa[k];
+            if (destino) out[destino] = fields[k];
+        });
+        return out;
+    }
     async loadAusentismoData(tableElement, notificationDiv) { // 📦459 — notificationDiv es legacy (DOM notification). Las notificaciones usan window.parent.updateNotifier vía showNotification().
         try {
+            // 📦1096 (2026-11-24) — SQLite PRIMERO (fuente de verdad). El
+            // Excel queda de respaldo para las empresas que todavía no
+            // importaron el histórico.
+            const filasBd = await this._filasDesdeBd();
+            if (filasBd) {
+                this.currentAusentismoData = filasBd;
+                this.ausentismoFileStatus = { missing: false, origen: 'bd' };
+                this.renderTable(tableElement, this.currentAusentismoData);
+                this.populateDynamicFilters();
+                return;
+            }
             const result = await window.electronAPI.readAusentismoData(this.currentCompany);
 
             // 📦459 — Persistir estado del archivo (también usado por wizard seguimiento)
@@ -8722,6 +8840,8 @@ class MedicionAusentismoComponent {
             const excelRowIndex = row.__rowIndex != null ? row.__rowIndex : index;
             const rowJson = JSON.stringify({
                 __rowIndex: excelRowIndex,
+                __id: row.__id || null,
+                __origen: row.__origen || 'excel',
                 no: no,
                 nombre: nombre,
                 cedula: cedula
@@ -8942,6 +9062,23 @@ class MedicionAusentismoComponent {
             });
 
             try {
+                // 📦1096 — Si la fila viene de SQLite, se actualiza la base.
+                if (fullRow.__origen === 'bd') {
+                    const resBd = await window.electronAPI.ausentismoActualizar({
+                        empresaId: this.currentCompany,
+                        id: fullRow.__id,
+                        datos: this._camposParaBd(fields)
+                    });
+                    if (resBd && resBd.success) {
+                        this.showNotification(`Registro #${rowData.no} actualizado en la base de datos.`, 'success');
+                        close();
+                        const tablaBd = document.querySelector('#ausentismoTableBody')?.closest('table');
+                        if (tablaBd) await this.loadAusentismoData(tablaBd);
+                    } else {
+                        this.showNotification('No se pudo actualizar: ' + ((resBd && resBd.error && resBd.error.message) || 'Error desconocido'), 'error');
+                    }
+                    return;
+                }
                 const result = await Promise.race([
                     window.electronAPI.updateAusentismoRow({
                         companyName: this.currentCompany,
@@ -9008,7 +9145,7 @@ class MedicionAusentismoComponent {
                         <div style="font-size: 14px; color: #1E293B; font-weight: 600; margin-top: 4px;">${rowData.nombre}</div>
                         <div style="font-size: 13px; color: #64748B; margin-top: 2px;">Cédula: ${rowData.cedula}</div>
                     </div>
-                    <p style="margin: 12px 0 0 0; font-size: 13px; color: #dc2626;"><i class="fas fa-exclamation-circle"></i> Esta acción no se puede deshacer. El registro se eliminará del Excel original.</p>
+                    <p style="margin: 12px 0 0 0; font-size: 13px; color: #dc2626;"><i class="fas fa-exclamation-circle"></i> Esta acción no se puede deshacer. El registro se eliminará de ${rowData.__origen === 'bd' ? 'la base de datos' : 'el Excel original'}.</p>
                 </div>
                 <div style="padding: 15px 25px; border-top: 1px solid #e2e8f0; display: flex; justify-content: flex-end; gap: 10px; background: #f8fafc; border-radius: 0 0 12px 12px;">
                     <button id="ausentismo-delete-cancel" style="padding: 10px 20px; border: 1px solid #cbd5e1; background: white; color: #475569; border-radius: 8px; cursor: pointer; font-size: 14px;">Cancelar</button>
@@ -9030,6 +9167,22 @@ class MedicionAusentismoComponent {
             confirmBtn.textContent = 'Eliminando...';
 
             try {
+                // 📦1096 — Si la fila viene de SQLite, se borra de la base.
+                if (rowData.__origen === 'bd' && rowData.__id) {
+                    const resBd = await window.electronAPI.ausentismoEliminar({
+                        empresaId: this.currentCompany,
+                        id: rowData.__id
+                    });
+                    if (resBd && resBd.success) {
+                        this.showNotification('Registro eliminado de la base de datos.', 'success');
+                        close();
+                        const tablaBd = document.querySelector('#ausentismoTableBody')?.closest('table');
+                        if (tablaBd) await this.loadAusentismoData(tablaBd);
+                    } else {
+                        this.showNotification('No se pudo eliminar: ' + ((resBd && resBd.error && resBd.error.message) || 'Error desconocido'), 'error');
+                    }
+                    return;
+                }
                 const result = await window.electronAPI.deleteAusentismoRow({
                     companyName: this.currentCompany,
                     rowIndex: excelRowIndex
@@ -9661,6 +9814,18 @@ class MedicionAusentismoComponent {
     async loadEstadisticasData(notificationDiv) { // 📦459 — notificationDiv legacy. Se usa this.container como fallback para inyectar banner.
         try {
             console.log('[ESTADISTICAS] Cargando datos para empresa:', this.currentCompany);
+            // 📦1096 (2026-11-24) — SQLite primero (fuente de verdad); el
+            // Excel queda de respaldo.
+            const filasBd = await this._filasDesdeBd();
+            if (filasBd) {
+                this.currentAusentismoDataStats = filasBd;
+                this.updateStatsMetrics(filasBd);
+                this.renderCharts(filasBd);
+                this.currentAusentismoStatsExtended = this._calcularEstadisticasExtendidas(filasBd);
+                this._renderEstadisticasTabs();
+                this.populateStatsFilters(filasBd);
+                return;
+            }
             const result = await window.electronAPI.readAusentismoData(this.currentCompany);
             console.log('[ESTADISTICAS] Resultado:', result);
 

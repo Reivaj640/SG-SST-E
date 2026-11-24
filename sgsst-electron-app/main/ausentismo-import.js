@@ -258,7 +258,80 @@ function leerHojaDatos(ws, nombreHoja) {
 }
 
 /**
- * Lee el archivo completo. Devuelve { hojas, total, avisos }.
+ * 📦1096 (2026-11-24) — Clave natural de un caso de incapacidad.
+ *
+ * MEDIDO: el archivo oficial trae el historico DOS veces. La hoja
+ * "<Empresa> 2024" (25 columnas) trae TODOS los anios (2016-2026), y ademas
+ * el archivo tiene las hojas "<anio>" sueltas (13 columnas) con los MISMOS
+ * casos en el formato viejo. Sin deduplicar, el import metia 5 593 filas de
+ * las cuales **1 985 eran duplicados exactos (35 %)**.
+ *
+ * La clave es persona + periodo + dias + codigo. Si no hay fechas no se puede
+ * saber si son el mismo caso, asi que se anade la fila: dos casos sin fecha
+ * nunca se fusionan.
+ */
+function _claveCaso(f) {
+  var base = [
+    f.cedula || '',
+    f.fecha_inicio || '',
+    f.fecha_fin || '',
+    f.dias_incapacidad,
+    f.codigo || ''
+  ].join('|');
+  if (f.fecha_inicio || f.fecha_fin) return base;
+  return base + '|fila:' + f.excel_fila + ':' + (f.excel_hoja || '');
+}
+
+/**
+ * 📦1096 — Deduplica las filas entre hojas.
+ *
+ * Gana la PRIMERA aparicion: la hoja de 25 columnas va antes que las sueltas
+ * en el libro (medido en los 3 archivos), y es la que la app muestra hoy. La
+ * fila conservada se COMPLETA con los campos que la repetida traia vacios
+ * (un caso sin codigo en la hoja nueva puede tenerlo en la vieja).
+ */
+function _deduplicar(hojas) {
+  var vistas = {};
+  var duplicadas = 0;
+  var resultado = [];
+
+  for (var h = 0; h < hojas.length; h++) {
+    var hoja = hojas[h];
+    var conservadas = [];
+    for (var i = 0; i < hoja.filas.length; i++) {
+      var f = hoja.filas[i];
+      var clave = _claveCaso(f);
+      if (vistas[clave]) {
+        duplicadas++;
+        var previa = vistas[clave];
+        for (var campo in f) {
+          if (!Object.prototype.hasOwnProperty.call(f, campo)) continue;
+          if (campo === 'excel_fila' || campo === 'excel_hoja') continue;
+          var vacio = previa[campo] === '' || previa[campo] === null || previa[campo] === undefined;
+          if (vacio && f[campo] !== '' && f[campo] !== null && f[campo] !== undefined) {
+            previa[campo] = f[campo];
+          }
+        }
+        continue;
+      }
+      vistas[clave] = f;
+      conservadas.push(f);
+    }
+    if (conservadas.length) {
+      resultado.push({
+        nombre: hoja.nombre,
+        anio: hoja.anio,
+        filaHeader: hoja.filaHeader,
+        filas: conservadas
+      });
+    }
+  }
+
+  return { hojas: resultado, duplicadas: duplicadas };
+}
+
+/**
+ * Lee el archivo completo. Devuelve { hojas, total, avisos, duplicadas }.
  * `avisos` son cosas que el usuario debe saber (hojas sin datos, etc.).
  */
 function leerArchivoAusentismo(filePath) {
@@ -286,12 +359,22 @@ function leerArchivoAusentismo(filePath) {
     hojas.push(leida);
   }
 
-  if (!hojas.length) {
+  // 📦1096 — Deduplicar entre hojas: el historico esta duplicado en el
+  // archivo oficial (la hoja de 25 columnas trae todos los anios, y las
+  // hojas sueltas "<anio>" traen los mismos casos en el formato viejo).
+  var dedup = _deduplicar(hojas);
+  var hojasUnicas = dedup.hojas;
+  if (dedup.duplicadas) {
+    avisos.push('Se descartaron ' + dedup.duplicadas + ' fila(s) repetidas: el archivo oficial trae ' +
+      'el historico dos veces (la hoja del anio con todos los anios y las hojas sueltas por anio).');
+  }
+
+  if (!hojasUnicas.length) {
     avisos.push('No se encontró ninguna hoja de datos (con columna de días de incapacidad y de cédula).');
   }
 
-  const total = hojas.reduce((acc, h) => acc + h.filas.length, 0);
-  return { hojas: hojas, total: total, avisos: avisos };
+  const total = hojasUnicas.reduce((acc, h) => acc + h.filas.length, 0);
+  return { hojas: hojasUnicas, total: total, avisos: avisos, duplicadas: dedup.duplicadas };
 }
 
 module.exports = {
@@ -305,5 +388,8 @@ module.exports = {
   mesDesdeTexto,
   anioDeHoja,
   REGLAS,
-  MESES
+  MESES,
+  // 📦1096 — deduplicacion entre hojas
+  _deduplicar: _deduplicar,
+  _claveCaso: _claveCaso
 };

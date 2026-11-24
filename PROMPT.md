@@ -2008,6 +2008,67 @@ del codigo de salida. La salida correcta es `cmd /c "..."` (que si espera) o `St
 3. **Un `MODULE_NOT_FOUND` con una ruta que tiene acentos puede ser un espacio al final.** Antes de
    culpar a la codificacion, imprimí la ruta: `console.log(JSON.stringify(process.env.KAIR_APP))`.
 
+### 5.64 📦 Migrar una vista de un archivo a una base no es cambiarle el `SELECT`: hay que devolverle el MISMO objeto
+
+**El caso real (24-nov-2026, 📦1096, ausentismo 3.3.6).** La tabla "Ver registros" y la de
+"Estadísticas" del 3.3.6 se movieron del Excel de G: a SQLite. Lo fácil —cambiar el `SELECT`— no
+servía: la lógica de esas vistas está llena de cadenas de respaldo.
+
+```js
+const anio = row['14'] || row.AÑO || row.ANO || '';
+const fechaInicio = row['15'] || row['F. INICIO'] || row['FECHA INICIO'] || row.fecha_inicio || '-';
+const clase = row['CLASE DE INCAPACIDAD'] || row['11'] || '';
+```
+
+y el filtro de mes compara contra el **nombre** del mes (`'ABRIL'`), no contra un número. Si la fila
+que llega de la base trae los nombres de campo de la base, la vista dibuja una tabla vacía — **sin
+error**: los `||` caen al siguiente candidato y la pantalla sale en blanco o con guiones.
+
+**Las reglas:**
+
+1. **Medir qué claves lee la vista, sobre el código real**, antes de escribir el adaptador. No la lista
+   de columnas de la tabla: las **cadenas de respaldo** que la UI consulta. En este caso, 7 métodos
+   (`renderTable`, `populateDynamicFilters`, `loadEstadisticasData`, `_calcularEstadisticasExtendidas`,
+   `updateStatsMetrics`, `renderCharts`, `populateStatsFilters`) y las claves se leen por dos vías: por
+   nombre de encabezado y por **índice 0-based** de la fila cruda (2=NOMBRE, 3=CEDULA, 9=MES,
+   11=CLASE, 14=AÑO, 15=F.INICIO, 16=F.FIN, 17=CODIGO).
+2. **El adaptador devuelve el objeto del archivo, no el de la tabla.** El MES como nombre en
+   mayúsculas, el AÑO como texto, la fecha como la que guarda la base.
+3. **La UI exige UNA clave de cada cadena, no todas.** Por eso el check se arma sobre cadenas: si '15'
+   está, la UI ya encuentra la fecha.
+4. **No copies las claves que la UI calcula.** La columna "No" la arma la vista como `indice + 1` sobre
+   el arreglo que está pintando (por eso se renumera al filtrar): copiarla desde la base deja números
+   con huecos.
+5. **Medir la forma real de la fuente.** Las cabeceras del Excel traen espacios al final ("NOMBRE ") y
+   el main las recorta: las claves son las recortadas.
+6. **La fecha es un dato, no un texto.** El Excel traía M/D/YY ("4/1/24") y hay celdas con typos
+   ("30/10/22018", "31/06/2019"). La base guarda ISO, y el ISO es lo que necesitan los cálculos: el
+   heatmap por día de la semana y el "última incapacidad" comparan fechas. Y el formato se midió, no se
+   suponer: el MES de la fila concuerda con el mes de esa fecha en 595 de 596 filas, o sea que **es
+   M/D, no D/M**.
+
+### 5.65 📦 El archivo oficial traía el histórico DOS veces: la deduplicación va en el importador, no en la vista
+
+**El caso real (24-nov-2026, 📦1096, ausentismo 3.3.6).** El PI/PG/GI-FO-076 guarda el histórico en la
+hoja `<Empresa> <anio>` (25 columnas, 656 filas de 2016-2026) **y** además en las hojas sueltas
+`<anio>` (13 columnas) con **los mismos casos** en el formato viejo. Medido sobre los 3 archivos:
+**2 050 de 5 593 filas (37 %) eran repetidas**. Sin deduplicar, la tabla iba a mostrar 1 102 filas con
+duplicados en vez de 753.
+
+**Las reglas:**
+
+1. **La clave natural del caso** es `cedula | fecha_inicio | fecha_fin | dias | codigo`. Gana la
+   **primera aparición** (la hoja de 25 columnas va antes que las sueltas en el libro) y la conservada
+   se **completa** con los campos que la repetida traía vacíos: un caso sin código en la hoja nueva
+   puede tenerlo en la vieja, y se pierde.
+2. **Sin fechas, no se fusiona.** Dos casos sin fecha no se pueden comparar: se añaden. Fusionar a
+   ciegas borra histórico.
+3. **La deduplicación va en el IMPORTADOR**, no en la vista. Si la deduplica la vista, el export
+   sigue sacando las repetidas al Excel del cliente y el problema queda en el entregable.
+4. **El import es idempotente por archivo**, así que reimportar con el dedup nuevo **reemplaza** las
+   filas: se borra lo que había de ese archivo y se vuelve a insertar. Por eso hay que respaldar la
+   base antes (medido: 5 593 → 3 543 filas, `integrity_check: ok`, `foreign_key_check` vacío).
+
 ### 6.1 Backend — bridges
 
 Sufijo **`-bridge.js`** (no `bridge-*.js`). Hay 30 en `main/`.
@@ -2447,6 +2508,12 @@ En el 📦1095 (ausentismo 3.3.6) hay **2** tests asi: `main/test-ausentismo-bri
 `main/test-ausentismo-sync-roundtrip.js` (20/20), los dos con dos bases en memoria para simular las dos
 maquinas del sync. El primero **cazo un bug real** que la base de produccion no iba a ver (ver §5.62):
 el fixture tiene menos columnas que `base_personal`.
+
+En el 📦1096 se sumo el tercero: `main/test-ausentismo-vistas.js` (43/43). Este **extrae los metodos del
+archivo real** con `new Function` y **mide sobre el codigo** que claves lee la UI, en vez de llevar la
+lista escritas a mano (§5.64). Y se **muto** para comprobar que el check muerde: quitando
+`'CLASE DE INCAPACIDAD'` y `'ENTIDAD'` del adaptador, el test cae a 42/43 con esas dos cadenas rotas.
+Un check que nunca se ha visto fallar no es un check.
 
 ### 7.8 La suite del `firma-service` se corre con el Node de Electron: no hay que recompilar
 

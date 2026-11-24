@@ -2468,6 +2468,28 @@ registro no viaja (no hay tombstone, como el que el 📦827 uso para los program
 **Reglas que salieron de este paquete (viven en `PROMPT.md` §5.62 y §5.63):** el SQL se arma contra
 `PRAGMA table_info`, no contra lo que uno recuerda de la base de hoy; y `electron.exe` hay que
 lanzarla por `cmd /c` porque PowerShell no espera a una app GUI.
+## 📦 Ausentismo (3.3.6) — las vistas leen de SQLite, con el Excel de respaldo (📦1096)
+
+**El modelo.** Completado el 📦1095: la tabla `ausentismo_registros` es la fuente de verdad **y las vistas
+leen de ella**. "Ver registros" y "Estadísticas" piden las filas a SQLite primero; si la empresa no tiene
+filas en la base, la vista cae al Excel de G: (fallback). Los botones **Editar** y **Eliminar** escriben
+en la base cuando la fila viene de SQLite, y en el Excel cuando no.
+
+**Las piezas nuevas:**
+
+| Pieza | Archivo | Qué hace |
+|---|---|---|
+| Adaptador | `modules/gestion-salud/ausentismo/medicion-ausentismo.js` | `_filasDesdeSqlite` reproduce el objeto del Excel (claves por nombre de encabezado + índices 0-based) para que la tabla, los filtros y las estadísticas no cambien |
+| Deduplicación | `main/ausentismo-import.js` | `_deduplicar` + `_claveCaso`: el archivo oficial trae el histórico dos veces (2 050 de 5 593 filas) |
+| Edición | `main/ausentismo-bridge.js` · `preload.js` | Canal `ausentismo:actualizar` (10 canales) + `ausentismoActualizar` |
+| Tests | `main/test-ausentismo-vistas.js` (43/43) | Mide sobre el código real qué claves lee la UI; mutado para comprobar que el check muerde |
+
+**Lo que cambió en pantalla:** la cédula sale sin separadores, las fechas en ISO (`2024-04-01`), la tabla
+muestra el histórico completo (753 / 1 501 / 1 289 filas) y el orden es del más reciente al más viejo.
+
+**Lo que NO se migró:** el wizard de seguimiento (lee Excel + `PRI.xlsx`; su parseo de fechas asume D/M
+— defecto preexistente) y el KPI del home (`get-ausentismo-stats`, Excel + `PRI.xlsx`).
+
 
 ## 🖋️ Servicio de firma electrónica (`firma-service`)
 Servicio **separado** del app de escritorio: lo opera Gesstiar S.A.S. y vive en `sgsst-electron-app/firma-service/` (Node, Express, SQLite). Se despliega aparte (tar en `/opt/kair-firma`), expone `https://firma.kair.fyi` por túnel de Cloudflare y tiene su propio manifiesto de evidencias legales (`legal-readiness.json`) y su propio gate de publicación (`scripts/auditar-readiness-legal.js`).

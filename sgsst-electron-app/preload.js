@@ -759,6 +759,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('ausentismo:listar', params),
   ausentismoBuscarPorCedula: (params) =>
     ipcRenderer.invoke('ausentismo:buscarPorCedula', params),
+  // 📦1096 (2026-11-24) — Editar una fila de la tabla (que ahora vive en SQLite)
+  ausentismoActualizar: (params) =>
+    ipcRenderer.invoke('ausentismo:actualizar', params),
   ausentismoEliminar: (params) =>
     ipcRenderer.invoke('ausentismo:eliminar', params),
   ausentismoImportarExcel: (params) =>

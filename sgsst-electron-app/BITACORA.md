@@ -11012,3 +11012,89 @@ se agrega **solo si la columna esta** (ver §5.62 del `PROMPT.md`).
   codificacion (ver §5.63 del `PROMPT.md`).
 - **`electron.exe` es una app GUI: PowerShell con `&` no espera.** `$LASTEXITCODE` queda vacio y el
   runner marca FAIL en todos los tests **sin ejecutar ninguno**. Con `cmd /c` si se lee el codigo.
+
+## 📦 Las vistas del 3.3.6 tambien leen de la base (📦1096, 2026-11-24)
+
+### Lo que la app leia y no se veia
+
+Medido contra el codigo, no de memoria: el handler `get-ausentismo-data` (`main.js`) no menciona
+`ausentismo_registros` ni SQLite en sus 9 000 lineas, y el log de arranque lo dice — "Archivo de
+ausentismo encontrado: G:\...\PI-FO-076...". Las tres vistas que consumian el historico leian **el
+Excel de G:**:
+
+| Vista | De donde leia |
+|---|---|
+| "Ver registros" | `loadAusentismoData` → `readAusentismoData` (Excel de G:) |
+| "Estadisticas" | `loadEstadisticasData` → `readAusentismoData` (Excel de G:) |
+| Wizard de seguimiento | lectura directa del Excel + `PRI.xlsx` |
+
+La consecuencia era concreta: un registro nuevo para Aseplus/Tempoactiva/Temposum iba **solo** a
+SQLite y **no aparecia en la app**. El registro y el export si usaban la base; las vistas no. La base
+era la fuente de verdad a medias.
+
+### El Excel oficial trae el historico DOS veces
+
+El archivo oficial guarda el historico en la hoja `<Empresa> <anio>` (25 columnas, 656 filas de
+2016-2026) **y** ademas en las hojas sueltas `<anio>` (13 columnas) con **los mismos casos** en el
+formato viejo. Medido sobre los 3 archivos:
+
+| Empresa | Filas importadas antes | Repetidas | Filas reales |
+|---|---|---|---|
+| Aseplus | 1 102 | 349 | 753 |
+| Tempoactiva | 2 325 | 824 | 1 501 |
+| Temposum | 2 166 | 877 | 1 289 |
+| **Total** | **5 593** | **2 050** | **3 543** |
+
+Sin deduplicar, la tabla de "Ver registros" iba a mostrar 1 102 filas con duplicados en vez de 753.
+
+**La regla.** La deduplicacion va en el **importador**, no en la vista. La clave natural del caso es
+`cedula | fecha_inicio | fecha_fin | dias | codigo`; gana la **primera aparicion** (la hoja de 25
+columnas va antes que las sueltas en el libro) y la conservada se **completa** con los campos que la
+repetida traia vacios. Dos casos **sin fecha** nunca se fusionan: sin fechas no se puede saber si son
+el mismo caso, asi que se anaden.
+
+### El adaptador tiene que devolver el MISMO objeto que devolvia el Excel
+
+Migrar la vista no es cambiarle el `SELECT`: la logica de la tabla y de las estadisticas esta llena de
+cadenas de respaldo (`row['15'] || row['F. INICIO'] || row.fecha_inicio`) y el filtro de mes compara
+contra el **nombre** del mes. Por eso `_filasDesdeSqlite` reproduce el objeto del Excel tal cual:
+claves por nombre de encabezado (recortadas, como las deja el main), los indices 0-based que usa la
+UI (2=NOMBRE, 3=CEDULA, 9=MES, 11=CLASE, 14=AÑO, 15=F.INICIO, 16=F.FIN, 17=CODIGO), el MES como nombre
+en mayusculas ("ABRIL") y el AÑO como texto.
+
+**Lo que NO se copia: la columna "No".** La UI la calcula como `indice + 1` sobre el arreglo que esta
+pintando, o sea que se renumera al filtrar. Copiarla desde la base dejaba numeros con huecos.
+
+**Las fechas van en ISO.** El Excel traia texto M/D/YY ("4/1/24") — medido: el MES de la fila concuerda
+con el mes de esa fecha en 595 de 596 filas de Aseplus, o sea que **es M/D, no D/M** — y ademas hay
+celdas con typos ("30/10/22018", "31/06/2019"). La base guarda ISO, y el ISO es lo que necesitan los
+calculos: el heatmap por dia de la semana y el "ultima incapacidad" comparan fechas.
+
+### Lo que cambia en pantalla (medido, para que no sorprenda)
+
+- La cedula sale **sin separadores** ("3729847" en vez de "3,729,847"): es el valor canonico de la base.
+- Las fechas **F. INICIO / F. FIN** salen en ISO ("2024-04-01" en vez de "4/1/24").
+- La tabla muestra **mas filas**: el historico completo, incluyendo los casos que solo existen en las
+  hojas por anio (753 vs 656 en Aseplus, 1 501 vs 1 275 en Tempoactiva, 1 289 vs 1 151 en Temposum).
+- El orden es **del mas reciente al mas viejo** (`ORDER BY anio DESC, mes_incapacidad DESC,
+  fecha_inicio DESC`), no el orden del archivo.
+
+### Lo que NO se migro, y por que
+
+- **El wizard de seguimiento** sigue leyendo el Excel: ademas del `PRI.xlsx`, hace su propio parseo de
+  fechas y su propia clasificacion de casos. Ojo: su parseo asume **D/M**, o sea que hoy ya confunde
+  las fechas del Excel — es un defecto preexistente, no de este paquete.
+- **El KPI del home** (`get-ausentismo-stats`) sigue cruzando Excel + `PRI.xlsx`: su clasificacion no
+  esta en SQLite.
+- El **export** no cambio: sigue copiando el oficial y anexando.
+
+### El test que se muerde
+
+`main/test-ausentismo-vistas.js` (43/43) extrae los metodos del archivo **real** con `new Function` y
+mide **que claves lee la UI** sobre el archivo real: no una lista escrita a mano, sino las cadenas de
+respaldo que aparecen en el codigo de la tabla y de las estadisticas. Para cada cadena basta que
+**una** de sus claves exista en la fila que produce el adaptador (que es lo que la UI exige).
+
+Y se **muto** para comprobar que el check muerde: quitando `'CLASE DE INCAPACIDAD'` y `'ENTIDAD'` del
+adaptador, el test cae a 42/43 con esas dos cadenas rotas. Un check que nunca se ha visto fallar no es
+un check (§7.7).

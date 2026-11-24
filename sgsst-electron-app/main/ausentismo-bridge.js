@@ -213,6 +213,18 @@ function _textoFecha(valor) {
   var s = String(valor).trim();
   var m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
   if (m) return m[1] + '-' + m[2] + '-' + m[3];
+  // 📦1096 — El modal de edicion manda la fecha COMO LA TIENE EL EXCEL, que es
+  // texto en formato M/D/YY ("4/1/24" = 1 de abril de 2024; medido en las
+  // hojas oficiales). Ojo: es M/D, no D/M.
+  var md = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2}|\d{4})$/);
+  if (md) {
+    var mes = Number(md[1]);
+    var dia = Number(md[2]);
+    var anio = md[3].length === 2 ? '20' + md[3] : md[3];
+    if (mes >= 1 && mes <= 12 && dia >= 1 && dia <= 31) {
+      return anio + '-' + String(mes).padStart(2, '0') + '-' + String(dia).padStart(2, '0');
+    }
+  }
   return null;
 }
 
@@ -270,6 +282,82 @@ function _handlerListar(params) {
 }
 
 /** Buscar por cédula (normaliza: el Excel trae "32.840.309"). */
+/**
+ * 📦1096 (2026-11-24) — Actualizar un registro (lo usa el botón "Editar" de
+ * la tabla cuando la fila viene de SQLite).
+ *
+ * Solo se actualizan los campos que el formulario de edicion expone. El
+ * `origen` NO se toca: una fila importada sigue siendo 'import_excel' y una
+ * creada en la app sigue siendo 'app', para que el import siga siendo
+ * idempotente y el export siga sabiendo que fila falta por exportar.
+ */
+function _handlerActualizar(params) {
+  if (!_getDb) return error('NO_DB', 'Base de datos no disponible');
+  if (!params || !params.id) return error('NO_ID', 'id requerido');
+  var empresaId = _empresaDe(params);
+  if (!empresaId) return error('NO_COMPANY', 'empresaId requerido');
+  try {
+    var db = _getDb();
+    var actual = db.prepare('SELECT * FROM ausentismo_registros WHERE id = ? AND empresa_id = ?')
+      .get(params.id, empresaId);
+    if (!actual) return error('NOT_FOUND', 'Registro no encontrado');
+
+    var d = params.datos || {};
+    var cambios = {};
+    // Campos editables: genero, clase, tipo, entidad, codigo, diagnostico,
+    // observaciones, cargo, area, nombre y las dos fechas.
+    if (d.genero !== undefined) cambios.genero = String(d.genero || '').trim();
+    if (d.clase_incapacidad !== undefined) cambios.clase_incapacidad = String(d.clase_incapacidad || '').trim();
+    if (d.tipo_incapacidad !== undefined) cambios.tipo_incapacidad = String(d.tipo_incapacidad || '').trim();
+    if (d.entidad !== undefined) cambios.entidad = String(d.entidad || '').trim();
+    if (d.codigo !== undefined) cambios.codigo = String(d.codigo || '').trim();
+    if (d.diagnostico !== undefined) cambios.diagnostico = String(d.diagnostico || '').trim();
+    if (d.observaciones !== undefined) cambios.observaciones = String(d.observaciones || '').trim();
+    if (d.cargo !== undefined) cambios.cargo = String(d.cargo || '').trim();
+    if (d.area !== undefined) cambios.area = String(d.area || '').trim();
+    if (d.nombre !== undefined) cambios.nombre = String(d.nombre || '').trim();
+
+    if (d.fecha_inicio !== undefined || d.fecha_fin !== undefined) {
+      var fi = d.fecha_inicio !== undefined ? _textoFecha(d.fecha_inicio) : actual.fecha_inicio;
+      var ff = d.fecha_fin !== undefined ? _textoFecha(d.fecha_fin) : actual.fecha_fin;
+      cambios.fecha_inicio = fi;
+      cambios.fecha_fin = ff;
+      if (fi) {
+        cambios.anio_incapacidad = Number(fi.slice(0, 4));
+        cambios.mes_incapacidad = Number(fi.slice(5, 7));
+      }
+    }
+
+    if (d.dias_incapacidad !== undefined) {
+      var dias = Number(d.dias_incapacidad);
+      if (isFinite(dias) && dias >= 0) {
+        cambios.dias_incapacidad = Math.round(dias);
+        cambios.mas_10_dias = dias > 10 ? 1 : 0;
+      }
+    }
+
+    var campos = Object.keys(cambios);
+    if (!campos.length) return { success: true, data: actual };
+
+    cambios.actualizado_en = ahora();
+    campos.push('actualizado_en');
+    var sql = 'UPDATE ausentismo_registros SET ' + campos.map(function (c) { return c + ' = ?'; }).join(', ') +
+      ' WHERE id = ? AND empresa_id = ?';
+    var vals = campos.map(function (c) { return cambios[c]; });
+    vals.push(params.id, empresaId);
+    var stmt = db.prepare(sql);
+    stmt.run.apply(stmt, vals);
+
+    return {
+      success: true,
+      data: db.prepare('SELECT * FROM ausentismo_registros WHERE id = ?').get(params.id)
+    };
+  } catch (e) {
+    console.error('[' + MOD + '][ACTUALIZAR]', e.message);
+    return error('DB_ERROR', e.message);
+  }
+}
+
 function _handlerBuscarPorCedula(params) {
   if (!_getDb) return error('NO_DB', 'Base de datos no disponible');
   var empresaId = _empresaDe(params);
@@ -369,6 +457,8 @@ function _handlerImportarExcel(params) {
         hojas: leido.hojas.length,
         por_anio: porAnio,
         archivo: params.filePath,
+        // 📦1096 — filas repetidas que el archivo oficial trae duplicadas
+        duplicadas: leido.duplicadas || 0,
         avisos: leido.avisos
       }
     };
@@ -697,6 +787,9 @@ function registerAusentismoHandlers(app, deps) {
   ipcMain.handle('ausentismo:buscarPorCedula', async function (event, params) {
     return _handlerBuscarPorCedula(params || {});
   });
+  ipcMain.handle('ausentismo:actualizar', async function (event, params) {
+    return _handlerActualizar(params || {});
+  });
   ipcMain.handle('ausentismo:eliminar', async function (event, params) {
     return _handlerEliminar(params || {});
   });
@@ -716,7 +809,7 @@ function registerAusentismoHandlers(app, deps) {
     return _handlerImportarOficial(params || {});
   });
 
-  console.log('[MAIN] 📦1095 · Handlers de ausentismo (9 canales) registrados correctamente');
+  console.log('[MAIN] 📦1096 · Handlers de ausentismo (10 canales) registrados correctamente');
 }
 
 module.exports = {
