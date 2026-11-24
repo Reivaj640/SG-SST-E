@@ -77,6 +77,42 @@ function _getCompanyByName(companyName) {
   }
 }
 
+// 📦1097 · Sanea una fecha que viene de un Excel/import: devuelve 'YYYY-MM-DD' o null.
+// Los Excels legacy exportan "0" (y "S/D", celdas vacías, etc.) en campos sin dato;
+// eso NUNCA debe guardarse como fecha — era el bug de la columna INGRESO/RETIRO
+// mostrando "0" en Base de Personal. Espejo de _normalizeDate del frontend
+// (modules/gestion-humana/base-personal/index.js).
+function _bpFechaIso(y, m, d) {
+  var yi = parseInt(y, 10);
+  var mi = parseInt(m, 10);
+  var di = parseInt(d, 10);
+  if (yi < 1800 || yi > 2200 || mi < 1 || mi > 12 || di < 1 || di > 31) return null;
+  return yi + '-' + String(mi).padStart(2, '0') + '-' + String(di).padStart(2, '0');
+}
+
+function _sanitizeFecha(val) {
+  if (val == null) return null;
+  if (val instanceof Date) {
+    if (isNaN(val.getTime())) return null;
+    return _bpFechaIso(val.getFullYear(), val.getMonth() + 1, val.getDate());
+  }
+  var s = String(val).trim();
+  if (!s) return null;
+  var mm;
+  // YYYYMMDD (8 dígitos) o YYYYMMDDHHMMSS (14 dígitos)
+  if (/^\d{8}$/.test(s) || /^\d{14}$/.test(s)) {
+    return _bpFechaIso(s.slice(0, 4), s.slice(4, 6), s.slice(6, 8));
+  }
+  // YYYY-MM-DD o YYYY-M-DD (con hora opcional: 2026-05-04T17:00:00.000Z)
+  mm = s.match(/^(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})(?:[ T].*)?$/);
+  if (mm) return _bpFechaIso(mm[1], mm[2], mm[3]);
+  // DD/MM/YYYY o DD-MM-YYYY (con hora opcional)
+  mm = s.match(/^(\d{1,2})[-\/](\d{1,2})[-\/](\d{4})(?:[ T].*)?$/);
+  if (mm) return _bpFechaIso(mm[3], mm[2], mm[1]);
+  // No se reconoce → basura → null (antes se guardaba tal cual)
+  return null;
+}
+
 // ========== ROW → OBJECT CONVERTERS (snake_case → camelCase) ==========
 function _rowToContratacion(row) {
   if (!row) return null;
@@ -5182,10 +5218,12 @@ function registerGestionHumanaHandlers(app, deps) {
       // No se tocan id/empresa_id/cedula/created_at/activo.
       // 📦767 · FASE 1.0-G.2 · Política estricta de campos de ciclo en import-update:
       //   - estado: CASE WHEN estado='retirado' THEN estado ELSE ? END  (preserva retirado)
-      //   - fecha_ingreso: CASE WHEN fecha_ingreso IS NOT NULL THEN fecha_ingreso ELSE ? END
-      //                    (preserva histórico, completa si NULL)
-      //   - fecha_retiro: NUNCA se modifica. Conserva el valor de la BD siempre.
-      //                    Import NO puede crear/modificar ciclo laboral de bp existente.
+      //   - fecha_ingreso: conserva el valor de la BD si ES fecha; si es basura
+      //     ("0" del Excel legacy, vacío, texto sin año) o NULL, se completa/corrige
+      //     con el valor del Excel (📦1097: antes "0" era NOT NULL y jamás se corregía)
+      //   - fecha_retiro: NUNCA se completa desde el Excel. Conserva el valor de la BD
+      //     si ES fecha; si es basura ("0") se limpia a NULL (📦1097).
+      //     Import NO puede crear/modificar ciclo laboral de bp existente.
       var stmtUpdate = localDb.prepare(
         "UPDATE base_personal SET " +
         "  nombres = ?, apellidos = ?, " +
@@ -5195,10 +5233,8 @@ function registerGestionHumanaHandlers(app, deps) {
         "  estado_civil = ?, nivel_educativo = ?, " +
         "  direccion = ?, barrio = ?, ciudad = ?, " +
         "  cargo = ?, salario = ?, tipo_contrato = ?, " +
-        "  fecha_ingreso = CASE WHEN fecha_ingreso IS NOT NULL THEN fecha_ingreso ELSE ? END, " +
-        "  fecha_retiro = CASE WHEN fecha_retiro IS NOT NULL THEN fecha_retiro " +
-        "                       WHEN estado = 'retirado' THEN NULL " +
-        "                       ELSE NULL END, " +
+        "  fecha_ingreso = CASE WHEN fecha_ingreso IS NOT NULL AND fecha_ingreso GLOB '*[0-9][0-9][0-9][0-9]*' THEN fecha_ingreso ELSE ? END, " +
+        "  fecha_retiro = CASE WHEN fecha_retiro IS NOT NULL AND fecha_retiro GLOB '*[0-9][0-9][0-9][0-9]*' THEN fecha_retiro ELSE NULL END, " +
         "  eps = ?, pension = ?, arl = ?, caja_compensacion = ?, " +
         "  empresa_usuaria = ?, banco = ?, numero_cuenta = ?, " +
         "  sede_id = ?, " +
@@ -5236,6 +5272,13 @@ function registerGestionHumanaHandlers(app, deps) {
               return;
             }
 
+            // 📦1097 · Sanear fechas ANTES de escribir: los Excels legacy mandan "0"
+            // en las celdas sin dato y eso no puede guardarse como fecha.
+            var fIngreso = _sanitizeFecha(row.fechaIngreso);
+            var fRetiro = _sanitizeFecha(row.fechaRetiro);
+            var fNacimiento = _sanitizeFecha(row.fechaNacimiento);
+            var fExpCedula = _sanitizeFecha(row.fechaExpCedula);
+
             var existing = stmtFind.get(company.company_key, row.cedula);
             if (existing) {
               if (duplicateMode === 'skip') {
@@ -5251,24 +5294,26 @@ function registerGestionHumanaHandlers(app, deps) {
                 // El import NO aborta toda la importación por una fila mala — solo reporta la fila y
                 // continúa con las demás. La fila inconsistente se procesa con fecha_retiro=NULL
                 // (un bp activo no debe tener fecha_retiro).
-                if (existing.estado === 'activo' && row.fechaRetiro) {
+                // 📦1097 · Se mira la fecha YA saneada: un "0" del Excel no es fecha de retiro
+                // y no debe generar el warning (se habría ignorado igual, pero ensucia el reporte).
+                if (existing.estado === 'activo' && fRetiro) {
                   errors.push({
                     row: index + 1,
                     error: 'BP activo con fecha_retiro en Excel (inconsistencia): se omitirá fecha_retiro para este BP',
-                    data: { cedula: row.cedula, excelFechaRetiro: row.fechaRetiro },
+                    data: { cedula: row.cedula, excelFechaRetiro: fRetiro },
                     warning: true
                   });
                 }
                 var now = new Date().toISOString();
                 stmtUpdate.run(
                   row.nombres, row.apellidos,
-                  row.tipoDocumento || 'CC', row.fechaExpCedula || null, row.lugarExpCedula || null,
-                  row.fechaNacimiento || null, row.lugarNacimiento || null,
+                  row.tipoDocumento || 'CC', fExpCedula, row.lugarExpCedula || null,
+                  fNacimiento, row.lugarNacimiento || null,
                   row.telefono || null, row.celular || null, row.email || null,
                   row.estadoCivil || null, row.nivelEducativo || null,
                   row.direccion || null, row.barrio || null, row.ciudad || null,
                   row.cargo || null, row.salario || null, row.tipoContrato || null,
-                  row.fechaIngreso || null,         // CASE WHEN: solo aplica si BD está NULL
+                  fIngreso,              // CASE WHEN: conserva si es fecha, corrige si es basura
                   // 📦767 · I-103.A1.0-G.2 · fecha_retiro: NO se pasa valor.
                   // El CASE WHEN usa solo columnas de la BD (regla estricta).
                   row.eps || null, row.pension || null, row.arl || null, row.cajaCompensacion || null,
@@ -5288,13 +5333,13 @@ function registerGestionHumanaHandlers(app, deps) {
             stmtInsert.run(
               id, company.company_key,
               row.nombres, row.apellidos, row.cedula,
-              row.tipoDocumento || 'CC', row.fechaExpCedula || null, row.lugarExpCedula || null,
-              row.fechaNacimiento || null, row.lugarNacimiento || null,
+              row.tipoDocumento || 'CC', fExpCedula, row.lugarExpCedula || null,
+              fNacimiento, row.lugarNacimiento || null,
               row.telefono || null, row.celular || null, row.email || null,
               row.estadoCivil || null, row.nivelEducativo || null,
               row.direccion || null, row.barrio || null, row.ciudad || null,
               row.cargo || null, row.salario || null, row.tipoContrato || null,
-              row.fechaIngreso || null, row.fechaRetiro || null, row.estado || 'activo',
+              fIngreso, fRetiro, row.estado || 'activo',
               row.eps || null, row.pension || null, row.arl || null, row.cajaCompensacion || null,
               row.empresaUsuaria || null, row.banco || null, row.numeroCuenta || null, row.sedeId || null,
               now, now

@@ -100,6 +100,17 @@ function _bpNormalize(s) {
     .replace(/[^a-z0-9]/g, '');
 }
 
+// 📦1097 · Valida y devuelve una fecha en YYYY-MM-DD, o null si no es fecha real.
+// y/m/d pueden venir de 1 o 2 dígitos (2026-1-5, 05/04/2026, etc.).
+// Un año fuera de rango o mes/día imposibles → null (basura del Excel).
+function _bpFechaIso(y, m, d) {
+  var yi = parseInt(y, 10);
+  var mi = parseInt(m, 10);
+  var di = parseInt(d, 10);
+  if (yi < 1800 || yi > 2200 || mi < 1 || mi > 12 || di < 1 || di > 31) return null;
+  return yi + '-' + String(mi).padStart(2, '0') + '-' + String(di).padStart(2, '0');
+}
+
 class BasePersonalComponent {
   constructor(container, companyName, moduleName, submoduleName, onBack, companyKey) {
     this.container = container;
@@ -211,6 +222,9 @@ class BasePersonalComponent {
 
   // 📦733 · Normaliza una fecha de cualquier formato a YYYY-MM-DD.
   // Soporta: Date object, YYYYMMDD, YYYY-MM-DD, DD/MM/YYYY, ISO 8601, etc.
+  // 📦1097 · Si NO reconoce el formato, devuelve null (antes devolvía el string
+  // original y la basura de los Excels legacy —"0" en celdas vacías— se guardaba
+  // como fecha y la columna INGRESO/RETIRO se pintaba "0").
   _normalizeDate(val) {
     if (!val) return null;
     // Si es Date object (SheetJS con cellDates:true puede devolver esto)
@@ -222,30 +236,19 @@ class BasePersonalComponent {
     }
     var s = String(val).trim();
     if (!s) return null;
-    // YYYYMMDD (8 dígitos, ej: 20260115)
-    if (/^\d{8}$/.test(s)) {
-      return s.slice(0, 4) + '-' + s.slice(4, 6) + '-' + s.slice(6, 8);
+    var mm;
+    // YYYYMMDD (8 dígitos, ej: 20260115) o YYYYMMDDHHMMSS (14 dígitos)
+    if (/^\d{8}$/.test(s) || /^\d{14}$/.test(s)) {
+      return _bpFechaIso(s.slice(0, 4), s.slice(4, 6), s.slice(6, 8));
     }
-    // YYYYMMDDHHMMSS (14 dígitos, ej: 20260115120000)
-    if (/^\d{14}$/.test(s)) {
-      return s.slice(0, 4) + '-' + s.slice(4, 6) + '-' + s.slice(6, 8);
-    }
-    // YYYY-MM-DD ya está OK
-    if (/^\d{4}-\d{2}-\d{2}/.test(s)) {
-      return s.slice(0, 10);
-    }
-    // DD/MM/YYYY
-    var dmy = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-    if (dmy) {
-      return dmy[3] + '-' + String(dmy[2]).padStart(2, '0') + '-' + String(dmy[1]).padStart(2, '0');
-    }
-    // DD-MM-YYYY
-    var dmy2 = s.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);
-    if (dmy2) {
-      return dmy2[3] + '-' + String(dmy2[2]).padStart(2, '0') + '-' + String(dmy2[1]).padStart(2, '0');
-    }
-    // Si no se reconoce, devolver el string original (la BD rechazará si es inválido)
-    return s;
+    // YYYY-MM-DD o YYYY-M-DD (con hora opcional: 2026-05-04T17:00:00.000Z)
+    mm = s.match(/^(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})(?:[ T].*)?$/);
+    if (mm) return _bpFechaIso(mm[1], mm[2], mm[3]);
+    // DD/MM/YYYY o DD-MM-YYYY (con hora opcional)
+    mm = s.match(/^(\d{1,2})[-\/](\d{1,2})[-\/](\d{4})(?:[ T].*)?$/);
+    if (mm) return _bpFechaIso(mm[3], mm[2], mm[1]);
+    // No se reconoce → basura ("0", "S/D", "N/A"…) → null, nunca el original
+    return null;
   }
 
   // === HTML ===
@@ -500,9 +503,11 @@ class BasePersonalComponent {
   }
 
   // Fecha corta YYYY-MM-DD (o '—' si vacía)
+  // 📦1097 · Si no trae año de 4 dígitos es basura (ej: "0" del Excel legacy) → '—'
   _fmtDateShort(iso) {
     if (!iso) return '—';
     var s = String(iso).slice(0, 10);
+    if (!/\d{4}/.test(s)) return '—';
     return s || '—';
   }
 

@@ -474,7 +474,13 @@ const MIGRATIONS_SQL = [
   "CREATE INDEX IF NOT EXISTS idx_gh_eventos_trabajador   ON gh_eventos_personal(trabajador_id, fecha_evento DESC);",
   "CREATE INDEX IF NOT EXISTS idx_gh_eventos_empresa      ON gh_eventos_personal(empresa_id, fecha_evento DESC);",
   "CREATE INDEX IF NOT EXISTS idx_gh_eventos_tipo         ON gh_eventos_personal(tipo_evento);",
-  "CREATE INDEX IF NOT EXISTS idx_gh_eventos_contratacion ON gh_eventos_personal(contratacion_id) WHERE contratacion_id IS NOT NULL;"
+  "CREATE INDEX IF NOT EXISTS idx_gh_eventos_contratacion ON gh_eventos_personal(contratacion_id) WHERE contratacion_id IS NOT NULL;",
+  // 📦1097 · Reparación de datos: los Excels legacy exportan "0" en las celdas sin dato
+  // (TASFRE/TASFIG = 0) y eso se guardó como fecha — columnas INGRESO/RETIRO con "0".
+  // Solo se limpian valores SIN año de 4 dígitos (una fecha real siempre lo trae):
+  // "0", vacíos, "S/D"… → NULL. Idempotente: en el arranque siguiente no halla nada.
+  "UPDATE base_personal SET fecha_ingreso = NULL WHERE fecha_ingreso IS NOT NULL AND fecha_ingreso NOT GLOB '*[0-9][0-9][0-9][0-9]*';",
+  "UPDATE base_personal SET fecha_retiro = NULL WHERE fecha_retiro IS NOT NULL AND fecha_retiro NOT GLOB '*[0-9][0-9][0-9][0-9]*';"
 ];
 
 module.exports = {

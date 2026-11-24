@@ -394,6 +394,74 @@ function _logSection(n, title) {
   _assertEq(bpT25Post.fecha_ingreso, '2020-01-15', 'T25.2 fecha_ingreso se COMPLETA con Excel');
   console.log('  ✓ fecha_ingreso NULL se completa con Excel (única excepción)');
 
+  // ========== TEST 26-29: 📦1097 — fechas basura del Excel legacy ("0") ==========
+  // Los Excels de sistemas viejos (TASFRE/TASTLR = 0) mandan "0" en celdas sin dato.
+  // Eso no puede guardarse como fecha: la columna INGRESO/RETIRO se pintaba "0".
+
+  // ========== TEST 26: INSERT con "0" en las 4 fechas → NULL ==========
+  _logSection('26', 'gh:import-personal — fechas "0" del Excel se guardan como NULL');
+  var r26 = await registeredHandlers['gh:import-personal']({}, {
+    token: 'test',
+    companyName: 'TEMPOACTIVA EST S.A.S.',
+    rows: [{ cedula: '9926', nombres: 'Test T26', apellidos: 'Cero', fechaIngreso: '0', fechaRetiro: '0', fechaNacimiento: '0', fechaExpCedula: '0' }],
+    duplicateMode: 'update'
+  });
+  _assert(r26.success === true, 'T26.1 import retorna success=true');
+  _assertEq(r26.data.created, 1, 'T26.2 created = 1');
+  var bpT26Post = db.prepare("SELECT fecha_ingreso, fecha_retiro, fecha_nacimiento, fecha_exp_cedula FROM base_personal WHERE cedula = '9926'").get();
+  _assertEq(bpT26Post.fecha_ingreso, null, 'T26.3 fecha_ingreso "0" → NULL');
+  _assertEq(bpT26Post.fecha_retiro, null, 'T26.4 fecha_retiro "0" → NULL');
+  _assertEq(bpT26Post.fecha_nacimiento, null, 'T26.5 fecha_nacimiento "0" → NULL');
+  _assertEq(bpT26Post.fecha_exp_cedula, null, 'T26.6 fecha_exp_cedula "0" → NULL');
+  console.log('  ✓ "0" del Excel se guarda como NULL en las 4 fechas');
+
+  // ========== TEST 27: la migración de reparación limpia el "0" ya guardado ==========
+  _logSection('27', 'Migración 📦1097 — repara "0" existentes en la BD');
+  var bpT27Id = 'bp-test-t27-' + (++_testIdCounter);
+  rawDb.exec("INSERT INTO base_personal (id, empresa_id, nombres, apellidos, cedula, estado, activo, fecha_ingreso, fecha_retiro, created_at, updated_at) VALUES ('" + bpT27Id + "', 'tempoactiva', 'Test T27', 'Basura', '9927', 'activo', 1, '0', '0', '2025-09-01', '2025-09-01')");
+  var bpT27bId = 'bp-test-t27b-' + _testIdCounter;
+  rawDb.exec("INSERT INTO base_personal (id, empresa_id, nombres, apellidos, cedula, estado, activo, fecha_ingreso, fecha_retiro, created_at, updated_at) VALUES ('" + bpT27bId + "', 'tempoactiva', 'Test T27b', 'Validas', '9928', 'activo', 1, '2020-05-10', '20240101', '2025-09-01', '2025-09-01')");
+  var repairSql = MIGRATIONS_SQL.filter(function (sql) { return sql.indexOf('UPDATE base_personal SET fecha') === 0; });
+  _assertEq(repairSql.length, 2, 'T27.1 hay 2 sentencias de reparación en MIGRATIONS_SQL');
+  repairSql.forEach(function (sql) { rawDb.exec(sql); });
+  var bpT27Post = db.prepare("SELECT fecha_ingreso, fecha_retiro FROM base_personal WHERE id = ?").get(bpT27Id);
+  _assertEq(bpT27Post.fecha_ingreso, null, 'T27.2 fecha_ingreso "0" reparado → NULL');
+  _assertEq(bpT27Post.fecha_retiro, null, 'T27.3 fecha_retiro "0" reparado → NULL');
+  var bpT27bPost = db.prepare("SELECT fecha_ingreso, fecha_retiro FROM base_personal WHERE id = ?").get(bpT27bId);
+  _assertEq(bpT27bPost.fecha_ingreso, '2020-05-10', 'T27.4 fecha ISO válida NO se toca');
+  _assertEq(bpT27bPost.fecha_retiro, '20240101', 'T27.5 fecha YYYYMMDD válida NO se toca');
+  console.log('  ✓ Migración limpia basura y conserva fechas reales');
+
+  // ========== TEST 28: update corrige fecha_ingreso "0" de la BD con el Excel ==========
+  _logSection('28', 'gh:import-personal — update corrige fecha_ingreso "0" con el Excel');
+  var bpT28Id = 'bp-test-t28-' + _testIdCounter;
+  rawDb.exec("INSERT INTO base_personal (id, empresa_id, nombres, apellidos, cedula, estado, activo, fecha_ingreso, created_at, updated_at) VALUES ('" + bpT28Id + "', 'tempoactiva', 'Test T28', 'CeroIng', '9929', 'activo', 1, '0', '2025-09-01', '2025-09-01')");
+  var r28 = await registeredHandlers['gh:import-personal']({}, {
+    token: 'test',
+    companyName: 'TEMPOACTIVA EST S.A.S.',
+    rows: [{ cedula: '9929', nombres: 'Test T28', apellidos: 'Corregido', fechaIngreso: '2026-10-27' }],
+    duplicateMode: 'update'
+  });
+  _assert(r28.success === true, 'T28.1 import update retorna success=true');
+  var bpT28Post = db.prepare("SELECT fecha_ingreso FROM base_personal WHERE id = ?").get(bpT28Id);
+  _assertEq(bpT28Post.fecha_ingreso, '2026-10-27', 'T28.2 "0" se REEMPLAZA con la fecha del Excel');
+  console.log('  ✓ fecha_ingreso "0" se corrige al re-importar');
+
+  // ========== TEST 29: update CONSERVA fecha_ingreso válida (aunque no sea ISO) ==========
+  _logSection('29', 'gh:import-personal — update conserva fecha_ingreso YYYYMMDD válida');
+  var bpT29Id = 'bp-test-t29-' + _testIdCounter;
+  rawDb.exec("INSERT INTO base_personal (id, empresa_id, nombres, apellidos, cedula, estado, activo, fecha_ingreso, created_at, updated_at) VALUES ('" + bpT29Id + "', 'tempoactiva', 'Test T29', 'Legacy', '9930', 'activo', 1, '20180101', '2025-09-01', '2025-09-01')");
+  var r29 = await registeredHandlers['gh:import-personal']({}, {
+    token: 'test',
+    companyName: 'TEMPOACTIVA EST S.A.S.',
+    rows: [{ cedula: '9930', nombres: 'Test T29', apellidos: 'Distinto', fechaIngreso: '2019-06-15' }],
+    duplicateMode: 'update'
+  });
+  _assert(r29.success === true, 'T29.1 import update retorna success=true');
+  var bpT29Post = db.prepare("SELECT fecha_ingreso FROM base_personal WHERE id = ?").get(bpT29Id);
+  _assertEq(bpT29Post.fecha_ingreso, '20180101', 'T29.2 fecha YYYYMMDD válida se CONSERVA (no es basura)');
+  console.log('  ✓ fecha_ingreso válida no-ISO se conserva (no se trata como basura)');
+
   // ========== RESUMEN ==========
   console.log('');
   console.log('═══════════════════════════════════════════════════════════');
