@@ -234,6 +234,21 @@
         _state.gestanteId = id;
     }
 
+    /**
+     * 📦1099 — Descarta valores que en la base NO son un dato real.
+     * La Base de Personal guarda "0" cuando la persona no tiene teléfono,
+     * y a veces "null"/"undefined" como texto. Mostrar eso como dato
+     * es peor que no mostrar nada.
+     */
+    function _datoUtil(valor) {
+        if (valor == null) return '';
+        var v = String(valor).trim();
+        if (!v) return '';
+        var min = v.toLowerCase();
+        if (min === '0' || min === '0.0' || min === '-' || min === 'null' || min === 'undefined' || min === 'n/a') return '';
+        return v;
+    }
+
     // ─── Carga de datos desde SQLite ───
     async function _cargarDatos() {
         if (!_state.empresaId) {
@@ -268,19 +283,19 @@
 
             // 📦464 (2026-07-03) — Enriquecer con datos de la BD de personal
             // (teléfono, correo). El bridge gestaciones NO devuelve estos campos,
-            // pero vienen en `buscarEmpleadoPorCedula` que ya usa el modal de
-            // nueva gestante y el wizard mensual.
+            // pero vienen en `ausentismoBuscarEmpleado` (base de Gestión Humana,
+            // 📦1099) que ya usa el modal de nueva gestante y el wizard mensual.
             try {
-                var resEmp = await window.electronAPI.buscarEmpleadoPorCedula(
-                    _state.gestante.cedula, _state.empresaId
-                );
-                if (resEmp && resEmp.success && resEmp.datos) {
-                    var d = resEmp.datos;
-                    if (d.telefono) _state.gestante.telefono = d.telefono;
-                    if (d.celular) _state.gestante.telefono = _state.gestante.telefono || d.celular;
-                    if (d.correo) _state.gestante.correo = d.correo;
-                    if (d.email) _state.gestante.correo = _state.gestante.correo || d.email;
-                    if (d.mail) _state.gestante.correo = _state.gestante.correo || d.mail;
+                var resEmp = await window.electronAPI.ausentismoBuscarEmpleado({
+                    cedula: _state.gestante.cedula,
+                    empresaId: _state.empresaId
+                });
+                if (resEmp && resEmp.success && resEmp.data) {
+                    var d = resEmp.data;
+                    var tel = _datoUtil(d.telefono) || _datoUtil(d.celular);
+                    var cor = _datoUtil(d.correo) || _datoUtil(d.email) || _datoUtil(d.mail);
+                    if (tel) _state.gestante.telefono = tel;
+                    if (cor) _state.gestante.correo = cor;
                 }
             } catch (eEmp) {
                 // No bloqueante: si falla el enriquecimiento, mostramos "—"

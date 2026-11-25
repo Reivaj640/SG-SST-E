@@ -250,6 +250,47 @@ ok('2) los 9 canales quedaron registrados', noRegistrados.length === 0, noRegist
   const empNo = await handlers['ausentismo:buscarEmpleado']({}, { cedula: '000' });
   ok('10) buscarEmpleado devuelve null si no está', empNo.success && empNo.data === null, JSON.stringify(empNo.data));
 
+  // ---------- 10b) Aliases de la base de Gestión Humana (📦1099) ----------
+  // `base_personal` llama distinto a los campos que la UI espera: `nombres` +
+  // `apellidos` (no `nombre`), `eps` (no `entidad`), `email` (no `correo`) y
+  // `empresa_id` (no `empresa`). El puente agrega los aliases.
+  db.exec('ALTER TABLE base_personal ADD COLUMN nombres TEXT');
+  db.exec('ALTER TABLE base_personal ADD COLUMN apellidos TEXT');
+  db.exec('ALTER TABLE base_personal ADD COLUMN eps TEXT');
+  db.exec('ALTER TABLE base_personal ADD COLUMN email TEXT');
+  db.exec('ALTER TABLE base_personal ADD COLUMN empresa_id TEXT');
+  db.exec('ALTER TABLE base_personal ADD COLUMN telefono TEXT');
+  db.exec('ALTER TABLE base_personal ADD COLUMN celular TEXT');
+  db.exec('ALTER TABLE base_personal ADD COLUMN arl TEXT');
+  db.exec('CREATE TABLE IF NOT EXISTS companies (company_key TEXT, display_name TEXT)');
+  db.prepare('INSERT OR REPLACE INTO companies VALUES (?, ?)').run('Aseplus', 'ASEPPLUS S.A.S.');
+  db.prepare("INSERT INTO base_personal (id, cedula, nombre, cargo, area, nombres, apellidos, eps, email, empresa_id, telefono, celular, arl) " +
+    "VALUES ('p2','999','IGNORADO','OPERATIVO','SEDE','MARIA','GARCIA','SURA','maria@ejemplo.com','Aseplus','3001112233','3114445566','POSITIVA')").run();
+
+  const alias = await handlers['ausentismo:buscarEmpleado']({}, { cedula: '999', empresaId: 'Aseplus' });
+  ok('10b) encuentra a la persona de la base', alias.success && !!alias.data, JSON.stringify(alias.data));
+  ok('10b) alias nombre <- nombres + apellidos',
+    alias.data && alias.data.nombre === 'MARIA GARCIA', alias.data && alias.data.nombre);
+  ok('10b) alias entidad <- eps',
+    alias.data && alias.data.entidad === 'SURA', alias.data && alias.data.entidad);
+  ok('10b) alias correo <- email',
+    alias.data && alias.data.correo === 'maria@ejemplo.com', alias.data && alias.data.correo);
+  ok('10b) alias empresa <- display_name de companies',
+    alias.data && alias.data.empresa === 'ASEPPLUS S.A.S.', alias.data && alias.data.empresa);
+  ok('10b) NO pisa un campo que la fila ya trae (cargo, arl, telefono)',
+    alias.data && alias.data.cargo === 'OPERATIVO' && alias.data.arl === 'POSITIVA' && alias.data.telefono === '3001112233',
+    alias.data && (alias.data.cargo + '/' + alias.data.arl + '/' + alias.data.telefono));
+  ok('10b) la empresa se filtra: otra empresa no la ve',
+    (await handlers['ausentismo:buscarEmpleado']({}, { cedula: '999', empresaId: 'Temposum' })).data === null);
+
+  // Sin tabla companies: la empresa cae a la propia key.
+  db.exec('DROP TABLE companies');
+  const sinCompanies = await handlers['ausentismo:buscarEmpleado']({}, { cedula: '999', empresaId: 'Aseplus' });
+  ok('10b) sin tabla companies, la empresa cae a la key',
+    sinCompanies.data && sinCompanies.data.empresa === 'Aseplus', sinCompanies.data && sinCompanies.data.empresa);
+  db.exec('CREATE TABLE IF NOT EXISTS companies (company_key TEXT, display_name TEXT)');
+  db.prepare('INSERT OR REPLACE INTO companies VALUES (?, ?)').run('Aseplus', 'ASEPPLUS S.A.S.');
+
   // ---------- 11) El exportador de Python ----------
   const scriptPy = path.join(__dirname, '..', 'Portear', 'src', 'exportar_ausentismo.py');
   ok('11) existe el exportador de Python', fs.existsSync(scriptPy), scriptPy);

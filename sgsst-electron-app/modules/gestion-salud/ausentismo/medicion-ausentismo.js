@@ -7598,47 +7598,32 @@ class MedicionAusentismoComponent {
                     this.showStatus(statusDiv, 'Buscando empleado...', 'info', true);
 
                     try {
-                        const result = await window.electronAPI.buscarEmpleadoPorCedula(cedula, this.currentCompany);
+                        /* 📦1099 (2026-11-25) — La búsqueda de cédula va a la
+                           base de Gestión Humana (`base_personal`, SQLite).
+                           SIN respaldo al Excel: si la cédula no está en la
+                           base, se avisa y se diligencia a mano. */
+                        const tieneApi = window.electronAPI &&
+                            typeof window.electronAPI.ausentismoBuscarEmpleado === 'function';
+                        if (!tieneApi) {
+                            this.showStatus(statusDiv, 'La búsqueda de empleados no está disponible. Diligencie manualmente.', 'warning');
+                            return;
+                        }
+
+                        const result = await window.electronAPI.ausentismoBuscarEmpleado({
+                            cedula: cedula,
+                            empresaId: this.currentCompany
+                        });
                         console.log('[DEBUG buscarEmpleado] result:', JSON.stringify(result));
 
-                        if (result && result.success) {
-                            console.log('[DEBUG buscarEmpleado] datos:', JSON.stringify(result.datos));
-                            document.getElementById('nombre-input').value = result.datos.nombre || '';
-                            document.getElementById('cargo-input').value = result.datos.cargo || '';
-                            document.getElementById('departamento-input').value = result.datos.area || '';
-                            document.getElementById('empresa-usuaria-input').value = result.datos.empresa_usuaria || '';
-                            document.getElementById('entidad-input').value = result.datos.entidad || '';
+                        if (result && result.success && result.data) {
+                            document.getElementById('nombre-input').value = result.data.nombre || '';
+                            document.getElementById('cargo-input').value = result.data.cargo || '';
+                            document.getElementById('departamento-input').value = result.data.area || '';
+                            document.getElementById('empresa-usuaria-input').value = result.data.empresa_usuaria || '';
+                            document.getElementById('entidad-input').value = result.data.entidad || '';
 
-                            // ✅ VALIDACIÓN: Verificar si el empleado pertenece a la empresa seleccionada
-                            const empresaSeleccionada = this.currentCompany.toUpperCase();
-                            const empresaEmpleado = (result.datos.empresa || '').toUpperCase();
-                            
-                            if (empresaEmpleado && empresaSeleccionada !== empresaEmpleado) {
-                                // ⚠️ ALERTA: El empleado pertenece a otra empresa - Mostrar modal personalizado
-                                this.showEmpresaMismatchModal(
-                                    result.datos.nombre,
-                                    result.datos.empresa,
-                                    this.currentCompany,
-                                    () => {
-                                        // Usuario confirmó - continuar con el registro
-                                        /* 📦443 — Mini-tarjeta con datos del empleado en lugar de mensaje plano */
-                                        this._showEmpleadoCard(statusDiv, result.datos);
-                                    },
-                                    () => {
-                                        // Usuario canceló - limpiar formulario
-                                        this.showStatus(statusDiv, 'Búsqueda cancelada. Empleado no pertenece a esta empresa.', 'warning');
-                                        document.getElementById('nombre-input').value = '';
-                                        document.getElementById('cargo-input').value = '';
-                                        document.getElementById('departamento-input').value = '';
-                                        document.getElementById('empresa-usuaria-input').value = '';
-                                        document.getElementById('entidad-input').value = '';
-                                    }
-                                );
-                            } else {
-                                // ✅ Empleado de la misma empresa
-                                /* 📦443 — Mini-tarjeta con datos del empleado en lugar de mensaje plano */
-                                this._showEmpleadoCard(statusDiv, result.datos);
-                            }
+                            /* 📦443 — Mini-tarjeta con datos del empleado en lugar de mensaje plano */
+                            this._showEmpleadoCard(statusDiv, result.data);
                         } else {
                             this.showStatus(statusDiv, 'Empleado no encontrado. Diligencie manualmente.', 'warning');
                             document.getElementById('nombre-input').value = '';
@@ -8021,6 +8006,13 @@ class MedicionAusentismoComponent {
 
     /**
      * Muestra modal personalizado de advertencia por empresa diferente
+     *
+     * 📦1099 — SIN LLAMADORES: la búsqueda de cédula ahora consulta la base de
+     * Gestión Humana filtrando por `empresa_id`, así que el empleado de otra
+     * empresa ya no llega hasta acá (la vista avisa "Empleado no encontrado").
+     * Se conserva el método porque aquí viven los `@keyframes ausFadeIn` y
+     * `ausSlideUp`, que usa el modal de selección de registro.
+     *
      * @param {string} nombreEmpleado - Nombre del empleado encontrado
      * @param {string} empresaEmpleado - Empresa a la que pertenece el empleado
      * @param {string} empresaSeleccionada - Empresa actualmente seleccionada en la UI

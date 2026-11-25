@@ -487,7 +487,7 @@
 
         // 📦467 (2026-07-03) — Autollenado de datos del personal al tabular desde Cédula.
         // Mismo patrón que el wizard de seguimiento (medicion-ausentismo.js → cedula-input blur).
-        // Llama `buscarEmpleadoPorCedula` (mismo IPC del wizard) y popula nombre/cargo/eps/arl.
+        // Llama `ausentismoBuscarEmpleado` (base de Gestión Humana, 📦1099) y popula nombre/cargo/eps/arl.
         var cedulaInput = document.getElementById('ngCedula');
         if (cedulaInput) {
             cedulaInput.addEventListener('blur', _autollenarDatosPersonal);
@@ -516,9 +516,15 @@
         if (nombreEl) nombreEl.placeholder = 'Buscando en BD de personal...';
 
         try {
-            var res = await window.electronAPI.buscarEmpleadoPorCedula(cedula, _state.empresaId);
-            if (res && res.success && res.datos) {
-                var d = res.datos;
+            /* 📦1099 (2026-11-25) — La búsqueda va a la base de Gestión Humana
+               (`base_personal`, SQLite). SIN respaldo al Excel: si la cédula
+               no está en la base, se diligencia a mano. */
+            var res = await window.electronAPI.ausentismoBuscarEmpleado({
+                cedula: cedula,
+                empresaId: _state.empresaId
+            });
+            if (res && res.success && res.data) {
+                var d = res.data;
                 if (nombreEl) nombreEl.value = d.nombre || '';
                 if (cargoEl) cargoEl.value = d.cargo || '';
                 if (epsEl) epsEl.value = d.entidad || '';

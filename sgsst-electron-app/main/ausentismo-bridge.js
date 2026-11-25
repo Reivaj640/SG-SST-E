@@ -522,11 +522,26 @@ function _handlerMarcarExportado(params) {
 }
 
 /**
+ * 📦1099 — Nombre visible de la empresa a partir de su company_key
+ * (`companies.display_name`). Si la tabla no existe, devuelve null: el
+ * que llama hace fallback a la propia key.
+ */
+function _displayEmpresa(db, empresaId) {
+  if (!empresaId) return null;
+  try {
+    var fila = db.prepare('SELECT display_name FROM companies WHERE company_key = ?').get(empresaId);
+    if (fila && fila.display_name) return fila.display_name;
+  } catch (e) { /* la tabla companies puede no existir */ }
+  return null;
+}
+
+/**
  * 📦1095 — Buscar un trabajador en `base_personal` (autollenado del
  * formulario). Devuelve null si esa empresa no tiene la persona.
  *
- * La persona se busca en la BD PRIMERO; el Excel de "BD Personal" queda como
- * respaldo (lo hace el renderer).
+ * La persona se busca en la BD. El Excel de "BD Personal" queda como
+ * respaldo SOLO en el flujo de Seguimiento de Incapacidades (📦1095);
+ * el formulario de registro y Gestión (📦1099) usan la base sin Excel.
  */
 function _handlerBuscarEmpleado(params) {
   if (!_getDb) return error('NO_DB', 'Base de datos no disponible');
@@ -570,6 +585,19 @@ function _handlerBuscarEmpleado(params) {
 
     fila.nombre_completo = [fila.nombres, fila.apellidos].filter(Boolean).join(' ').trim() || (fila.nombre || '');
     fila.area = sede ? sede.nombre : (fila.area || fila.departamento || '');
+
+    // 📦1099 — Aliases ADITIVOS: la UI (formulario de registro y Gestación)
+    // espera los nombres de campo que traía el Excel, pero `base_personal`
+    // los llama distinto (`nombres`+`apellidos`, `eps`, `email`).
+    // `nombre` se arma desde nombres+apellidos (la fuente real); los demás
+    // alias SOLO se agregan si la fila no trae ese campo.
+    if (fila.nombre_completo) fila.nombre = fila.nombre_completo;
+    if (!fila.entidad && fila.eps) fila.entidad = fila.eps;
+    if (!fila.correo && fila.email) fila.correo = fila.email;
+    if (!fila.empresa) {
+      fila.empresa = _displayEmpresa(db, fila.empresa_id) || (fila.empresa_id || '');
+    }
+
     return { success: true, data: fila };
   } catch (e) {
     console.error('[' + MOD + '][EMPLEADO]', e.message);
