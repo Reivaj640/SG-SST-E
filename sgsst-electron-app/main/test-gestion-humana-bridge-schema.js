@@ -212,9 +212,11 @@ async function run() {
     // Write Contratación (4) — Fase 2
     'gh:create-contratacion', 'gh:update-contratacion',
     'gh:delete-contratacion', 'gh:marcar-paso',
-    // Write Personal (4) — Fase 3
+    // Write Personal (5) — Fase 3
     'gh:create-personal', 'gh:update-personal',
     'gh:delete-personal', 'gh:cambiar-estado',
+    // 📦1098 · Borrado duro del personal de la empresa (limpieza desde la UI)
+    'gh:clear-personal',
     // Write Sedes (2) — Fase 3
     'gh:create-sede', 'gh:update-sede',
     // Vacaciones (6) — Fase 5
@@ -256,10 +258,11 @@ async function run() {
   // solo lo ajustamos para que el test quede en verde con la realidad del bridge actual.
   // 📦767 · FASE 1.0-G.2 · El conteo del bridge subió a 60 (era 59 pre-G.2). El desajuste de 1
   // ya existía antes de G.2 (probablemente LEGACY-SIGN-REMOVE dejó 1 handler que no se restó).
-  // I-AUDIT-2026-09-11 · Carpetas v0.2.0 añade 9 handlers. Total actual: 81 (era 70).
+  // I-AUDIT-2026-09-11 · Carpetas v0.2.0 añade 9 handlers. Total actual: 82 (era 70).
   //   70 pre-Carpetas = 64 esperado (con desfase histórico de 6) + 9 Carpetas.
   // 📦743 · +2 handlers (docs de contratación en carpeta). Total: 81.
-  _assertEq(Object.keys(registeredHandlers).length, 81, 'cantidad de handlers registrados = 81 (era 70; +9 carpetas +2 contratacion)');
+  // 📦1098 · +1 handler (gh:clear-personal — borrado duro del personal). Total: 82.
+  _assertEq(Object.keys(registeredHandlers).length, 82, 'cantidad de handlers registrados = 82 (era 70; +9 carpetas +2 contratacion +1 clear-personal)');
   expectedHandlers.forEach(function(ch) {
     _assert(typeof registeredHandlers[ch] === 'function', 'handler "' + ch + '" registrado');
   });

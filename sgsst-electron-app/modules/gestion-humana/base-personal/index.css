@@ -995,6 +995,116 @@
 }
 
 /* ═══════════════════════════════════════════════════════════════════
+   📦1098 · DESPLEGABLE "ACCIONES" (Importar / Exportar / Borrar)
+   Mismo lenguaje visual que el desplegable de Sede, pero con su propio
+   prefijo para no acoplar las dos piezas.
+   ═══════════════════════════════════════════════════════════════════ */
+.bp-actions-dropdown {
+  position: relative;
+  display: inline-block;
+}
+
+.bp-actions-dropdown__toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 132px;
+  padding: 0.5rem 0.75rem;
+  background: #fff;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: #374151;
+  font-family: inherit;
+  cursor: pointer;
+  transition: border-color 0.12s, box-shadow 0.12s;
+}
+.bp-actions-dropdown__toggle:hover {
+  border-color: #9ca3af;
+}
+.bp-actions-dropdown--open .bp-actions-dropdown__toggle {
+  border-color: #174ea6;
+  box-shadow: 0 0 0 3px rgba(23, 78, 166, 0.12);
+}
+
+.bp-actions-dropdown__icon {
+  font-size: 0.75rem;
+  color: #6b7280;
+}
+
+.bp-actions-dropdown__chevron {
+  margin-left: 0.25rem;
+  font-size: 0.7rem;
+  color: #6b7280;
+  transition: transform 0.15s;
+}
+.bp-actions-dropdown--open .bp-actions-dropdown__chevron {
+  transform: rotate(180deg);
+}
+
+.bp-actions-dropdown__menu {
+  position: absolute;
+  top: calc(100% + 0.375rem);
+  right: 0;
+  min-width: 240px;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04);
+  padding: 0.375rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  z-index: 100;
+}
+/* El atributo hidden debe ganarle al display:flex de arriba */
+.bp-actions-dropdown__menu[hidden] { display: none; }
+
+.bp-actions-option {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+  width: 100%;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  padding: 0.4375rem 0.625rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: #4b5563;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+  font-family: inherit;
+  white-space: nowrap;
+}
+.bp-actions-option:hover:not(:disabled) {
+  background: #f3f4f6;
+  color: #1f2937;
+}
+.bp-actions-option:focus-visible {
+  outline: 2px solid #174ea6;
+  outline-offset: -2px;
+}
+
+/* 📦1098 · La opción destructiva se ve roja ANTES de confirmarla */
+.bp-actions-option--danger {
+  color: #b91c1c;
+}
+.bp-actions-option--danger:hover:not(:disabled) {
+  background: #fef2f2;
+  color: #991b1b;
+}
+
+.bp-actions-sep {
+  height: 1px;
+  margin: 0.25rem 0.125rem;
+  background: #e5e7eb;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
    📦810 · MODO OSCURO (overlay automático, append-only)
    Cubre data-theme="dark" (Sistema + SO oscuro) y "dark-legacy" (Oscuro manual).
    Los colores claros escritos a mano pasan a los tokens de styles.css, que ya
@@ -1208,3 +1318,24 @@
 [data-theme="dark-legacy"] .bp-sede-option { color: var(--text-light-color); }
 [data-theme="dark"] .bp-sede-option:hover:not(:disabled),
 [data-theme="dark-legacy"] .bp-sede-option:hover:not(:disabled) { color: var(--text-color); }
+/* 📦1098 · Desplegable "Acciones" (tema oscuro) */
+[data-theme="dark"] .bp-actions-dropdown__toggle,
+[data-theme="dark-legacy"] .bp-actions-dropdown__toggle { background: var(--widget-bg-color); border: 1px solid var(--border-color); color: var(--text-color); }
+[data-theme="dark"] .bp-actions-dropdown--open .bp-actions-dropdown__toggle,
+[data-theme="dark-legacy"] .bp-actions-dropdown--open .bp-actions-dropdown__toggle { border-color: var(--primary-color); box-shadow: var(--box-shadow); }
+[data-theme="dark"] .bp-actions-dropdown__menu,
+[data-theme="dark-legacy"] .bp-actions-dropdown__menu { background: var(--widget-bg-color); border: 1px solid var(--border-color); box-shadow: var(--box-shadow); }
+[data-theme="dark"] .bp-actions-option,
+[data-theme="dark-legacy"] .bp-actions-option { color: var(--text-light-color); }
+[data-theme="dark"] .bp-actions-option:hover:not(:disabled),
+[data-theme="dark-legacy"] .bp-actions-option:hover:not(:disabled) { background: rgba(255, 255, 255, 0.08); color: var(--text-color); }
+[data-theme="dark"] .bp-actions-option--danger,
+[data-theme="dark-legacy"] .bp-actions-option--danger { color: #f87171; }
+[data-theme="dark"] .bp-actions-option--danger:hover:not(:disabled),
+[data-theme="dark-legacy"] .bp-actions-option--danger:hover:not(:disabled) { background: rgba(248, 113, 113, 0.12); color: #fca5a5; }
+[data-theme="dark"] .bp-actions-sep,
+[data-theme="dark-legacy"] .bp-actions-sep { background: var(--border-color); }
+[data-theme="dark"] .bp-actions-dropdown__icon,
+[data-theme="dark-legacy"] .bp-actions-dropdown__icon,
+[data-theme="dark"] .bp-actions-dropdown__chevron,
+[data-theme="dark-legacy"] .bp-actions-dropdown__chevron { color: var(--text-light-color); }

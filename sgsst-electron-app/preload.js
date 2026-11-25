@@ -490,6 +490,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   ghCreatePersonal: (payload) => ipcRenderer.invoke('gh:create-personal', payload),
   ghUpdatePersonal: (payload) => ipcRenderer.invoke('gh:update-personal', payload),
   ghDeletePersonal: (payload) => ipcRenderer.invoke('gh:delete-personal', payload),
+  // 📦1098 · Borrar toda la base de personal de la empresa (limpieza desde la UI)
+  ghClearPersonal: (payload) => ipcRenderer.invoke('gh:clear-personal', payload),
   ghCambiarEstado: (payload) => ipcRenderer.invoke('gh:cambiar-estado', payload),
   // Write Sedes (2)
   ghCreateSede: (payload) => ipcRenderer.invoke('gh:create-sede', payload),

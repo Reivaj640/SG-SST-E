@@ -283,8 +283,19 @@ class BasePersonalComponent {
                 '<div id="bp-sede-menu" class="bp-sede-dropdown__menu" role="listbox" aria-labelledby="bp-sede-label-text" hidden></div>' +
               '</div>' +
             '</div>' +
-            '<button id="bp-importar-btn" class="bp-btn bp-btn--ghost" type="button" title="Importar trabajadores desde Excel"><i class="fas fa-file-import"></i> Importar Excel</button>' +
-            '<button id="bp-exportar-btn" class="bp-btn bp-btn--ghost" type="button"><i class="fas fa-download"></i> Exportar CSV</button>' +
+            '<div class="bp-actions-dropdown" id="bp-actions-dropdown">' +
+              '<button id="bp-actions-toggle" class="bp-actions-dropdown__toggle" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="Acciones de la base de personal">' +
+                '<i class="fas fa-ellipsis-v bp-actions-dropdown__icon"></i>' +
+                '<span>Acciones</span>' +
+                '<i class="fas fa-chevron-down bp-actions-dropdown__chevron"></i>' +
+              '</button>' +
+              '<div id="bp-actions-menu" class="bp-actions-dropdown__menu" role="menu" aria-label="Acciones de la base de personal" hidden>' +
+                '<button type="button" role="menuitem" class="bp-actions-option" data-action="importar"><i class="fas fa-file-import"></i> Importar Excel</button>' +
+                '<button type="button" role="menuitem" class="bp-actions-option" data-action="exportar"><i class="fas fa-download"></i> Exportar CSV</button>' +
+                '<div class="bp-actions-sep" role="separator"></div>' +
+                '<button type="button" role="menuitem" class="bp-actions-option bp-actions-option--danger" data-action="borrar"><i class="fas fa-trash-alt"></i> Borrar base de personal</button>' +
+              '</div>' +
+            '</div>' +
           '</div>' +
         '</div>' +
       '</div>' +
@@ -609,11 +620,43 @@ class BasePersonalComponent {
     }
 
     // Wire up
-    var exportarBtn = this.container.querySelector('#bp-exportar-btn');
-    if (exportarBtn) exportarBtn.onclick = function () { self._exportarCSV(); };
-
-    var importarBtn = this.container.querySelector('#bp-importar-btn');
-    if (importarBtn) importarBtn.onclick = function () { self._openImport(); };
+    // 📦1098 · Importar / Exportar / Borrar viven en el desplegable "Acciones"
+    // (mismo patrón que el desplegable de Sede: abrir, clic fuera y Escape cierran).
+    var accionesToggle = this.container.querySelector('#bp-actions-toggle');
+    var accionesMenu = this.container.querySelector('#bp-actions-menu');
+    var accionesDropdown = this.container.querySelector('#bp-actions-dropdown');
+    if (accionesToggle && accionesMenu && accionesDropdown) {
+      var closeAccionesMenu = function () {
+        accionesMenu.hidden = true;
+        accionesToggle.setAttribute('aria-expanded', 'false');
+        accionesDropdown.classList.remove('bp-actions-dropdown--open');
+      };
+      this._closeAccionesMenu = closeAccionesMenu;
+      accionesToggle.onclick = function (ev) {
+        ev.stopPropagation();
+        if (!accionesMenu.hidden) { closeAccionesMenu(); return; }
+        accionesMenu.hidden = false;
+        accionesToggle.setAttribute('aria-expanded', 'true');
+        accionesDropdown.classList.add('bp-actions-dropdown--open');
+      };
+      accionesMenu.onclick = function (ev) {
+        var btn = ev.target.closest('.bp-actions-option');
+        if (!btn) return;
+        var action = btn.getAttribute('data-action');
+        closeAccionesMenu();
+        if (action === 'importar') self._openImport();
+        else if (action === 'exportar') self._exportarCSV();
+        else if (action === 'borrar') self._borrarBasePersonal();
+      };
+      document.addEventListener('click', function (ev) {
+        if (accionesMenu.hidden) return;
+        if (accionesDropdown.contains(ev.target)) return;
+        closeAccionesMenu();
+      });
+      document.addEventListener('keydown', function (ev) {
+        if (ev.key === 'Escape' && !accionesMenu.hidden) closeAccionesMenu();
+      });
+    }
 
     // Wirear modal close (backdrop + botón X + botón Cancelar)
     var modal = this.container.querySelector('#bp-import-modal');
@@ -900,6 +943,47 @@ class BasePersonalComponent {
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
     this._toast.success('Exportación completa', this.filtered.length + ' filas exportadas a CSV');
+  }
+
+  // 📦1098 · Borrar TODA la base de personal de la empresa.
+  // Es la limpieza que antes solo se podía hacer desde un script: se borran los
+  // trabajadores de la empresa abierta y todo lo que cuelga de ellos. Pide confirmación
+  // explícita porque no se puede deshacer.
+  async _borrarBasePersonal() {
+    var self = this;
+    var total = (this.personales && this.personales.length) ? this.personales.length : 0;
+    if (total === 0) {
+      this._toast.warning('No hay trabajadores para borrar');
+      return;
+    }
+    var plural = total === 1 ? 'trabajador' : 'trabajadores';
+    var empresa = this.companyName || 'la empresa';
+    var confirmed = await this._confirmDialog().confirm({
+      title: '🗑 Borrar base de personal',
+      message: 'Se eliminarán ' + total + ' ' + plural + ' de ' + empresa + '. Esta acción NO se puede deshacer.',
+      details: 'Se borran también los registros asociados a esos trabajadores: vacaciones, permisos, documentos, afiliaciones, mensajes, carpetas (expedientes y archivos) e historial de cambios de estado. Los procesos de contratación NO se eliminan, solo quedan sin trabajador asociado. Para volver a cargar el personal usá Importar Excel.',
+      confirmText: 'Sí, borrar ' + total + ' ' + plural,
+      cancelText: 'Cancelar',
+      type: 'danger'
+    });
+    if (!confirmed) return;
+
+    try {
+      var r = await window.electronAPI.ghClearPersonal({
+        companyName: this.companyName,
+        confirmar: true
+      });
+      if (!r || !r.success) {
+        self._toast.error('❌ No se pudo borrar', (r && r.error ? r.error.message : 'desconocido'));
+        return;
+      }
+      var borrados = (r.data && r.data.deleted != null) ? r.data.deleted : total;
+      var bp = (borrados === 1) ? '1 trabajador eliminado' : (borrados + ' trabajadores eliminados');
+      self._toast.success('🗑 Base de personal borrada', bp);
+      await self._load();
+    } catch (e) {
+      self._toast.error('❌ No se pudo borrar', e.message);
+    }
   }
 
   // === IPC CALLS ===

@@ -1,7 +1,8 @@
 <!-- modules/gestion-humana/base-personal/index.html
      📦730 · Vista "Base de Personal" — HTML separado (v0.2.0)
      Estructura:
-       - Toolbar unificada (búsqueda + segmented + Sede + Importar/Exportar en una sola fila)
+       - Toolbar unificada (búsqueda + segmented + Sede + Acciones en una sola fila)
+        📦1098: Importar / Exportar / Borrar viven en el desplegable "Acciones".
        - Table container
      Nota: la barra de KPIs superior se eliminó (los conteos viven en los
      filtros segmentados Todos/Activos/Retirados). La fila de contador de
@@ -43,12 +44,28 @@
             <div id="bp-sede-menu" class="bp-sede-dropdown__menu" role="listbox" aria-labelledby="bp-sede-label-text" hidden></div>
           </div>
         </div>
-        <button id="bp-importar-btn" class="bp-btn bp-btn--ghost" type="button" title="Importar trabajadores desde Excel">
-          <i class="fas fa-file-import"></i> Importar Excel
-        </button>
-        <button id="bp-exportar-btn" class="bp-btn bp-btn--ghost" type="button">
-          <i class="fas fa-download"></i> Exportar CSV
-        </button>
+        <!-- 📦1098 · Menú "Acciones" (mismo estilo que el desplegable de Sede).
+             Reúne Importar / Exportar / Borrar en un solo botón físico. -->
+        <div class="bp-actions-dropdown" id="bp-actions-dropdown">
+          <button id="bp-actions-toggle" class="bp-actions-dropdown__toggle" type="button"
+                  aria-haspopup="menu" aria-expanded="false" aria-label="Acciones de la base de personal">
+            <i class="fas fa-ellipsis-v bp-actions-dropdown__icon"></i>
+            <span>Acciones</span>
+            <i class="fas fa-chevron-down bp-actions-dropdown__chevron"></i>
+          </button>
+          <div id="bp-actions-menu" class="bp-actions-dropdown__menu" role="menu" aria-label="Acciones de la base de personal" hidden>
+            <button type="button" role="menuitem" class="bp-actions-option" data-action="importar">
+              <i class="fas fa-file-import"></i> Importar Excel
+            </button>
+            <button type="button" role="menuitem" class="bp-actions-option" data-action="exportar">
+              <i class="fas fa-download"></i> Exportar CSV
+            </button>
+            <div class="bp-actions-sep" role="separator"></div>
+            <button type="button" role="menuitem" class="bp-actions-option bp-actions-option--danger" data-action="borrar">
+              <i class="fas fa-trash-alt"></i> Borrar base de personal
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   </div>

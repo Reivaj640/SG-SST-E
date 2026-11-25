@@ -1252,6 +1252,83 @@ function _handlerDeletePersonal(token, personalId, usuarioId) {
 }
 
 /**
+ * gh:clear-personal (📦1098 · Borrar la base de personal desde la UI)
+ * Destrucción DURA (DELETE) de TODOS los trabajadores de UNA empresa — la que se está
+ * viendo en pantalla. Antes esto solo se podía hacer con un script; ahora la vista
+ * "Base de Personal" lo ofrece con confirmación explícita.
+ *
+ * Qué se borra:
+ *   - base_personal de la empresa (empresa_id = company_key).
+ *   - Por CASCADE (foreign_keys=ON en main.js desde 📦824): gh_vacaciones, gh_permisos,
+ *     gh_documentos, gh_mensajes (remitente/destinatario), gh_documentos_afiliaciones,
+ *     gh_carpetas_expedientes y gh_carpetas_documentos.
+ *   - gh_eventos_personal: EXPLÍCITO, porque esa tabla NO tiene FK declarada.
+ * Qué NO se borra:
+ *   - contrataciones: solo se desvincula (trabajador_id → NULL). El pipeline se conserva.
+ *   - gh_sedes, gh_templates y el resto de datos de la empresa.
+ *
+ * Doble candado: la UI ya pregunta al usuario, pero el canal exige `confirmar: true`
+ * para que un llamado accidental (sin confirmación del usuario) no borre nada.
+ *
+ * Input: { token, companyName, confirmar: true }
+ * Devuelve: { success, data: { deleted, empresa } }
+ */
+function _handlerClearPersonal(token, companyName, confirmar) {
+  var auth = _checkAuth(token);
+  if (!auth.ok) return _err(auth.error.code, auth.error.message);
+
+  if (!companyName) return _err('INVALID_INPUT', 'companyName es requerido');
+  if (confirmar !== true) {
+    return _err('CONFIRM_REQUIRED', 'Se requiere confirmación explícita (confirmar: true)');
+  }
+
+  var company = _getCompanyByName(companyName);
+  if (!company) return _err('COMPANY_NOT_FOUND', 'Empresa "' + companyName + '" no encontrada');
+
+  var localDb = _getDb();
+  if (!localDb) return _err('NO_DB', 'BD no disponible');
+
+  try {
+    var ids = localDb.prepare('SELECT id FROM base_personal WHERE empresa_id = ?')
+      .all(company.company_key)
+      .map(function (r) { return r.id; });
+
+    if (ids.length === 0) {
+      return _ok({ deleted: 0, empresa: company.display_name });
+    }
+
+    // Transacción: o se borra todo, o no se borra nada (evita una base a medias).
+    localDb.exec('BEGIN');
+    try {
+      // 1) Historial laboral — sin FK declarada, se limpia a mano.
+      localDb.prepare('DELETE FROM gh_eventos_personal WHERE empresa_id = ?').run(company.company_key);
+
+      // 2) Contrataciones: se conserva el pipeline, solo se suelta el vínculo con el
+      //    trabajador que se está borrando (si no, queda apuntando a un id inexistente).
+      var ph = ids.map(function () { return '?'; }).join(',');
+      var stmtUnlink = localDb.prepare(
+        'UPDATE contrataciones SET trabajador_id = NULL WHERE trabajador_id IN (' + ph + ')'
+      );
+      stmtUnlink.run.apply(stmtUnlink, ids);
+
+      // 3) Personal — la CASCADE se encarga de los registros que lo apuntan.
+      localDb.prepare('DELETE FROM base_personal WHERE empresa_id = ?').run(company.company_key);
+
+      localDb.exec('COMMIT');
+    } catch (e2) {
+      try { localDb.exec('ROLLBACK'); } catch (e3) { /* la transacción ya podía estar cerrada */ }
+      throw e2;
+    }
+
+    console.log('[' + MOD + '][clear-personal] ' + ids.length + ' trabajadores borrados de ' + company.company_key);
+    return _ok({ deleted: ids.length, empresa: company.display_name });
+  } catch (e) {
+    console.error('[' + MOD + '][clear-personal]', e.message);
+    return _err('INTERNAL', e.message);
+  }
+}
+
+/**
  * gh:recontratar-personal (📦767 · I-103.A1.0-E-refactor)
  * Operación atómica de alto nivel: crea la nueva CT + reactiva el BP + vincula + registra RECONTRATACION.
  * RECONTRATACION siempre = BP retirado + nueva CT (sin CT es REINGRESO via gh:cambiar-estado).
@@ -4539,6 +4616,16 @@ function registerGestionHumanaHandlers(app, deps) {
       return _err('INTERNAL', e.message);
     }
   });
+  // 📦1098 · Borrado duro del personal de la empresa (limpieza desde la UI).
+  ipcMainHandle('gh:clear-personal', function (event, payload) {
+    try {
+      var p = payload || {};
+      return _handlerClearPersonal(p.token || '', p.companyName, p.confirmar);
+    } catch (e) {
+      console.error('[' + MOD + '][clear-personal]', e.message);
+      return _err('INTERNAL', e.message);
+    }
+  });
   ipcMainHandle('gh:cambiar-estado', function (event, payload) {
     try {
       var p = payload || {};
@@ -5408,7 +5495,7 @@ function registerGestionHumanaHandlers(app, deps) {
     catch (e) { return _err('INTERNAL', e.message); }
   });
 
-  console.log('[' + MOD + '][INIT][SUCCESS] Bridge registrado · 5 read + 4 write-contratacion + 4 write-personal + 2 write-sedes + 6 vacaciones + 5 permisos + 5 documentos + 5 anuncios + 4 mensajes + 5 docs-afiliaciones + 5 templates + 3 import-excel + 4 soportes-contratacion + 1 diag + 9 carpetas + 2 carpetas-contratacion · 81 handlers totales · LEGACY-SIGN-REMOVE (sin firma canvas)');
+  console.log('[' + MOD + '][INIT][SUCCESS] Bridge registrado · 5 read + 4 write-contratacion + 5 write-personal + 2 write-sedes + 6 vacaciones + 5 permisos + 5 documentos + 5 anuncios + 4 mensajes + 5 docs-afiliaciones + 5 templates + 3 import-excel + 4 soportes-contratacion + 1 diag + 9 carpetas + 2 carpetas-contratacion · 82 handlers totales · LEGACY-SIGN-REMOVE (sin firma canvas)');
 }
 
 registerGestionHumanaHandlers.init = function(ipcMain) {
