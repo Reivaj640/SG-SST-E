@@ -2539,6 +2539,20 @@ muestra el histórico completo (753 / 1 501 / 1 289 filas) y el orden es del má
 
 **Tests.** `main/test-copasst-actas-pickers.js` (75/75, con `_buildMonthGrid` y `_buildTimeSlots` **extraídos del archivo vivo y ejecutados**, y 8 mutaciones que muerden) · `main/test-copasst-tema-890.js` (47/47, su constante de sello se actualizó al nuevo).
 
+## 🖋️ Generador de Actas del Comité de Convivencia (Recursos) — la fecha y las dos horas con desplegables propios, y el formulario deja de estar blanco en el tema oscuro
+
+**El modelo.** El formulario de "Conformación de Comité de Convivencia" lo arma `showRealizarActasInterface()` (`modules/recursos/comite-convivencia/comite-convivencia-logic.js`): se inyecta **en el DOM del shell** (no es un iframe) con un `<style>` propio. Sus tres campos de fecha y hora eran `<input type="date" id="fecha">`, `<input type="time" id="inicia">` y `<input type="time" id="termina">` — el mismo esqueleto del Generador de Actas del COPASST, con otro contenedor (`.convivencia-actas-container`) y otro Excel: la fecha va a la **fila 9**, el inicio a la **11** y el fin a la **12**.
+
+**Lo que cambió.** Las tres casillas pasaron a desplegables propios, con el prefijo de clases `ccv-` (para no mezclarse con las del COPASST, que viven en la misma pantalla): la **fecha** usa un calendario propio (42 celdas, semana en lunes, con "Limpiar" y "Hoy") y las **dos horas** una rejilla de **96 horarios en pasos de 15 minutos** en **24 h**, que abre **centrada en la hora que ya tenía el campo**. El bloque de CSS y los once métodos **se extrajeron del archivo vivo del COPASST (📦1104)** y se adaptaron, para que las dos implementaciones no puedan divergir.
+
+**Lo que NO cambió.** El `<input>` nativo **queda oculto pero intacto, con su ID**: `handleExportExcel()`, `prepareExcelChanges()` y el autollenado leen y escriben igual que antes. El desplegable es una vista encima del input, no un reemplazo.
+
+**El arreglo de fondo: el tema oscuro del formulario no aplicaba.** El bloque heredado usaba `.convivencia-actas-container[data-theme="dark"]`, con el atributo **en el contenedor**, pero el tema lo pone la Isla 1 en **`<html>`** (`renderer.js`, `scripts/theme-manager.js`): esas **13 reglas nunca aplicaron** y el formulario salía con la tarjeta blanca en el tema oscuro. Ahora usan `[data-theme^="dark"] .convivencia-actas-container`, la forma que exige `PROMPT.md` §4.
+
+**El sello.** `index.html:520` pide `comite-convivencia-logic.js?v=CONVIVENCIA-20261126-v2-actas-pickers`: sin subir el sello, Electron sirve el JS viejo del caché y el cambio no llega a la app. El sello del `portal-logic.js` **no se tocó**: ese archivo no cambió.
+
+**Tests.** `main/test-comite-convivencia-actas-pickers.js` (86/86, con `_buildMonthGridCcv` y `_buildTimeSlotsCcv` **extraídos del archivo vivo y ejecutados**, y 11 mutaciones que muerden) · `main/test-copasst-actas-pickers.js` (75/75).
+
 ## 🖋️ Servicio de firma electrónica (`firma-service`)
 Servicio **separado** del app de escritorio: lo opera Gesstiar S.A.S. y vive en `sgsst-electron-app/firma-service/` (Node, Express, SQLite). Se despliega aparte (tar en `/opt/kair-firma`), expone `https://firma.kair.fyi` por túnel de Cloudflare y tiene su propio manifiesto de evidencias legales (`legal-readiness.json`) y su propio gate de publicación (`scripts/auditar-readiness-legal.js`).
 **Lo que cambió el 27-oct-2026 (📦976), que es lo que hay que tener presente:**- **El remitente del enlace puede ser la Empresa.** Cada Empresa puede registrar una cuenta de envío propia (SMTP) en el servicio; la clave se guarda cifrada con la llave maestra y cada cambio deja rastro. El enlace de acceso y el aviso de la firma salen por esa cuenta. **El código de verificación (OTP) sale SIEMPRE desde la cuenta de K+AIR**, porque es el dato de creación de la firma y su custodia no puede depender de la Empresa (art. 2.2.2.47.4 núm. 1 del Decreto 1074 de 2015).

@@ -231,19 +231,192 @@ class ComiteConvivenciaComponent {
 }
 
 /* Modo oscuro — compatibilidad heredada */
-.convivencia-actas-container[data-theme="dark"] .pres-header h1 { color: #e2e8f0; }
-.convivencia-actas-container[data-theme="dark"] .pres-header__crumb { color: #8791a1; }
-.convivencia-actas-container[data-theme="dark"] .pres-header p { color: #a0aec0; }
-.convivencia-actas-container[data-theme="dark"] .pres-header .header-back-btn { color: #adb5bd; border-color: #4a5568; background: transparent; }
-.convivencia-actas-container[data-theme="dark"] .pres-header .header-back-btn:hover { background: rgba(77, 166, 255, 0.15); color: #4da6ff; }
-.convivencia-actas-container[data-theme="dark"] .acta-form-wrapper { background: transparent; }
-.convivencia-actas-container[data-theme="dark"] .acta-card { background: #2d3748; border-color: #4a5568; }
-.convivencia-actas-container[data-theme="dark"] .acta-card-title { color: #e2e8f0; }
-.convivencia-actas-container[data-theme="dark"] .acta-form-group label { color: #a0aec0; }
-.convivencia-actas-container[data-theme="dark"] .acta-form-group input,
-.convivencia-actas-container[data-theme="dark"] .acta-form-group textarea { background: #1a202c; border-color: #4a5568; color: #e2e8f0; }
-.convivencia-actas-container[data-theme="dark"] .acta-dynamic-item { background: #1a202c; border-color: #4a5568; }
-.convivencia-actas-container[data-theme="dark"] .acta-btn-add { background: transparent; color: #4da6ff; border-color: #4a5568; }
+[data-theme^="dark"] .convivencia-actas-container .pres-header h1 { color: #e2e8f0; }
+[data-theme^="dark"] .convivencia-actas-container .pres-header__crumb { color: #8791a1; }
+[data-theme^="dark"] .convivencia-actas-container .pres-header p { color: #a0aec0; }
+[data-theme^="dark"] .convivencia-actas-container .pres-header .header-back-btn { color: #adb5bd; border-color: #4a5568; background: transparent; }
+[data-theme^="dark"] .convivencia-actas-container .pres-header .header-back-btn:hover { background: rgba(77, 166, 255, 0.15); color: #4da6ff; }
+[data-theme^="dark"] .convivencia-actas-container .acta-form-wrapper { background: transparent; }
+[data-theme^="dark"] .convivencia-actas-container .acta-card { background: #2d3748; border-color: #4a5568; }
+[data-theme^="dark"] .convivencia-actas-container .acta-card-title { color: #e2e8f0; }
+[data-theme^="dark"] .convivencia-actas-container .acta-form-group label { color: #a0aec0; }
+[data-theme^="dark"] .convivencia-actas-container .acta-form-group input,
+[data-theme^="dark"] .convivencia-actas-container .acta-form-group textarea { background: #1a202c; border-color: #4a5568; color: #e2e8f0; }
+[data-theme^="dark"] .convivencia-actas-container .acta-dynamic-item { background: #1a202c; border-color: #4a5568; }
+[data-theme^="dark"] .convivencia-actas-container .acta-btn-add { background: transparent; color: #4da6ff; border-color: #4a5568; }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   📦1105 — Desplegables de FECHA y HORA del Generador de Actas del Comite de Convivencia.
+   Mismo lenguaje visual que el Formulario de Registro de ausentismo
+   (📦1101): boton con borde, chevron que gira, menu PROPIO (no el del
+   sistema operativo) y calendario propio. El <input> nativo queda
+   OCULTO como fuente de verdad: handleExportExcel y prepareExcelChanges
+   siguen leyendo los mismos IDs (fecha, inicia, termina).
+   ═══════════════════════════════════════════════════════════════════════ */
+.convivencia-actas-container .ccv-dd { position: relative; display: block; width: 100%; }
+.convivencia-actas-container .ccv-dd__native { display: none; }
+
+.convivencia-actas-container .ccv-dd__toggle {
+  display: flex; align-items: center; gap: 0.5rem; width: 100%;
+  padding: 0.55rem 0.75rem;
+  background: var(--kair-card, #ffffff);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  font-family: var(--kair-font-ui, 'Segoe UI', 'Roboto', sans-serif);
+  font-size: 0.875rem; font-weight: 500;
+  color: var(--kair-ink, #14213d);
+  text-align: left; cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.convivencia-actas-container .ccv-dd__toggle:hover:not(:disabled) { border-color: var(--kair-blue, #2057b8); }
+.convivencia-actas-container .ccv-dd--open .ccv-dd__toggle {
+  border-color: var(--kair-blue, #2057b8);
+  box-shadow: 0 0 0 3px rgba(32, 87, 184, 0.10);
+}
+.convivencia-actas-container .ccv-dd__value {
+  flex: 1; min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.convivencia-actas-container .ccv-dd__icon {
+  width: 16px; height: 16px; flex-shrink: 0;
+  color: var(--kair-muted, #748096);
+}
+.convivencia-actas-container .ccv-dd__chevron {
+  width: 16px; height: 16px; flex-shrink: 0;
+  color: var(--kair-muted, #748096);
+  transition: transform 0.15s ease;
+}
+.convivencia-actas-container .ccv-dd--open .ccv-dd__chevron { transform: rotate(180deg); }
+
+.convivencia-actas-container .ccv-dd__menu {
+  position: absolute;
+  top: calc(100% + 0.375rem);
+  left: 0;
+  min-width: 100%;
+  max-width: 300px;
+  background: var(--kair-card, #ffffff);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  box-shadow: var(--kair-shadow-soft, 0 8px 18px rgba(32, 87, 184, 0.15));
+  padding: 0.375rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  z-index: 100;
+}
+/* El atributo hidden debe ganarle al display:flex de arriba */
+.convivencia-actas-container .ccv-dd__menu[hidden] { display: none; }
+/* El editor tiene scroll: si el menu no cabe hacia abajo, se abre hacia arriba */
+.convivencia-actas-container .ccv-dd__menu--up { top: auto; bottom: calc(100% + 0.375rem); }
+
+/* Las casillas de hora */
+.convivencia-actas-container .ccv-dd__option {
+  display: flex; align-items: center; justify-content: center;
+  width: 100%;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  padding: 0.3rem 0.25rem;
+  font-family: var(--kair-font-ui, 'Segoe UI', 'Roboto', sans-serif);
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--kair-ink, #14213d);
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+.convivencia-actas-container .ccv-dd__option:hover:not(:disabled) { background: var(--kair-blue-soft, #eaf1fb); }
+.convivencia-actas-container .ccv-dd__option:focus-visible { outline: 2px solid var(--kair-blue, #2057b8); outline-offset: -2px; }
+.convivencia-actas-container .ccv-dd__option--active {
+  background: var(--kair-blue-soft, #eaf1fb);
+  color: var(--kair-blue, #2057b8);
+  font-weight: 700;
+}
+/* 📦1105 — La hora de FIN no puede ser anterior a la de INICIO: esas
+   casillas quedan deshabilitadas (un acta no puede terminar antes de
+   empezar) */
+.convivencia-actas-container .ccv-dd__option:disabled { opacity: 0.35; cursor: not-allowed; }
+
+/* Rejilla de horarios: 4 columnas x 24 filas (pasos de 15 minutos) */
+.convivencia-actas-container .ccv-dd--hora .ccv-dd__menu { width: 272px; min-width: 272px; max-width: 272px; padding: 0.5rem; }
+.convivencia-actas-container .ccv-horas {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 2px;
+  max-height: 288px; overflow-y: auto;
+}
+
+/* Calendario propio de la fecha */
+.convivencia-actas-container .ccv-dd--fecha .ccv-dd__menu { width: 272px; min-width: 272px; max-width: 272px; padding: 0.5rem; }
+.convivencia-actas-container .ccv-cal__head {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 4px; padding: 2px 4px 6px;
+}
+.convivencia-actas-container .ccv-cal__label {
+  font-size: 0.8125rem; font-weight: 700; color: var(--kair-ink, #14213d);
+}
+.convivencia-actas-container .ccv-cal__nav {
+  width: 28px; height: 28px;
+  border: none; background: transparent;
+  border-radius: 8px;
+  font-size: 16px; line-height: 1;
+  color: var(--kair-muted, #748096);
+  cursor: pointer;
+}
+.convivencia-actas-container .ccv-cal__nav:hover { background: var(--kair-soft, #f3f6f6); }
+.convivencia-actas-container .ccv-cal__week,
+.convivencia-actas-container .ccv-cal__grid {
+  display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px;
+}
+.convivencia-actas-container .ccv-cal__week span {
+  font-size: 10px; font-weight: 700; color: var(--kair-faint, #aab1bd);
+  text-align: center; text-transform: uppercase;
+  padding-bottom: 2px;
+}
+.convivencia-actas-container .ccv-cal__day {
+  height: 30px;
+  border: none; background: transparent;
+  border-radius: 8px;
+  font-family: var(--kair-font-ui, 'Segoe UI', 'Roboto', sans-serif);
+  font-size: 12.5px;
+  color: var(--kair-ink, #14213d);
+  cursor: pointer;
+}
+.convivencia-actas-container .ccv-cal__day:hover { background: var(--kair-soft, #f3f6f6); }
+.convivencia-actas-container .ccv-cal__day--out { opacity: 0.45; }
+.convivencia-actas-container .ccv-cal__day--today {
+  box-shadow: inset 0 0 0 1px var(--kair-blue, #2057b8);
+  color: var(--kair-blue, #2057b8);
+  font-weight: 700;
+}
+.convivencia-actas-container .ccv-cal__day--sel {
+  background: var(--kair-blue, #2057b8);
+  color: #fff;
+  font-weight: 700;
+}
+.convivencia-actas-container .ccv-cal__day--sel:hover { background: var(--kair-blue, #2057b8); }
+.convivencia-actas-container .ccv-cal__foot {
+  display: flex; justify-content: space-between; gap: 6px;
+  border-top: 1px solid var(--border-color);
+  margin-top: 4px; padding-top: 6px;
+}
+.convivencia-actas-container .ccv-cal__btn {
+  flex: 1;
+  border: 1px solid var(--border-color); background: transparent;
+  border-radius: 8px;
+  padding: 5px 8px;
+  font-family: var(--kair-font-ui, 'Segoe UI', 'Roboto', sans-serif);
+  font-size: 12px; font-weight: 600;
+  color: var(--kair-muted, #748096);
+  cursor: pointer;
+}
+.convivencia-actas-container .ccv-cal__btn:hover { background: var(--kair-soft, #f3f6f6); }
+
+/* 📦1105 — Modo oscuro: los tokens ya viran solos (--kair-card, --kair-ink,
+   --kair-line, --kair-blue-soft), asi que solo hay que arreglar los dos
+   colores que NO son token: el texto del dia elegido (blanco sobre azul
+   claro no se lee) y la sombra del menu. */
+[data-theme^="dark"] .convivencia-actas-container .ccv-cal__day--sel { color: #0b1f33; }
+[data-theme^="dark"] .convivencia-actas-container .ccv-dd__menu {
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.45);
+}
 `;
         wrapper.appendChild(style);
 
@@ -253,9 +426,9 @@ class ComiteConvivenciaComponent {
                     <h2 class="acta-card-title">Información de la Reunión</h2>
                     <div class="acta-form-grid">
                         <div class="acta-form-group"><label>N° de Acta</label><input type="number" id="acta-number" value="001"></div>
-                        <div class="acta-form-group"><label>Fecha</label><input type="date" id="fecha" value="${new Date().toISOString().split('T')[0]}"></div>
-                        <div class="acta-form-group"><label>Hora Inicio</label><input type="time" id="inicia" value="08:00"></div>
-                        <div class="acta-form-group"><label>Hora Fin</label><input type="time" id="termina" value="09:00"></div>
+                                                <div class="acta-form-group"><label for="fecha">Fecha</label><div class="ccv-dd ccv-dd--fecha" data-ccv-dd="fecha"><button type="button" class="ccv-dd__toggle" aria-haspopup="dialog" aria-expanded="false"><svg class="ccv-dd__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg><span class="ccv-dd__value">Seleccione...</span><svg class="ccv-dd__chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></button><div class="ccv-dd__menu ccv-cal" hidden></div></div><input type="date" id="fecha" class="ccv-dd__native" value="${new Date().toISOString().split('T')[0]}"></div>
+                                                <div class="acta-form-group"><label for="inicia">Hora Inicio</label><div class="ccv-dd ccv-dd--hora" data-ccv-dd="inicia"><button type="button" class="ccv-dd__toggle" aria-haspopup="listbox" aria-expanded="false"><svg class="ccv-dd__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15.5 14"/></svg><span class="ccv-dd__value">Seleccione...</span><svg class="ccv-dd__chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></button><div class="ccv-dd__menu" hidden></div></div><input type="time" id="inicia" class="ccv-dd__native" value="08:00"></div>
+                                                <div class="acta-form-group"><label for="termina">Hora Fin</label><div class="ccv-dd ccv-dd--hora" data-ccv-dd="termina"><button type="button" class="ccv-dd__toggle" aria-haspopup="listbox" aria-expanded="false"><svg class="ccv-dd__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15.5 14"/></svg><span class="ccv-dd__value">Seleccione...</span><svg class="ccv-dd__chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></button><div class="ccv-dd__menu" hidden></div></div><input type="time" id="termina" class="ccv-dd__native" value="09:00"></div>
                         <div class="acta-form-group full-width"><label>Tema</label><input type="text" id="topic" value="Reunión del Comité de Convivencia Laboral"></div>
                         <div class="acta-form-group full-width"><label>Lugar</label><input type="text" id="ciudad-lugar" value="Barranquilla, Oficinas"></div>
                     </div>
@@ -313,8 +486,366 @@ class ComiteConvivenciaComponent {
         initialDesarrollo.forEach(d => desarrolloList.appendChild(createDesarrolloItem(d)));
         document.getElementById('add-agenda-btn').onclick = () => agendaList.appendChild(createAgendaItem());
         document.getElementById('add-desarrollo-btn').onclick = () => desarrolloList.appendChild(createDesarrolloItem());
+        // 📦1105 — Los 3 desplegables de fecha y hora se arman al final,
+        // cuando el formulario ya esta en el DOM.
+        this._initCcvPickers();
       document.getElementById('btn-export-excel-header').onclick = () => this.handleExportExcel();
     }
+
+    // ═════════════════════════════════════════════════════════════════
+    // 📦1105 — Desplegables de FECHA y HORA del Generador de Actas del Comite de Convivencia.
+    // Mismo lenguaje visual que el Formulario de Registro de ausentismo
+    // (📦1101): el <input> nativo queda OCULTO como fuente de verdad y todo
+    // lo que existia (handleExportExcel, prepareExcelChanges) sigue leyendo
+    // los mismos IDs: fecha, inicia, termina.
+    // ═════════════════════════════════════════════════════════════════
+
+    /** Grilla del mes: 42 celdas (6 filas × 7 días), semana arrancando en
+     *  lunes, con las celdas del mes vecino marcadas inMonth=false.
+     *  Pura (sin this, sin DOM): por eso el test la ejecuta de verdad. */
+    _buildMonthGridCcv(year, month) {
+        const DIAS_MES = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+        const bisiesto = (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0;
+        const diasDelMes = (month === 1 && bisiesto) ? 29 : DIAS_MES[month];
+        const aIso = function (f) {
+            const mm = String(f.getMonth() + 1).padStart(2, '0');
+            const dd = String(f.getDate()).padStart(2, '0');
+            return f.getFullYear() + '-' + mm + '-' + dd;
+        };
+        const offset = (new Date(year, month, 1).getDay() + 6) % 7;
+        const celdas = [];
+        for (let i = offset; i >= 1; i--) {
+            const f = new Date(year, month, 1 - i);
+            celdas.push({ iso: aIso(f), day: f.getDate(), inMonth: false });
+        }
+        for (let d = 1; d <= diasDelMes; d++) {
+            celdas.push({ iso: aIso(new Date(year, month, d)), day: d, inMonth: true });
+        }
+        let siguiente = 1;
+        while (celdas.length < 42) {
+            celdas.push({ iso: aIso(new Date(year, month + 1, siguiente)), day: siguiente, inMonth: false });
+            siguiente++;
+        }
+        return celdas;
+    }
+
+    /** Los horarios del dia en pasos de 15 minutos: 96 casillas (24 horas × 4).
+     *  Pura (sin this, sin DOM): por eso el test la ejecuta de verdad. */
+    _buildTimeSlotsCcv() {
+        const slots = [];
+        for (let h = 0; h < 24; h++) {
+            for (let m = 0; m < 60; m += 15) {
+                slots.push(String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0'));
+            }
+        }
+        return slots;
+    }
+
+    /** Convierte los 3 campos nativos en desplegables. Se llama al final del
+     *  setup del formulario. */
+    _initCcvPickers() {
+        const self = this;
+        const cont = document.querySelector('.convivencia-actas-container');
+        if (!cont) return;
+        const dds = cont.querySelectorAll('.ccv-dd');
+        if (!dds.length) return;
+
+        // Listeners globales de documento: se reemplazan en cada render para
+        // no acumularlos (el modulo se vuelve a montar en cada visita)
+        if (this._ccvDocClick) {
+            document.removeEventListener('click', this._ccvDocClick);
+            document.removeEventListener('keydown', this._ccvDocKey);
+        }
+        this._ccvDocClick = function (ev) {
+            // Un clic DENTRO de un desplegable nunca lo cierra. Se revisa el
+            // camino completo del evento (composedPath) y no solo el destino:
+            // al repintar el menu (innerHTML) el boton pulsado queda
+            // DESCONECTADO del documento.
+            const dentro = (ev.composedPath ? ev.composedPath() : []).some(function (n) {
+                return n && n.classList && n.classList.contains('ccv-dd');
+            }) || (ev.target && ev.target.closest && !!ev.target.closest('.ccv-dd'));
+            if (!dentro) self._cerrarTodosCcv();
+        };
+        this._ccvDocKey = function (ev) {
+            if (ev.key === 'Escape') self._cerrarTodosCcv();
+        };
+        document.addEventListener('click', this._ccvDocClick);
+        document.addEventListener('keydown', this._ccvDocKey);
+
+        dds.forEach(dd => {
+            const native = document.getElementById(dd.getAttribute('data-ccv-dd'));
+            const toggle = dd.querySelector('.ccv-dd__toggle');
+            const menu = dd.querySelector('.ccv-dd__menu');
+            if (!native || !toggle || !menu) return;
+            const esFecha = native.type === 'date';
+            const esHora = native.type === 'time';
+
+            if (esFecha) {
+                // Calendario: un solo listener delegado en el menu (sobrevive
+                // a los repintados de _pintarCalendarioCcv, que usa innerHTML)
+                menu.addEventListener('click', function (ev) {
+                    // Un clic dentro del calendario JAMAS debe cerrar el menu.
+                    ev.stopPropagation();
+                    const acc = ev.target.closest ? ev.target.closest('[data-ccv-accion]') : null;
+                    if (!acc) return;
+                    const tipo = acc.getAttribute('data-ccv-accion');
+                    if (tipo === 'mes') {
+                        const delta = parseInt(acc.getAttribute('data-cop-delta'), 10) || 0;
+                        const vista = (dd.getAttribute('data-ccv-view') || '').split('-');
+                        const base = new Date(parseInt(vista[0], 10), parseInt(vista[1], 10) + delta, 1);
+                        dd.setAttribute('data-ccv-view', base.getFullYear() + '-' + base.getMonth());
+                        self._pintarCalendarioCcv(dd);
+                    } else if (tipo === 'dia') {
+                        const iso = acc.getAttribute('data-iso') || '';
+                        native.value = iso;
+                        // La vista queda en el mes del dia elegido: al reabrir
+                        // el calendario se ve el mes donde esta la fecha.
+                        const p = iso.split('-');
+                        if (p.length === 3) dd.setAttribute('data-ccv-view', p[0] + '-' + (parseInt(p[1], 10) - 1));
+                        native.dispatchEvent(new Event('change', { bubbles: true }));
+                        self._actualizarLabelCcv(dd);
+                        self._cerrarCcv(dd);
+                    } else if (tipo === 'hoy') {
+                        const h = new Date();
+                        native.value = h.getFullYear() + '-' +
+                            String(h.getMonth() + 1).padStart(2, '0') + '-' +
+                            String(h.getDate()).padStart(2, '0');
+                        dd.setAttribute('data-ccv-view', h.getFullYear() + '-' + h.getMonth());
+                        native.dispatchEvent(new Event('change', { bubbles: true }));
+                        self._actualizarLabelCcv(dd);
+                        self._cerrarCcv(dd);
+                    } else if (tipo === 'limpiar') {
+                        native.value = '';
+                        dd.removeAttribute('data-ccv-view');
+                        native.dispatchEvent(new Event('change', { bubbles: true }));
+                        self._actualizarLabelCcv(dd);
+                        self._cerrarCcv(dd);
+                    }
+                });
+            } else if (esHora) {
+                // Casillas de hora: un solo listener delegado en el menu
+                menu.addEventListener('click', function (ev) {
+                    ev.stopPropagation();
+                    const acc = ev.target.closest ? ev.target.closest('[data-ccv-accion]') : null;
+                    if (!acc) return;
+                    if (acc.getAttribute('data-ccv-accion') !== 'hora') return;
+                    const valor = acc.getAttribute('data-value') || '';
+                    native.value = valor;
+                    native.dispatchEvent(new Event('change', { bubbles: true }));
+                    // 📦1105 — Si se movio la hora de INICIO y la de FIN quedo
+                    // antes, el acta quedaria con una duracion negativa: la
+                    // de FIN sigue a la de INICIO.
+                    if (dd.getAttribute('data-ccv-dd') === 'inicia') {
+                        const termina = document.getElementById('termina');
+                        if (termina && termina.value && termina.value < valor) {
+                            termina.value = valor;
+                            termina.dispatchEvent(new Event('change', { bubbles: true }));
+                            const ddFin = cont.querySelector('.ccv-dd[data-ccv-dd="termina"]');
+                            if (ddFin) self._actualizarLabelCcv(ddFin);
+                        }
+                    }
+                    self._actualizarLabelCcv(dd);
+                    self._cerrarCcv(dd);
+                });
+            }
+
+            toggle.addEventListener('click', function () {
+                if (toggle.disabled) return;
+                const abierto = !menu.hidden;
+                self._cerrarTodosCcv();
+                if (!abierto) self._abrirCcv(dd);
+            });
+
+            // El rotulo del campo tambien abre el desplegable
+            const rotulo = cont.querySelector('label[for="' + native.id + '"]');
+            if (rotulo) {
+                rotulo.addEventListener('click', function (ev) {
+                    if (toggle.disabled) return;
+                    ev.preventDefault();
+                    // Sin esto el clic burbujea a documento y el listener de
+                    // "clic fuera" cierra el menu que acaba de abrirse
+                    ev.stopPropagation();
+                    const abierto = !menu.hidden;
+                    self._cerrarTodosCcv();
+                    if (!abierto) self._abrirCcv(dd);
+                });
+            }
+
+            self._actualizarLabelCcv(dd);
+        });
+    }
+
+    _abrirCcv(dd) {
+        const menu = dd.querySelector('.ccv-dd__menu');
+        const toggle = dd.querySelector('.ccv-dd__toggle');
+        if (!menu || !toggle || !menu.hidden) return;
+        if (dd.classList.contains('ccv-dd--fecha')) {
+            this._pintarCalendarioCcv(dd);
+        } else if (dd.classList.contains('ccv-dd--hora')) {
+            // 📦1105 — La hora de FIN no puede ser anterior a la de INICIO:
+            // esas casillas quedan deshabilitadas.
+            const esTermina = dd.getAttribute('data-ccv-dd') === 'termina';
+            const inicio = esTermina ? document.getElementById('inicia') : null;
+            this._pintarHorasCcv(dd, inicio && inicio.value ? inicio.value : null);
+        }
+        this._actualizarLabelCcv(dd);
+        menu.hidden = false;
+        dd.classList.add('ccv-dd--open');
+        toggle.setAttribute('aria-expanded', 'true');
+        // 📦1105 — Ya con medidas: la rejilla se centra en la hora actual
+        if (dd.classList.contains('ccv-dd--hora')) this._centrarHorasCcv(dd);
+
+        // El editor tiene scroll: si el menu no cabe hacia abajo se abre
+        // hacia arriba; y si se pasa del borde derecho se ancla a la derecha
+        const tRect = toggle.getBoundingClientRect();
+        const mAlto = menu.offsetHeight;
+        const scroller = dd.closest('.acta-editor-container');
+        const sRect = scroller ? scroller.getBoundingClientRect() : null;
+        const limiteAbajo = Math.min(sRect ? sRect.bottom : window.innerHeight, window.innerHeight);
+        const limiteArriba = Math.max(sRect ? sRect.top : 0, 0);
+        const cabeAbajo = (limiteAbajo - tRect.bottom) >= (mAlto + 8);
+        const cabeArriba = (tRect.top - limiteArriba) >= (mAlto + 8);
+        if (!cabeAbajo && cabeArriba) menu.classList.add('ccv-dd__menu--up');
+        else menu.classList.remove('ccv-dd__menu--up');
+
+        menu.style.left = '';
+        menu.style.right = '';
+        const limiteDerecha = Math.min(sRect ? sRect.right : window.innerWidth, window.innerWidth);
+        if (tRect.left + menu.offsetWidth > limiteDerecha - 8) {
+            menu.style.left = 'auto';
+            menu.style.right = '0';
+        }
+    }
+
+    _cerrarCcv(dd) {
+        const menu = dd.querySelector('.ccv-dd__menu');
+        const toggle = dd.querySelector('.ccv-dd__toggle');
+        if (menu) menu.hidden = true;
+        dd.classList.remove('ccv-dd--open');
+        if (toggle) toggle.setAttribute('aria-expanded', 'false');
+    }
+
+    _cerrarTodosCcv() {
+        const cont = document.querySelector('.convivencia-actas-container');
+        if (!cont) return;
+        cont.querySelectorAll('.ccv-dd').forEach(dd => this._cerrarCcv(dd));
+    }
+
+    /** Escribe en el boton lo que vale el campo oculto (o "Seleccione..."
+     *  si esta vacio) y marca en el menu la opcion elegida. */
+    _actualizarLabelCcv(dd) {
+        const native = document.getElementById(dd.getAttribute('data-ccv-dd'));
+        const valor = dd.querySelector('.ccv-dd__value');
+        if (!native || !valor) return;
+        let texto = '';
+        if (native.type === 'date') {
+            const p = (native.value || '').split('-');
+            if (p.length === 3) texto = p[2] + '/' + p[1] + '/' + p[0];
+        } else if (native.value) {
+            // La hora se muestra en 24 h: es exactamente lo que va al Excel
+            texto = native.value;
+        }
+        valor.textContent = texto || 'Seleccione...';
+        dd.querySelectorAll('.ccv-dd__option').forEach(op => {
+            const activa = op.getAttribute('data-value') === (native.value || '');
+            op.classList.toggle('ccv-dd__option--active', activa);
+        });
+    }
+
+    /** Re-sincroniza las etiquetas de los tres desplegables. Se llama cuando
+     *  un valor cambia FUERA del desplegable (el autollenado cambia la fecha):
+     *  sin esto el boton mostraria una fecha y el Excel llevaria otra. */
+    _syncCcvPickers() {
+        const cont = document.querySelector('.convivencia-actas-container');
+        if (!cont) return;
+        cont.querySelectorAll('.ccv-dd').forEach(dd => this._actualizarLabelCcv(dd));
+    }
+
+    /** Pinta el calendario del menu de la fecha: mes en curso, navegacion
+     *  con chevrons, dia de hoy marcado y el dia elegido en azul. */
+    _pintarCalendarioCcv(dd) {
+        const native = document.getElementById(dd.getAttribute('data-ccv-dd'));
+        const menu = dd.querySelector('.ccv-dd__menu');
+        if (!native || !menu) return;
+        const MESES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+                       'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+        const hoy = new Date();
+        const vista = (dd.getAttribute('data-ccv-view') || '').split('-');
+        let y = parseInt(vista[0], 10);
+        let m = parseInt(vista[1], 10);
+        if (isNaN(y) || isNaN(m)) {
+            if (native.value) {
+                const p = native.value.split('-');
+                y = parseInt(p[0], 10);
+                m = parseInt(p[1], 10) - 1;
+            } else {
+                y = hoy.getFullYear();
+                m = hoy.getMonth();
+            }
+            dd.setAttribute('data-ccv-view', y + '-' + m);
+        }
+        const isoHoy = hoy.getFullYear() + '-' +
+            String(hoy.getMonth() + 1).padStart(2, '0') + '-' +
+            String(hoy.getDate()).padStart(2, '0');
+        const celdas = this._buildMonthGridCcv(y, m);
+        let dias = '';
+        celdas.forEach(c => {
+            const clases = ['ccv-cal__day'];
+            if (!c.inMonth) clases.push('ccv-cal__day--out');
+            if (c.iso === native.value) clases.push('ccv-cal__day--sel');
+            if (c.iso === isoHoy) clases.push('ccv-cal__day--today');
+            dias += '<button type="button" class="' + clases.join(' ') +
+                '" data-ccv-accion="dia" data-iso="' + c.iso + '">' + c.day + '</button>';
+        });
+        menu.innerHTML =
+            '<div class="ccv-cal__head">' +
+                '<button type="button" class="ccv-cal__nav" data-ccv-accion="mes" data-cop-delta="-1" aria-label="Mes anterior">&#8249;</button>' +
+                '<span class="ccv-cal__label">' + MESES[m] + ' ' + y + '</span>' +
+                '<button type="button" class="ccv-cal__nav" data-ccv-accion="mes" data-cop-delta="1" aria-label="Mes siguiente">&#8250;</button>' +
+            '</div>' +
+            '<div class="ccv-cal__week"><span>L</span><span>M</span><span>X</span><span>J</span><span>V</span><span>S</span><span>D</span></div>' +
+            '<div class="ccv-cal__grid">' + dias + '</div>' +
+            '<div class="ccv-cal__foot">' +
+                '<button type="button" class="ccv-cal__btn" data-ccv-accion="limpiar">Limpiar</button>' +
+                '<button type="button" class="ccv-cal__btn" data-ccv-accion="hoy">Hoy</button>' +
+            '</div>';
+    }
+
+    /** Pinta la rejilla de horarios del menu de una hora. Las casillas
+     *  anteriores al limite (la hora de INICIO, en el caso de la hora de FIN)
+     *  quedan deshabilitadas. El valor actual SIEMPRE queda alcanzable,
+     *  aunque no caiga en la grilla de 15 minutos. */
+    _pintarHorasCcv(dd, limiteInferior) {
+        const native = document.getElementById(dd.getAttribute('data-ccv-dd'));
+        const menu = dd.querySelector('.ccv-dd__menu');
+        if (!native || !menu) return;
+        let slots = this._buildTimeSlotsCcv();
+        if (native.value && slots.indexOf(native.value) === -1) {
+            slots = [native.value].concat(slots);
+        }
+        let html = '<div class="ccv-horas">';
+        slots.forEach(s => {
+            const bloqueada = !!(limiteInferior && s < limiteInferior);
+            html += '<button type="button" class="ccv-dd__option"' +
+                ' data-ccv-accion="hora" data-value="' + s + '"' +
+                (bloqueada ? ' disabled' : '') + '>' + s + '</button>';
+        });
+        html += '</div>';
+        menu.innerHTML = html;
+    }
+
+    /** 📦1105 — La rejilla de horarios arranca mostrando la hora que ya
+     *  tiene el campo. Va DESPUES de abrir el menu: mientras esta oculto
+     *  (display:none) no tiene medidas, y el scroll no aplicaba. */
+    _centrarHorasCcv(dd) {
+        const menu = dd.querySelector('.ccv-dd__menu');
+        if (!menu) return;
+        const grid = menu.querySelector('.ccv-horas');
+        const activa = grid ? grid.querySelector('.ccv-dd__option--active') : null;
+        if (!grid || !activa) return;
+        grid.scrollTop = Math.max(0, (activa.offsetTop - grid.offsetTop) - (grid.clientHeight / 2) + (activa.offsetHeight / 2));
+    }
+
 
     async handleAutoFill() {
  const btn = document.getElementById('btn-auto-fill-header');
@@ -339,6 +870,9 @@ class ComiteConvivenciaComponent {
 
  if (actaNumberInput) actaNumberInput.value = data.nextActaNumber || 1;
  if (fechaInput) fechaInput.value = data.suggestedDate || new Date().toISOString().split('T')[0];
+ // 📦1105 — El autollenado cambia la fecha FUERA del desplegable: sin
+ // esto el boton mostraria la fecha vieja y el Excel llevaria la nueva.
+ if (typeof this._syncCcvPickers === 'function') this._syncCcvPickers();
  if (topicInput) topicInput.value = `Reunión del Comité de Convivencia - ${data.targetMonth || ''} ${data.targetYear || ''}`;
 
  const agendaList = document.getElementById('agenda-list');
