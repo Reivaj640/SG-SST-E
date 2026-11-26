@@ -275,6 +275,15 @@ async function main() {
     ok('2b) el aviso inline también lista las otras empresas',
       /Aseplus/.test(els.ngCedulaAviso.textContent), els.ngCedulaAviso.textContent);
 
+    // 2c) Si el usuario borra la cédula, el aviso se tiene que ir: no puede
+    // quedar un aviso de "otra empresa" debajo de un campo vacío.
+    els.ngCedula.value = '';
+    await fnSeg();
+    ok('2c) al borrar la cédula, el aviso inline se oculta',
+      els.ngCedulaAviso.style.display === 'none' && els.ngCedulaAviso.textContent === '',
+      JSON.stringify(els.ngCedulaAviso));
+    els.ngCedula.value = ' 1.044.392.755 ';
+
     // El aviso inline se limpia cuando la búsqueda vuelve a la empresa activa.
     CAMPOS_SEG.forEach(([id]) => { els[id].value = 'VIEJO'; });
     toasts.length = 0; llamadas.length = 0;
@@ -385,6 +394,19 @@ async function main() {
     ok('3) si la búsqueda falla, igual renderiza (no bloquea)',
       renders.includes('todo') && !renders.some(r => r.startsWith('error')), JSON.stringify(renders));
 
+    // 3d) La persona está en OTRA empresa: sus contactos NO se copian a la
+    // gestante de la empresa actual (mezclar empresas es un error).
+    montar({
+      success: true, esEmpresaActual: false, empresasEncontradas: ['Temposum E.S.'],
+      data: { nombre: 'MARIA GARCIA', telefono: '3009998877', celular: '3118887766', correo: 'otra@empresa.com', email: 'otra@empresa.com' }
+    });
+    await fnAnt();
+    ok('3d) si la persona es de otra empresa, NO se copian su teléfono ni su correo',
+      !global._state.gestante.telefono && !global._state.gestante.correo,
+      JSON.stringify({ t: global._state.gestante.telefono, c: global._state.gestante.correo }));
+    ok('3d) la vista se renderiza igual (el enriquecimiento no bloquea)',
+      renders.includes('todo'), JSON.stringify(renders));
+
     ok('3) en el archivo no queda ninguna llamada al canal del Excel',
       !/electronAPI\.buscarEmpleadoPorCedula/.test(srcAntesala));
   }
@@ -417,6 +439,59 @@ async function main() {
     /_limpiarAviso\(\)/.test(srcSeguimiento));
   ok('6) el toast tiene respaldo en consola (no se pierde en silencio)',
     /console\.warn\('\[GESTION-SEGUIMIENTO\] Toast sin notificador/.test(srcSeguimiento));
+
+  // ══════════════════════════════════════════════════════════════
+  // 7) 📦1100-fix — El modal "Empresa Diferente" trata los textos que
+  // vienen de la base como TEXTO, no como HTML. Los nombres vienen de un
+  // Excel importado: cualquiera puede haber escrito "<img ...>".
+  // ══════════════════════════════════════════════════════════════
+  const fnModalRaw = extraerMetodo(srcMedicion, 'showEmpresaMismatchModal');
+  const fnEscRaw = extraerMetodo(srcMedicion, '_escapeHtml');
+  ok('7) existe showEmpresaMismatchModal', !!fnModalRaw);
+  ok('7) existe el helper _escapeHtml', !!fnEscRaw);
+
+  if (fnModalRaw && fnEscRaw) {
+    const htmls = [];
+    function fakeEl(tag) {
+      return {
+        tagName: tag, style: {}, _html: '', textContent: '',
+        classList: { add() {}, remove() {} },
+        children: [],
+        set innerHTML(v) { this._html = String(v); htmls.push(this._html); },
+        get innerHTML() { return this._html; },
+        appendChild(c) { this.children.push(c); return c; },
+        addEventListener() {}, remove() {}, focus() {}
+      };
+    }
+    const docAntes = global.document;
+    global.document = {
+      createElement: fakeEl,
+      body: { appendChild() {} },
+      head: { appendChild() {} }
+    };
+    const fnModal = comoFuncion(fnModalRaw);
+    const ctx = { _escapeHtml: comoFuncion(fnEscRaw) };
+    fnModal.call(ctx,
+      '<img src=x onerror=alert(1)>',
+      'EMP<svg onload=alert(2)>',
+      'Mi Empresa & Cia',
+      function () {}, function () {},
+      ['Otra <b>Empresa</b>']
+    );
+    global.document = docAntes;
+
+    const todo = htmls.join('\n');
+    // "<" escrito a mano para que el editor no lo confunda con una etiqueta.
+    const LT = '&' + 'lt;';
+    const GT = '&' + 'gt;';
+    ok('7) el nombre con una etiqueta HTML se muestra como TEXTO, no se ejecuta',
+      todo.indexOf('<img src=x') === -1 && todo.indexOf(LT + 'img src=x') !== -1, todo);
+    ok('7) la empresa encontrada con una etiqueta HTML se muestra como TEXTO',
+      todo.indexOf('<svg onload') === -1 && todo.indexOf(LT + 'svg onload') !== -1, todo);
+    ok('7) las empresas donde también aparece se muestran como TEXTO',
+      todo.indexOf('<b>Empresa</b>') === -1 &&
+      todo.indexOf(LT + 'b' + GT + 'Empresa' + LT + '/b' + GT) !== -1, todo);
+  }
 
   // ══════════════════════════════════════════════════════════════
   // Resumen

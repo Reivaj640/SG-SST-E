@@ -2081,28 +2081,38 @@ En la base real hay **2 707 filas** (Temposum 1 659, Tempoactiva 773, Aseplus 27
 **Lo que la decisión del owner cambió del diseño.** La pregunta *"¿qué fila gana?"* tiene respuesta propia y
 no se puede inventar. El owner la respondió: **comparar la fecha de ingreso en ambas empresas y entregar la
 más actual**. Eso se tradujo en un orden de cuatro criterios, y cada uno se justificó con un dato que
-existe en la base: (1) la empresa del usuario primero —si está en tu empresa, es tuya—, (2) `activo` antes
-que retirado, (3) **fecha de ingreso más reciente** —el criterio pedido—, (4) `updated_at` más reciente, que
-solo desempata.
+existe en la base: (1) la empresa del usuario primero —si está en tu empresa, es tuya—, (2) **la persona
+vigente antes que la retirada**, (3) **fecha de ingreso más reciente** —el criterio pedido—, (4) `updated_at`
+más reciente, que solo desempata.
 
 **Las reglas:**
 
 1. **El criterio de desempate se pregunta, no se elige.** "La más reciente" es ambiguo hasta que se sabe
    *de qué*: la de ingreso, la de edición, la de alta. Acá se eligió la de ingreso.
-2. **El criterio tiene que ser comparable.** Una fecha se compara solo si está en un formato único. La base
-   guarda `2023-06-01` y también `2026-09-11T17:00:00.000Z`: hay que normalizar a `YYYY-MM-DD` antes de
-   ordenar, o el orden termina siendo alfabético y no temporal.
-3. **Una fila sin empresa no es "otra empresa".** Si la fila no trae `empresa_id`, no se puede probar que sea
+2. **El estado se lee en la columna CORRECTA.** En `base_personal` hay **dos** columnas que parecen el
+   estado: `activo` (INTEGER) y `estado` (TEXT). **`activo` es el BORRADO LÓGICO** (soft delete) y está en
+   `1` para las **2 708 filas** de la base real: como criterio no discrimina nada. El **ciclo laboral** está
+   en `estado`: `activo`, `A` (abreviatura del importador legacy), `retirado`, `incapacitado`,
+   `vacaciones`, `permiso`, `maternidad`, `paternidad`, `luto`. En la base real hay **33 cédulas** con una
+   fila vigente y otra retirada: sin leer `estado`, el desempate se apoya en la fecha y puede entregar un
+   vínculo laboral ya terminado.
+3. **El borrado lógico se EXCLUYE, no se ordena.** `activo = 0` es una fila que el usuario borró: no se
+   ofrece como si la persona estuviera en la empresa.
+4. **El criterio tiene que ser comparable.** Una fecha se compara solo si está en un formato único. La base
+   guarda `2023-06-01`, `2026-09-11T17:00:00.000Z` y (cuando el Excel viene con celda numérica) `20250101`:
+   hay que **normalizar a `YYYY-MM-DD`** antes de ordenar. Sin normalizar, la compacta queda SIEMPRE detrás
+   de la ISO y el desempate por ingreso se invierte sin que nadie lo note.
+5. **Una fila sin empresa no es "otra empresa".** Si la fila no trae `empresa_id`, no se puede probar que sea
    de otra: se trata como de la empresa actual. Sin esa guarda, una instalación con el esquema viejo dispara
    una **falsa alarma** de "pertenece a otra empresa" con el nombre de empresa vacío.
-4. **La base central tiene basura: filtrá contra la lista real de empresas.** `empresa_id` es un dato de la
+6. **La base central tiene basura: filtrá contra la lista real de empresas.** `empresa_id` es un dato de la
    fila, no una garantía: contra la tabla `companies` —que es la lista de empresas reales— se descartan las
    filas huérfanas. Así se descartó la fila con `empresa_id='1'`.
-5. **Devolvé dónde aparece, no solo dónde ganó.** La misma persona puede estar en dos empresas a la vez (en la
+7. **Devolvé dónde aparece, no solo dónde ganó.** La misma persona puede estar en dos empresas a la vez (en la
    base real hay cédulas repetidas en Tempoactiva+Temposum y en Aseplus+Tempoactiva). El aviso tiene que decir
    *"pertenece a Temposum"* **y** *"también aparece en Aseplus"*: con una sola empresa el usuario no puede
    saber si el registro que está mirando es el que le sirve.
-6. **El camino viejo tiene que quedar igual.** El modo "buscar en todas" es **opt-in**
+8. **El camino viejo tiene que quedar igual.** El modo "buscar en todas" es **opt-in**
    (`buscarEnTodasLasEmpresas`): sin el flag, la consulta sigue filtrando por `empresa_id` y devuelve una
    sola fila. Un cambio de este tipo rompe a los que no lo piden si no es opt-in.
 
@@ -2123,6 +2133,35 @@ sabe por qué. El aviso *"esta cédula es de otra empresa"* es justo el tipo de 
    consola: un aviso que se pierde en silencio no es un aviso.
 3. **El mensaje en pantalla se limpia en cada búsqueda**, no solo cuando aparece: si el intento siguiente es
    de tu empresa, el aviso anterior tiene que irse (si no, el usuario ve dos verdades contradictorias).
+4. **La limpieza va ANTES de cualquier salida temprana.** Si el usuario borra la cédula, la función se
+   devuelve antes de buscar: el aviso de "otra empresa" se queda debajo de un campo vacío y sigue
+   afirmando algo falso. El orden correcto es limpiar → validar → buscar.
+
+### 5.68 📦 Una búsqueda que cruza empresas no devuelve la ficha completa: devuelve una lista de campos
+
+**El caso real (25-nov-2026, 📦1100-fix, ausentismo 3.3.6).** Al habilitar la búsqueda global, la consulta
+pasó a devolver la fila COMPLETA de `base_personal` (`SELECT p.*`): 48 columnas, con salario, banco,
+número de cuenta, dirección, fecha de nacimiento, pensión y contactos de personas de OTRAS empresas. La
+búsqueda que cruza empresas no es una consulta a la ficha completa de un tercero: es una consulta para
+avisarle al usuario en qué empresa está.
+
+**Las reglas:**
+
+1. **Lo que cruza empresas se recorta con una lista EXPLÍCITA de campos.** No "todo menos lo sensible"
+   (una lista negra se desactualiza con cada columna nueva): una lista blanca de lo que la interfaz
+   necesita, que acá es nombre, cargo, área, EPS, ARL, empresa y fecha de ingreso.
+2. **La búsqueda de la PROPIA empresa no se recorta.** El wizard de Seguimiento de Incapacidades autocompleta
+   salario y fecha de nacimiento de ahí: el recorte y la respuesta completa son caminos distintos. Y el
+   recorte lo decide **la fila** (su `empresa_id`), no el aviso: sin empresa activa no se puede afirmar
+   "es otra empresa" (no hay falsa alarma), pero la ficha de una persona que sí tiene empresa tampoco
+   sale entera.
+3. **Lo que viene de la base es TEXTO, no HTML.** Los nombres vienen de un Excel importado: si se pintan
+   con `innerHTML` sin escapar, un nombre con una etiqueta `img` y un `onerror` se EJECUTA dentro de la
+   ventana. Todo texto de la base que se pinte como HTML va escapado (`_escapeHtml`). La regla no es "este
+   modal es peligroso": es "ningún dato de la base se interpreta como HTML".
+4. **Los datos de otra empresa no se copian a un registro de la tuya.** En la antesala, el teléfono y el
+   correo de la gestante se rellenaban con los de la persona en otra empresa: el registro de TU empresa
+   quedaba con el contacto de la OTRA. Si el contacto no es de la misma empresa, no se copia.
 
 ### 6.1 Backend — bridges
 

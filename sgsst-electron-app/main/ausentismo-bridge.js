@@ -537,21 +537,72 @@ function _mapaEmpresas(db) {
 }
 
 /**
- * 📦1100 — Fecha comparable (`YYYY-MM-DD`). Acepta '2023-06-01' y
- * '2023-06-01T10:00:00.000Z'. Si el formato no se reconoce, devuelve ''.
+ * 📦1100-fix — Fecha comparable (`YYYY-MM-DD`). Acepta '2023-06-01',
+ * '2023-06-01T10:00:00.000Z' y el formato COMPACTO 'YYYYMMDD' /
+ * 'YYYYMMDDHHMMSS' (que el importador de Gestión Humana conserva cuando la
+ * celda del Excel viene así). Sin normalizar, una fecha compacta queda
+ * SIEMPRE detrás de una ISO y el desempate por ingreso se invierte.
  */
 function _fechaComparable(valor) {
   if (!valor) return '';
   var v = String(valor).trim();
   if (/^\d{4}-\d{2}-\d{2}/.test(v)) return v.slice(0, 10);
+  var mm = v.match(/^(\d{4})(\d{2})(\d{2})(?:\d{6})?$/);
+  if (mm) return mm[1] + '-' + mm[2] + '-' + mm[3];
   return '';
+}
+
+/**
+ * 📦1100-fix — Estado laboral de una fila de `base_personal`.
+ *
+ * OJO: `activo` NO es el estado laboral: es el BORRADO LÓGICO (soft delete)
+ * y está en 1 para las 2.708 filas de la base real. El ciclo laboral vive
+ * en `estado`: 'activo', 'A' (abreviatura del importador legacy),
+ * 'retirado', 'incapacitado', 'vacaciones', 'permiso', 'maternidad',
+ * 'paternidad', 'luto'.
+ *
+ * Puntuación: 2 = vigente, 1 = sin dato, 0 = retirado.
+ */
+function _puntajeEstado(fila) {
+  var est = String(fila && fila.estado != null ? fila.estado : '').trim().toLowerCase();
+  if (!est) return 1;
+  if (est === 'retirado' || est === 'retirada') return 0;
+  // Los demás estados (incapacitado, vacaciones, permiso, maternidad,
+  // paternidad, luto) son situaciones PERMANENTES: la persona sigue
+  // trabajando, no está retirada.
+  return 2;
+}
+
+/**
+ * 📦1100-fix — Campos que la interfaz necesita de una persona de OTRA
+ * empresa. Lo demás (salario, banco, número de cuenta, dirección, fecha de
+ * nacimiento, pensión, contactos) no tiene por qué viajar al renderer:
+ * la búsqueda que cruza empresas NO es una consulta a la ficha completa de
+ * un tercero, es una consulta para avisarle al usuario en qué empresa está.
+ */
+var _CAMPOS_CRUCE_EMPRESAS = [
+  'cedula', 'tipo_documento', 'nombres', 'apellidos', 'nombre',
+  'nombre_completo', 'cargo', 'area', 'eps', 'entidad', 'arl',
+  'empresa', 'empresa_id', 'empresa_usuaria', 'sede_id',
+  'fecha_ingreso', 'updated_at', 'estado'
+];
+
+/**
+ * 📦1100-fix — Recorta la fila a los campos que la interfaz necesita.
+ */
+function _recortarFila(fila) {
+  var out = {};
+  _CAMPOS_CRUCE_EMPRESAS.forEach(function (c) {
+    if (fila[c] !== undefined) out[c] = fila[c];
+  });
+  return out;
 }
 
 /**
  * 📦1100 — Ordena las coincidencias de una cédula (la misma persona puede
  * estar en más de una empresa):
  *   1. la empresa del usuario primero
- *   2. la persona activa antes que la retirada
+ *   2. la persona vigente antes que la retirada
  *   3. la FECHA DE INGRESO más reciente
  *   4. la edición más reciente
  */
@@ -560,9 +611,10 @@ function _compararFila(a, b, empresaId) {
   var bActual = (empresaId && b.empresa_id === empresaId) ? 1 : 0;
   if (aActual !== bActual) return bActual - aActual;
 
-  var aAct = a.activo ? 1 : 0;
-  var bAct = b.activo ? 1 : 0;
-  if (aAct !== bAct) return bAct - aAct;
+  // 📦1100-fix — `activo` es el borrado lógico, no el estado laboral.
+  var aEst = _puntajeEstado(a);
+  var bEst = _puntajeEstado(b);
+  if (aEst !== bEst) return bEst - aEst;
 
   var aF = _fechaComparable(a.fecha_ingreso);
   var bF = _fechaComparable(b.fecha_ingreso);
@@ -619,6 +671,13 @@ function _handlerBuscarEmpleado(params) {
       if (hayEmpresas) {
         // Se descartan las filas cuya empresa no existe (datos basura).
         todas = todas.filter(function (f) { return !f.empresa_id || mapaEmpresas[f.empresa_id]; });
+      }
+      // 📦1100-fix — `activo = 0` es el BORRADO LÓGICO: esa fila no se ofrece
+      // como si la persona estuviera en la empresa.
+      if (cols.indexOf('activo') !== -1) {
+        todas = todas.filter(function (f) {
+          return f.activo === null || f.activo === undefined || f.activo === 1 || f.activo === '1';
+        });
       }
       filas = todas.slice().sort(function (a, b) { return _compararFila(a, b, empresaId); });
     } else {
@@ -680,9 +739,19 @@ function _handlerBuscarEmpleado(params) {
       });
     }
 
+    // 📦1100-fix — Si la persona está en OTRA empresa, la respuesta se
+    // RECORTA: solo viaja lo que la interfaz necesita (nombre, cargo,
+    // empresa, fecha de ingreso). El salario, el banco, la dirección, la
+    // fecha de nacimiento y los contactos de un tercero no salen de la base.
+    // Ojo: el recorte se decide por la fila (`empresa_id`), no por
+    // `esEmpresaActual`: sin empresa activa no se puede afirmar "es otra",
+    // pero el dato de una fila con empresa tampoco sale completo.
+    var esDeOtraEmpresa = !!fila.empresa_id && (!empresaId || fila.empresa_id !== empresaId);
+    var salida = (buscarTodas && esDeOtraEmpresa) ? _recortarFila(fila) : fila;
+
     return {
       success: true,
-      data: fila,
+      data: salida,
       esEmpresaActual: esEmpresaActual,
       empresasEncontradas: empresasEncontradas
     };

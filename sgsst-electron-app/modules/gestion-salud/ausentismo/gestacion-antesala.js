@@ -293,7 +293,12 @@
                     empresaId: _state.empresaId,
                     buscarEnTodasLasEmpresas: true
                 });
-                if (resEmp && resEmp.success && resEmp.data) {
+                // 📦1100-fix — Si la persona está en OTRA empresa, su teléfono y
+                // su correo NO se copian a la gestante de la empresa actual:
+                // mezclar los datos de dos empresas es un error. La búsqueda
+                // global se conserva (esta gestante sí puede estar en la otra
+                // empresa), pero el contacto solo se usa si es de la misma.
+                if (resEmp && resEmp.success && resEmp.data && resEmp.esEmpresaActual !== false) {
                     var d = resEmp.data;
                     var tel = _datoUtil(d.telefono) || _datoUtil(d.celular);
                     var cor = _datoUtil(d.correo) || _datoUtil(d.email) || _datoUtil(d.mail);

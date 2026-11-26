@@ -513,6 +513,19 @@
     async function _autollenarDatosPersonal() {
         var cedulaInput = document.getElementById('ngCedula');
         var cedula = (cedulaInput && cedulaInput.value || '').trim();
+
+        /* 📦1100-fix — El aviso inline se limpia ANTES de cualquier salida
+           temprana: si el usuario borra la cédula, el aviso de "otra
+           empresa" no puede quedarse en pantalla debajo de un campo vacío
+           (serían dos verdades contradictorias). */
+        var avisoEl = document.getElementById('ngCedulaAviso');
+        function _limpiarAviso() {
+            if (!avisoEl) return;
+            avisoEl.textContent = '';
+            avisoEl.style.display = 'none';
+        }
+        _limpiarAviso();
+
         if (!cedula) return;
         if (!_state.empresaId) {
             _mostrarToast('warning', 'Sin empresa', 'No se detecta empresa activa para autollenado.');
@@ -530,15 +543,6 @@
 
         // Hint visual mientras se busca
         if (nombreEl) nombreEl.placeholder = 'Buscando en BD de personal...';
-
-        /* 📦1100 — Aviso inline bajo la cédula (se limpia en cada búsqueda). */
-        var avisoEl = document.getElementById('ngCedulaAviso');
-        function _limpiarAviso() {
-            if (!avisoEl) return;
-            avisoEl.textContent = '';
-            avisoEl.style.display = 'none';
-        }
-        _limpiarAviso();
 
         try {
             /* 📦1099 (2026-11-25) — La búsqueda va a la base de Gestión Humana

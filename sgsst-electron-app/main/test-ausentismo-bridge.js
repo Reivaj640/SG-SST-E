@@ -360,6 +360,125 @@ ok('2) los 9 canales quedaron registrados', noRegistrados.length === 0, noRegist
   ok('10c) si no está en ninguna empresa, devuelve null',
     globalNoExiste.success && globalNoExiste.data === null, JSON.stringify(globalNoExiste.data));
 
+  // ---------- 10d) La respuesta que CRUZA empresas no lleva datos sensibles ----------
+  // La fila completa de `base_personal` trae salario, banco, número de cuenta,
+  // dirección, fecha de nacimiento y contactos. Cuando la búsqueda cruza a
+  // otra empresa, esos datos no tienen por qué viajar al renderer.
+  db.exec('ALTER TABLE base_personal ADD COLUMN salario TEXT');
+  db.exec('ALTER TABLE base_personal ADD COLUMN banco TEXT');
+  db.exec('ALTER TABLE base_personal ADD COLUMN numero_cuenta TEXT');
+  db.exec('ALTER TABLE base_personal ADD COLUMN direccion TEXT');
+  db.exec('ALTER TABLE base_personal ADD COLUMN fecha_nacimiento TEXT');
+  db.exec('ALTER TABLE base_personal ADD COLUMN pension TEXT');
+  db.exec('ALTER TABLE base_personal ADD COLUMN estado TEXT');
+  db.prepare("INSERT INTO base_personal (id, cedula, nombre, cargo, area, nombres, apellidos, empresa_id, fecha_ingreso, updated_at, estado, salario, banco, numero_cuenta, direccion, fecha_nacimiento, pension, telefono, celular, email) " +
+    "VALUES ('s1','666','CON DATOS SENSIBLES','OP','SEDE','CON','SENSIBLES','Aseplus','2024-01-01','2024-01-01','activo','3500000','BANCO X','123-456','CALLE 1','1990-01-01','AFP','3001112233','3114445566','a@b.com')").run();
+
+  const globalSensible = await handlers['ausentismo:buscarEmpleado']({}, {
+    cedula: '666', empresaId: 'Temposum', buscarEnTodasLasEmpresas: true
+  });
+  ok('10d) la búsqueda que cruza empresas NO trae salario', globalSensible.data && globalSensible.data.salario === undefined,
+    globalSensible.data && globalSensible.data.salario);
+  ok('10d) la búsqueda que cruza empresas NO trae banco ni número de cuenta',
+    globalSensible.data && globalSensible.data.banco === undefined && globalSensible.data.numero_cuenta === undefined,
+    globalSensible.data && (globalSensible.data.banco + '/' + globalSensible.data.numero_cuenta));
+  ok('10d) la búsqueda que cruza empresas NO trae dirección ni fecha de nacimiento',
+    globalSensible.data && globalSensible.data.direccion === undefined && globalSensible.data.fecha_nacimiento === undefined,
+    globalSensible.data && (globalSensible.data.direccion + '/' + globalSensible.data.fecha_nacimiento));
+  ok('10d) la búsqueda que cruza empresas NO trae contactos ni pensión',
+    globalSensible.data && globalSensible.data.telefono === undefined && globalSensible.data.celular === undefined &&
+    globalSensible.data.email === undefined && globalSensible.data.correo === undefined && globalSensible.data.pension === undefined,
+    JSON.stringify(globalSensible.data));
+  ok('10d) la búsqueda que cruza empresas SÍ trae lo que la interfaz usa',
+    globalSensible.data && globalSensible.data.nombre === 'CON SENSIBLES' &&
+    globalSensible.data.cargo === 'OP' && globalSensible.data.empresa === 'ASEPPLUS S.A.S.',
+    JSON.stringify(globalSensible.data));
+
+  // La búsqueda de la propia empresa NO se recorta: el wizard de Seguimiento
+  // de Incapacidades autocompleta salario y fecha de nacimiento de ahí.
+  const propiaSensible = await handlers['ausentismo:buscarEmpleado']({}, {
+    cedula: '666', empresaId: 'Aseplus'
+  });
+  ok('10d) la búsqueda de la PROPIA empresa sí trae los campos completos',
+    propiaSensible.data && propiaSensible.data.salario === '3500000' &&
+    propiaSensible.data.fecha_nacimiento === '1990-01-01',
+    JSON.stringify(propiaSensible.data));
+
+  // ---------- 10e) Gana la persona ACTIVA, no la retirada ----------
+  // `activo` es el borrado lógico (está en 1 para todos). El ciclo laboral
+  // está en `estado`: 'activo', 'A' o 'retirado'.
+  db.prepare("INSERT INTO base_personal (id, cedula, nombre, cargo, area, nombres, apellidos, empresa_id, fecha_ingreso, updated_at, estado) " +
+    "VALUES ('r1','777','RETIRADO NUEVO','OP','SEDE','RETIRADO','NUEVO','Tempoactiva','2025-01-01','2025-01-01','retirado')").run();
+  db.prepare("INSERT INTO base_personal (id, cedula, nombre, cargo, area, nombres, apellidos, empresa_id, fecha_ingreso, updated_at, estado) " +
+    "VALUES ('r2','777','ACTIVO VIEJO','OP','SEDE','ACTIVO','VIEJO','Temposum','2019-01-01','2019-01-01','activo')").run();
+
+  const globalRetirado = await handlers['ausentismo:buscarEmpleado']({}, {
+    cedula: '777', empresaId: 'Aseplus', buscarEnTodasLasEmpresas: true
+  });
+  ok('10e) gana la persona ACTIVA aunque la retirada tenga el ingreso más nuevo',
+    globalRetirado.data && globalRetirado.data.nombre === 'ACTIVO VIEJO',
+    globalRetirado.data && globalRetirado.data.nombre);
+
+  db.prepare("INSERT INTO base_personal (id, cedula, nombre, cargo, area, nombres, apellidos, empresa_id, fecha_ingreso, updated_at, estado) " +
+    "VALUES ('r3','778','ESTADO A','OP','SEDE','ESTADO','A','Tempoactiva','2025-01-01','2025-01-01','A')").run();
+  db.prepare("INSERT INTO base_personal (id, cedula, nombre, cargo, area, nombres, apellidos, empresa_id, fecha_ingreso, updated_at, estado) " +
+    "VALUES ('r4','778','RETIRADO NUEVO 2','OP','SEDE','RETIRADO','NUEVO','Temposum','2025-06-01','2025-06-01','retirado')").run();
+  const globalEstadoA = await handlers['ausentismo:buscarEmpleado']({}, {
+    cedula: '778', empresaId: 'Aseplus', buscarEnTodasLasEmpresas: true
+  });
+  ok('10e) el estado "A" cuenta como ACTIVA',
+    globalEstadoA.data && globalEstadoA.data.nombre === 'ESTADO A',
+    globalEstadoA.data && globalEstadoA.data.nombre);
+
+  // ---------- 10f) Fechas en formato compacto (YYYYMMDD) también se comparan ----------
+  db.prepare("INSERT INTO base_personal (id, cedula, nombre, cargo, area, nombres, apellidos, empresa_id, fecha_ingreso, updated_at, estado) " +
+    "VALUES ('f1','889','FECHA COMPACTA','OP','SEDE','FECHA','COMPACTA','Tempoactiva','20250101','2025-01-01','activo')").run();
+  db.prepare("INSERT INTO base_personal (id, cedula, nombre, cargo, area, nombres, apellidos, empresa_id, fecha_ingreso, updated_at, estado) " +
+    "VALUES ('f2','889','FECHA ISO VIEJA','OP','SEDE','FECHA','ISO','Temposum','2024-01-01','2024-01-01','activo')").run();
+  const globalCompacta = await handlers['ausentismo:buscarEmpleado']({}, {
+    cedula: '889', empresaId: 'Aseplus', buscarEnTodasLasEmpresas: true
+  });
+  ok('10f) una fecha YYYYMMDD se compara con una ISO (gana la más nueva)',
+    globalCompacta.data && globalCompacta.data.nombre === 'FECHA COMPACTA',
+    globalCompacta.data && globalCompacta.data.nombre);
+
+  // ---------- 10g) Las filas BORRADAS LÓGICAMENTE (activo=0) no se ofrecen ----------
+  // `activo` es el soft delete de `base_personal` (NO es el estado laboral).
+  db.exec('ALTER TABLE base_personal ADD COLUMN activo INTEGER');
+  db.prepare("INSERT INTO base_personal (id, cedula, nombre, cargo, area, nombres, apellidos, empresa_id, fecha_ingreso, updated_at, estado, activo) " +
+    "VALUES ('x1','1212','BORRADA LOGICAMENTE','OP','SEDE','BORRADA','LOGICAMENTE','Tempoactiva','2025-01-01','2025-01-01','activo',0)").run();
+  db.prepare("INSERT INTO base_personal (id, cedula, nombre, cargo, area, nombres, apellidos, empresa_id, fecha_ingreso, updated_at, estado, activo) " +
+    "VALUES ('x2','1212','VIGENTE','OP','SEDE','VIGENTE','PERSISTENTE','Temposum','2020-01-01','2020-01-01','activo',1)").run();
+
+  const globalBorrada = await handlers['ausentismo:buscarEmpleado']({}, {
+    cedula: '1212', empresaId: 'Aseplus', buscarEnTodasLasEmpresas: true
+  });
+  ok('10g) una fila borrada lógicamente (activo=0) NO gana la búsqueda',
+    globalBorrada.data && globalBorrada.data.nombre === 'VIGENTE PERSISTENTE',
+    globalBorrada.data && globalBorrada.data.nombre);
+
+  db.prepare("INSERT INTO base_personal (id, cedula, nombre, cargo, area, nombres, apellidos, empresa_id, fecha_ingreso, updated_at, estado, activo) " +
+    "VALUES ('x3','1313','SOLO BORRADA','OP','SEDE','SOLO','BORRADA','Tempoactiva','2025-01-01','2025-01-01','activo',0)").run();
+  const globalSoloBorrada = await handlers['ausentismo:buscarEmpleado']({}, {
+    cedula: '1313', empresaId: 'Aseplus', buscarEnTodasLasEmpresas: true
+  });
+  ok('10g) si la única fila está borrada lógicamente, no se encuentra',
+    globalSoloBorrada.success && globalSoloBorrada.data === null,
+    JSON.stringify(globalSoloBorrada.data));
+
+  // ---------- 10h) Sin empresa activa: tampoco sale la ficha completa ----------
+  // Sin empresa no se puede AFIRMAR "es otra empresa" (no hay falsa alarma),
+  // pero la fila de una persona que sí tiene empresa tampoco se entrega
+  // entera: el recorte lo decide la fila, no el aviso.
+  const globalSinEmpresaActiva = await handlers['ausentismo:buscarEmpleado']({}, {
+    cedula: '666', buscarEnTodasLasEmpresas: true
+  });
+  ok('10h) sin empresa activa, la fila de otra empresa también se recorta',
+    globalSinEmpresaActiva.data && globalSinEmpresaActiva.data.salario === undefined,
+    globalSinEmpresaActiva.data && globalSinEmpresaActiva.data.salario);
+  ok('10h) sin empresa activa, no se afirma que sea "otra empresa" (sin falsa alarma)',
+    globalSinEmpresaActiva.esEmpresaActual === true, globalSinEmpresaActiva.esEmpresaActual);
+
   // ---------- 11) El exportador de Python ----------
   const scriptPy = path.join(__dirname, '..', 'Portear', 'src', 'exportar_ausentismo.py');
   ok('11) existe el exportador de Python', fs.existsSync(scriptPy), scriptPy);

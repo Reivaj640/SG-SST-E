@@ -11119,8 +11119,9 @@ archivo"* (ya no hay archivo) sino **"en la base"**.
 empresas conviven ahi separadas por `empresa_id` (base real: 2 707 filas — Temposum 1 659, Tempoactiva 773,
 Aseplus 274 — y **1 fila basura** con `empresa_id='1'`, que no esta en `companies`). Y hay **cedulas que
 aparecen en dos empresas a la vez**. El owner fijo el desempate: **comparar la fecha de ingreso en ambas y
-entregar la mas actual**. El orden completo quedo con cuatro niveles (empresa del usuario, `activo`, fecha de
-ingreso, `updated_at`), y las fechas se normalizan a `YYYY-MM-DD` porque la base mezcla `2023-06-01` con
+entregar la mas actual**. El orden completo quedo con cuatro niveles (empresa del usuario, **vigente antes
+que retirada**, fecha de ingreso, `updated_at`). Ojo: la segunda columna NO es `activo` — ver el 📦1100-fix
+abajo; y las fechas se normalizan a `YYYY-MM-DD` porque la base mezcla `2023-06-01` con
 `2026-09-11T17:00:00.000Z`: sin normalizar, el orden es alfabetico y no temporal.
 
 **La regla.** La busqueda global es **opt-in** (`buscarEnTodasLasEmpresas`): sin el flag, la consulta sigue
@@ -11141,3 +11142,78 @@ nunca se nota.
 deja rastro**: los campos quedan vacios y el usuario no sabe por que. Por eso el aviso de "otra empresa"
 **tambien** se escribe **en la pantalla** (una linea bajo el campo cedula) y el notificador tiene respaldo
 en la consola. Un aviso que se pierde en silencio no es un aviso (§5.67).
+
+## 📦 La revision independiente del 📦1100 encontro seis cosas reales (📦1100-fix, 2026-11-25)
+
+**El como.** El 📦1100 se commiteo y se pusheo, y despues se lanzo una revision independiente sobre el
+diff (`7d46901f..73ec0c24`). Salieron **seis hallazgos, todos con confianza alta**. La regla de este repo es
+no implementarlos a ciegas: cada uno se **verifico contra el codigo y contra la base real** antes de
+tocarlo. Los seis eran verdad, pero el del estado era **mas grave de lo que parecia**: un criterio que no
+discriminaba NADA.
+
+### 1) `activo` NO es el estado laboral: es el borrado logico (y no discriminaba nada)
+
+**El error.** El desempate del 📦1100 ordenaba por `activo` antes que por la fecha de ingreso, con la
+intencion de "la persona activa antes que la retirada". En `base_personal` hay **dos** columnas que parecen
+el estado: `activo INTEGER DEFAULT 1` y `estado TEXT DEFAULT 'activo'`. Medido sobre la base real:
+
+| `estado` | `activo` | filas |
+|---|---|---|
+| `A` | 1 | 124 |
+| `activo` | 1 | 375 |
+| `retirado` | 1 | **2 208** |
+
+`activo` esta en `1` para **las 2 708 filas**: como criterio era un **no-op**, y **2 208 personas retiradas
+seguian contando como "activas"**. El ciclo laboral esta en `estado` (`activo`, `A` —abreviatura del
+importador legacy—, `retirado`, `incapacitado`, `vacaciones`, `permiso`, `maternidad`, `paternidad`,
+`luto`).
+
+**El impacto real.** Hay **33 cedulas** que aparecen en dos empresas con una fila vigente y otra retirada.
+Con el criterio viejo esas 33 se resolvian por la fecha de ingreso (que hoy coincide: **0 cambian**), o sea
+que el bug era **latente**, no visible: el dia que alguien reimportara una base con una fecha distinta, la
+app entregaba el vinculo laboral ya terminado. Ademas, `activo = 0` (borrado logico) no se excluia: una fila
+borrada por el usuario se ofrecia como si la persona estuviera en la empresa.
+
+**El fix.** `_puntajeEstado(fila)`: 2 = vigente (`activo`, `A` y las situaciones permanentes), 1 = sin dato,
+0 = `retirado`. Y las filas con `activo = 0` se **excluyen** de la busqueda global. Verificado contra las
+**33 cedulas reales**: las 33 devuelven la persona vigente.
+
+### 2) La busqueda que cruza empresas devolvia la FICHA COMPLETA de un tercero
+
+`SELECT p.*` devolvia **48 columnas** de la fila de la otra empresa: salario, banco, numero de cuenta,
+direccion, fecha de nacimiento, pension y contactos. La busqueda global no es una consulta a la ficha
+completa de un tercero: es una consulta para avisarle al usuario en que empresa esta. El fix es una **lista
+blanca explicita** de campos (`_CAMPOS_CRUCE_EMPRESAS`): nombre, cargo, area, EPS, ARL, empresa y fecha de
+ingreso. La busqueda de la **propia** empresa NO se recorta (el wizard de Seguimiento de Incapacidades
+autocompleta salario y fecha de nacimiento de ahi).
+
+### 3) El modal "Empresa Diferente" interpretaba texto de la base como HTML
+
+`message.innerHTML` y `extra.innerHTML` metian el nombre, la empresa encontrada, la empresa abierta y la
+lista de empresas **sin escapar**. Los nombres vienen de un Excel importado: un nombre con una etiqueta
+`img` y un `onerror` se ejecutaba dentro de la ventana (la CSP no lo detiene: `index.html` permite HTML en
+linea). El fix escapa los cuatro valores con el `_escapeHtml` que ya tenia la vista. Verificado en un
+**Chromium real** (Electron): 0 elementos creados, 0 ejecuciones, y el texto se ve tal cual.
+
+### 4) La antesala copiaba el contacto de otra empresa al registro de la tuya
+
+El enriquecimiento de telefono y correo tomaba el resultado de la busqueda global **sin mirar de que empresa
+era**: una gestante de Asel recibia el correo de Tempoactiva. En la base local hay **2 de las 3 gestantes**
+en esa situacion. El fix: el contacto solo se aplica cuando `esEmpresaActual !== false`.
+
+### 5) El aviso de "otra empresa" se quedaba cuando el usuario borraba la cedula
+
+En `_autollenarDatosPersonal` la limpieza del aviso estaba **despues** del `if (!cedula) return;`: al borrar
+la cedula, el aviso se quedaba debajo del campo vacio, afirmando algo falso. El fix: limpiar **antes** de
+cualquier salida temprana (limpiar → validar → buscar).
+
+### 6) Una fecha compacta `YYYYMMDD` perdia siempre contra una ISO
+
+`_fechaComparable` solo reconocia `YYYY-MM-DD`: cualquier fecha compacta quedaba por detras de cualquier
+ISO, sin importar cual fuera mas nueva. Hoy la base real tiene **0 de 2 707** en formato compacto, pero el
+importador de Gestion Humana las conserva a proposito (el Excel las trae asi), asi que el caso puede volver.
+El fix normaliza `YYYYMMDD` y `YYYYMMDDHHMMSS` a `YYYY-MM-DD`.
+
+**La regla que queda.** Una revision independiente no se implementa a ciegas: se verifica contra el codigo y
+contra los datos reales, y se mide el impacto antes de afirmar que algo esta roto. Los seis fixes se
+comprobaron con pruebas en rojo primero (y el del estado, ademas, con las 33 cedulas reales de la base).

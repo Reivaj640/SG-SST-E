@@ -8139,10 +8139,13 @@ class MedicionAusentismoComponent {
             line-height: 1.6;
             margin-bottom: 16px;
         `;
+        // 📦1100-fix — Los textos vienen de la base (un Excel importado): se
+        // escapan para que se muestren como TEXTO. Sin esto, un nombre con
+        // "<img ...>" se ejecuta dentro de la ventana.
         message.innerHTML = `
-            El empleado <strong style="color: #1E293B;">${nombreEmpleado}</strong> pertenece a la empresa 
-            <strong style="color: #174ea6;">${empresaEmpleado}</strong>, pero usted está registrado en 
-            <strong style="color: #174ea6;">${empresaSeleccionada}</strong>.
+            El empleado <strong style="color: #1E293B;">${this._escapeHtml(nombreEmpleado)}</strong> pertenece a la empresa
+            <strong style="color: #174ea6;">${this._escapeHtml(empresaEmpleado)}</strong>, pero usted está registrado en
+            <strong style="color: #174ea6;">${this._escapeHtml(empresaSeleccionada)}</strong>.
         `;
 
         // Nota informativa
@@ -8157,7 +8160,7 @@ class MedicionAusentismoComponent {
         `;
         note.innerHTML = `
             <strong>Nota:</strong> Los datos se guardarán en la base de
-            <strong>${empresaSeleccionada}</strong>. Asegúrese de que esta sea la empresa correcta
+            <strong>${this._escapeHtml(empresaSeleccionada)}</strong>. Asegúrese de que esta sea la empresa correcta
             antes de continuar.
         `;
 
@@ -8170,9 +8173,11 @@ class MedicionAusentismoComponent {
                 font-size: 13px;
                 color: #475569;
             `;
+            // 📦1100-fix — Los nombres de empresa también se escapan.
+            const otrasHtml = otras.map((e) => this._escapeHtml(e)).join(', ');
             extra.innerHTML = `
                 <strong>Nota:</strong> Esta cédula también aparece en:
-                <strong>${otras.join(', ')}</strong>.
+                <strong>${otrasHtml}</strong>.
             `;
             note.appendChild(extra);
         }
