@@ -114,6 +114,10 @@
         var notifier = (window.parent && window.parent.updateNotifier) || window.updateNotifier;
         if (notifier && typeof notifier.show === 'function') {
             notifier.show({ type: tipo, title: titulo, subtitle: mensaje, autoClose: 4000 });
+        } else {
+            // 📦1100 — Sin notificador el aviso se perdería en silencio: al
+            // menos queda registrado en la consola para diagnóstico.
+            console.warn('[GESTION-SEGUIMIENTO] Toast sin notificador:', tipo, titulo, mensaje);
         }
     }
 
@@ -491,6 +495,18 @@
         var cedulaInput = document.getElementById('ngCedula');
         if (cedulaInput) {
             cedulaInput.addEventListener('blur', _autollenarDatosPersonal);
+            /* 📦1100 — Aviso inline bajo la cédula. El toast puede no estar
+               disponible (vista abierta sin el shell), y el usuario tiene que
+               enterarse igual de que la persona es de otra empresa. */
+            var cedulaField = cedulaInput.closest ? cedulaInput.closest('.ng-field') : null;
+            if (cedulaField && !document.getElementById('ngCedulaAviso')) {
+                var aviso = document.createElement('div');
+                aviso.className = 'ng-field__hint';
+                aviso.id = 'ngCedulaAviso';
+                aviso.style.display = 'none';
+                aviso.style.color = 'var(--v3-warning, #e7a224)';
+                cedulaField.appendChild(aviso);
+            }
         }
     }
 
@@ -515,16 +531,56 @@
         // Hint visual mientras se busca
         if (nombreEl) nombreEl.placeholder = 'Buscando en BD de personal...';
 
+        /* 📦1100 — Aviso inline bajo la cédula (se limpia en cada búsqueda). */
+        var avisoEl = document.getElementById('ngCedulaAviso');
+        function _limpiarAviso() {
+            if (!avisoEl) return;
+            avisoEl.textContent = '';
+            avisoEl.style.display = 'none';
+        }
+        _limpiarAviso();
+
         try {
             /* 📦1099 (2026-11-25) — La búsqueda va a la base de Gestión Humana
                (`base_personal`, SQLite). SIN respaldo al Excel: si la cédula
-               no está en la base, se diligencia a mano. */
+               no está en la base, se diligencia a mano.
+               📦1100 — Si no está en la empresa activa, se busca en las bases
+               de las demás empresas y se avisa en cuál está. */
             var res = await window.electronAPI.ausentismoBuscarEmpleado({
                 cedula: cedula,
-                empresaId: _state.empresaId
+                empresaId: _state.empresaId,
+                buscarEnTodasLasEmpresas: true
             });
             if (res && res.success && res.data) {
                 var d = res.data;
+                /* 📦1100 — Está en otra empresa: se avisa pero NO se autollenan
+                   los datos (acá se está creando una gestante para la empresa
+                   activa, con sus datos de afiliación). */
+                if (res.esEmpresaActual === false) {
+                    if (nombreEl) nombreEl.value = '';
+                    if (cargoEl) cargoEl.value = '';
+                    if (epsEl) epsEl.value = '';
+                    if (arlEl) arlEl.value = '';
+                    if (areaEl) areaEl.value = '';
+                    if (empresaNombreEl) empresaNombreEl.value = '';
+                    if (empresaClienteEl) empresaClienteEl.value = '';
+                    /* 📦1100 — Si la cédula aparece en más de una empresa, se
+                       informa la empresa ganadora y se listan las otras. */
+                    var otras = (res.empresasEncontradas || []).filter(function (e) {
+                        return e && e !== d.empresa;
+                    });
+                    _mostrarToast('warning', 'Está en otra empresa',
+                        'La cédula ' + cedula + ' pertenece a la empresa ' +
+                        (d.empresa || 'otra') + '. Verifique antes de continuar.' +
+                        (otras.length ? ' También aparece en: ' + otras.join(', ') + '.' : ''));
+                    if (avisoEl) {
+                        avisoEl.textContent = 'Esta cédula pertenece a la empresa ' +
+                            (d.empresa || 'otra') + '. No se autollenaron los datos.' +
+                            (otras.length ? ' También aparece en: ' + otras.join(', ') + '.' : '');
+                        avisoEl.style.display = 'block';
+                    }
+                    return;
+                }
                 if (nombreEl) nombreEl.value = d.nombre || '';
                 if (cargoEl) cargoEl.value = d.cargo || '';
                 if (epsEl) epsEl.value = d.entidad || '';

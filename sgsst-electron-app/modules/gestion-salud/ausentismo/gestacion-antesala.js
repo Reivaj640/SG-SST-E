@@ -285,10 +285,13 @@
             // (teléfono, correo). El bridge gestaciones NO devuelve estos campos,
             // pero vienen en `ausentismoBuscarEmpleado` (base de Gestión Humana,
             // 📦1099) que ya usa el modal de nueva gestante y el wizard mensual.
+            // 📦1100 — Si no está en la empresa activa, se busca en las bases de
+            // las demás empresas (sin aviso: este enriquecimiento no bloquea).
             try {
                 var resEmp = await window.electronAPI.ausentismoBuscarEmpleado({
                     cedula: _state.gestante.cedula,
-                    empresaId: _state.empresaId
+                    empresaId: _state.empresaId,
+                    buscarEnTodasLasEmpresas: true
                 });
                 if (resEmp && resEmp.success && resEmp.data) {
                     var d = resEmp.data;

@@ -11098,3 +11098,46 @@ respaldo que aparecen en el codigo de la tabla y de las estadisticas. Para cada 
 Y se **muto** para comprobar que el check muerde: quitando `'CLASE DE INCAPACIDAD'` y `'ENTIDAD'` del
 adaptador, el test cae a 42/43 con esas dos cadenas rotas. Un check que nunca se ha visto fallar no es
 un check (§7.7).
+
+## 📦 La cedula que no estaba en tu empresa: el aviso que quedo dormido y volvio (📦1100, 2026-11-25)
+
+**El sintoma.** El formulario de registro (3.3.6) autollenaba nombre, cargo, area, EPS y empresa usuaria
+al tabular la cedula. Cuando la persona **no estaba en la empresa abierta**, la app decia *"Empleado no
+encontrado. Diligencie manualmente."* — sin decir donde estaba esa persona. El owner lo pidio al pie: *si no
+esta en mi empresa, buscala en las demas y decime en cual esta*.
+
+**Por que el aviso existia y no aparecia.** El modal *"Empresa Diferente"* (`showEmpresaMismatchModal` en
+`medicion-ausentismo.js`) venia del backup contra el Excel, donde cada fila traia su campo "empresa". En el
+📦1099 la busqueda paso a la base de Gestion Humana **filtrando por `empresa_id`**, y el modal quedo **sin
+llamadores**: la persona de otra empresa ya no llegaba nunca a ese codigo. El metodo se conservo porque
+**dentro viven los `@keyframes ausFadeIn` y `ausSlideUp`** que usa el modal de seleccion de registro
+(borrarlos rompia ese otro modal) — o sea: *un metodo sin llamadores no es codigo muerto, es deuda viva*.
+El 📦1100 le devuelve el llamador y actualiza el texto: la nota ya no dice *"los datos se guardaran en el
+archivo"* (ya no hay archivo) sino **"en la base"**.
+
+**Lo que hay que decidir cuando la busqueda cruza empresas.** `base_personal` es una tabla **central**: las
+empresas conviven ahi separadas por `empresa_id` (base real: 2 707 filas — Temposum 1 659, Tempoactiva 773,
+Aseplus 274 — y **1 fila basura** con `empresa_id='1'`, que no esta en `companies`). Y hay **cedulas que
+aparecen en dos empresas a la vez**. El owner fijo el desempate: **comparar la fecha de ingreso en ambas y
+entregar la mas actual**. El orden completo quedo con cuatro niveles (empresa del usuario, `activo`, fecha de
+ingreso, `updated_at`), y las fechas se normalizan a `YYYY-MM-DD` porque la base mezcla `2023-06-01` con
+`2026-09-11T17:00:00.000Z`: sin normalizar, el orden es alfabetico y no temporal.
+
+**La regla.** La busqueda global es **opt-in** (`buscarEnTodasLasEmpresas`): sin el flag, la consulta sigue
+filtrando por `empresa_id` y devuelve una sola fila, exactamente como antes. Las filas cuya empresa no existe
+se descartan contra la tabla `companies`, y una fila **sin `empresa_id`** se reporta como de la empresa
+actual (no se puede probar que sea de otra, y sin esa guarda sale una falsa alarma con el nombre de empresa
+vacio).
+
+**El aviso se pone donde NO rompe el proceso.** El owner lo dijo asi: *"donde no afecte engativamente el
+flujo del proceso"*. Quedo asi: en el **Formulario de Registro**, el modal de antes (el usuario decide:
+Continuar llena los datos, Cancelar limpia); en el **modal Nueva gestante**, un aviso que **no** detiene y
+que **no** autollena los datos de la otra empresa (aca se esta creando una gestante para TU empresa, con sus
+datos de afiliacion); en la **antesala**, nada: el enriquecimiento de telefono y correo no bloquea y casi
+nunca se nota.
+
+**El detalle que casi se escapa.** El toast del modal Nueva gestante lo emite `window.parent.updateNotifier`
+— vive en la **ventana principal**, no en el iframe. Si esa cadena no existe, el toast no aparece **y no
+deja rastro**: los campos quedan vacios y el usuario no sabe por que. Por eso el aviso de "otra empresa"
+**tambien** se escribe **en la pantalla** (una linea bajo el campo cedula) y el notificador tiene respaldo
+en la consola. Un aviso que se pierde en silencio no es un aviso (§5.67).

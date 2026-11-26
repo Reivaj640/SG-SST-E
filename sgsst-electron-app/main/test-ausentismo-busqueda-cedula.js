@@ -4,6 +4,10 @@
 // cédula no está en la base, se dice "Empleado no encontrado" y se limpian los
 // campos.
 //
+// 📦1100 — Si la cédula no está en la empresa del usuario, se busca en las
+// bases de las OTRAS empresas y se avisa en cuál está (modal "Empresa
+// Diferente" en el formulario, aviso en el modal de nueva gestante).
+//
 // Cubre los 3 puntos que antes leían el Excel:
 //   1. Formulario de Registro (medicion-ausentismo.js, blur de #cedula-input)
 //   2. Gestación · modal nueva gestante (gestacion-seguimiento-home.js)
@@ -112,7 +116,19 @@ async function main() {
   ok('1) el blur ya NO llama a buscarEmpleadoPorCedula (Excel)',
     !/buscarEmpleadoPorCedula/.test(blur));
   ok('1) manda cedula y empresaId (this.currentCompany)',
-    /ausentismoBuscarEmpleado\(\{\s*cedula:\s*cedula\s*,\s*empresaId:\s*this\.currentCompany\s*\}/.test(blur));
+    /ausentismoBuscarEmpleado\(\{\s*cedula:\s*cedula\s*,\s*empresaId:\s*this\.currentCompany\s*,?\s*buscarEnTodasLasEmpresas:\s*true\s*\}/.test(blur));
+  ok('1) busca en las bases de las demás empresas (buscarEnTodasLasEmpresas)',
+    /buscarEnTodasLasEmpresas:\s*true/.test(blur));
+  ok('1) mira si la persona es de la empresa del usuario (result.esEmpresaActual)',
+    /result\.esEmpresaActual/.test(blur));
+  ok('1) si es de OTRA empresa, abre el modal "Empresa Diferente"',
+    /showEmpresaMismatchModal\(/.test(blur) &&
+    /result\.esEmpresaActual\s*===\s*false/.test(blur));
+  ok('1) el modal se abre SOLO cuando NO es la empresa del usuario',
+    blur.indexOf('showEmpresaMismatchModal(') > blur.indexOf('result.esEmpresaActual === false'),
+    blur.indexOf('showEmpresaMismatchModal(') + ' vs ' + blur.indexOf('result.esEmpresaActual === false'));
+  ok('1) el modal dice que los datos se guardan en la BASE (no en "el archivo")',
+    /se guardarán en la base/.test(srcMedicion) && !/se guardarán en el archivo/.test(srcMedicion));
   ok('1) lee result.data (la forma del puente), no result.datos',
     /result\.data/.test(blur) && !/result\.datos/.test(blur));
 
@@ -129,8 +145,8 @@ async function main() {
     ok('1) ' + id + ' <- data.' + campo, re.test(blur));
   });
 
-  ok('1) ya NO abre el modal de "pertenece a otra empresa" (la consulta filtra por empresa)',
-    !/showEmpresaMismatchModal/.test(blur));
+  ok('1) 📦1100 — el modal "Empresa Diferente" vuelve a usarse (la búsqueda ya llega a otras empresas)',
+    /showEmpresaMismatchModal\(/.test(blur));
   ok('1) si no está en la base avisa "Empleado no encontrado. Diligencie manualmente."',
     /Empleado no encontrado\. Diligencie manualmente\./.test(blur));
   ok('1) si no está, limpia los 5 campos', campos.every(([id]) =>
@@ -168,6 +184,8 @@ async function main() {
           llamadas.push(params);
           return {
             success: true,
+            esEmpresaActual: true,
+            empresasEncontradas: [],
             data: {
               nombre: 'MARIA GARCIA', cargo: 'OPERATIVA', entidad: 'SURA', arl: 'POSITIVA',
               area: 'SEDE 1', empresa: 'Tempoactiva', empresa_usuaria: 'CLIENTE SAS'
@@ -183,6 +201,8 @@ async function main() {
     global.document = { getElementById: id => els[id] || null };
     global._state = { empresaId: 'emp-1' };
     global._mostrarToast = (tipo, titulo, msg) => toasts.push({ tipo, titulo, msg });
+    // 📦1100 — Aviso inline bajo la cédula (elemento real del modal).
+    els.ngCedulaAviso = { textContent: '', style: { display: 'none' } };
 
     const fnSeg = comoFuncion(fnSegRaw);
     els.ngCedula = { value: ' 1.044.392.755 ', placeholder: '' };
@@ -194,6 +214,8 @@ async function main() {
     ok('2) manda cedula normalizada y empresaId del contexto',
       llamadas[0] && llamadas[0].cedula === '1.044.392.755' && llamadas[0].empresaId === 'emp-1',
       JSON.stringify(llamadas[0]));
+    ok('2) pide buscar en las bases de las demás empresas',
+      llamadas[0] && llamadas[0].buscarEnTodasLasEmpresas === true, JSON.stringify(llamadas[0]));
     CAMPOS_SEG.forEach(([id, campo]) => {
       const esperado = {
         nombre: 'MARIA GARCIA', cargo: 'OPERATIVA', entidad: 'SURA', arl: 'POSITIVA',
@@ -222,6 +244,53 @@ async function main() {
       els.ngNombre.placeholder === 'Nombres y apellidos', els.ngNombre.placeholder);
     ok('2) en el archivo no queda ninguna llamada al canal del Excel',
       !/electronAPI\.buscarEmpleadoPorCedula/.test(srcSeguimiento));
+
+    // 2b) La persona está en OTRA empresa: se avisa pero NO se autollenan
+    // los datos (acá se está creando una gestante para la empresa activa).
+    CAMPOS_SEG.forEach(([id]) => { els[id].value = 'VIEJO'; });
+    toasts.length = 0; llamadas.length = 0;
+    global.window.electronAPI.ausentismoBuscarEmpleado = async function (params) {
+      llamadas.push(params);
+      return {
+        success: true,
+        esEmpresaActual: false,
+        empresasEncontradas: ['Temposum E.S.', 'Aseplus E.S.'],
+        data: { nombre: 'MARIA GARCIA', cargo: 'OPERATIVA', entidad: 'SURA', empresa: 'Temposum E.S.' }
+      };
+    };
+    await fnSeg();
+    ok('2b) si está en otra empresa, avisa en cuál está',
+      toasts.some(t => /otra empresa/i.test(t.titulo) && /Temposum/.test(t.msg)),
+      JSON.stringify(toasts));
+    ok('2b) si está en otra empresa, NO autollena los datos',
+      CAMPOS_SEG.every(([id]) => els[id].value === ''),
+      JSON.stringify(CAMPOS_SEG.map(([id]) => els[id].value)));
+    ok('2b) si la cédula aparece en varias empresas, lista las otras',
+      toasts.some(t => /también aparece en/i.test(t.msg) && /Aseplus/.test(t.msg)),
+      JSON.stringify(toasts));
+    ok('2b) el aviso inline bajo la cédula dice en qué empresa está',
+      els.ngCedulaAviso.style.display === 'block' &&
+      /Temposum/.test(els.ngCedulaAviso.textContent),
+      JSON.stringify(els.ngCedulaAviso));
+    ok('2b) el aviso inline también lista las otras empresas',
+      /Aseplus/.test(els.ngCedulaAviso.textContent), els.ngCedulaAviso.textContent);
+
+    // El aviso inline se limpia cuando la búsqueda vuelve a la empresa activa.
+    CAMPOS_SEG.forEach(([id]) => { els[id].value = 'VIEJO'; });
+    toasts.length = 0; llamadas.length = 0;
+    global.window.electronAPI.ausentismoBuscarEmpleado = async function (params) {
+      llamadas.push(params);
+      return {
+        success: true,
+        esEmpresaActual: true,
+        empresasEncontradas: ['Tempoactiva'],
+        data: { nombre: 'MARIA GARCIA', cargo: 'OPERATIVA', entidad: 'SURA', empresa: 'Tempoactiva' }
+      };
+    };
+    await fnSeg();
+    ok('2b) el aviso inline se oculta cuando la persona es de la empresa activa',
+      els.ngCedulaAviso.style.display === 'none' && els.ngCedulaAviso.textContent === '',
+      JSON.stringify(els.ngCedulaAviso));
   }
 
   // ══════════════════════════════════════════════════════════════
@@ -283,6 +352,8 @@ async function main() {
     ok('3) manda la cédula de la gestante y la empresa',
       llamadas[0] && llamadas[0].cedula === '1044392755' && llamadas[0].empresaId === 'emp-1',
       JSON.stringify(llamadas[0]));
+    ok('3) pide buscar en las bases de las demás empresas',
+      llamadas[0] && llamadas[0].buscarEnTodasLasEmpresas === true, JSON.stringify(llamadas[0]));
     ok('3) data.telefono llena el teléfono de la gestante',
       global._state.gestante.telefono === '3001112233', global._state.gestante.telefono);
     ok('3) data.correo llena el correo de la gestante',
@@ -336,11 +407,23 @@ async function main() {
     /gestacion-antesala\.js\?v=[A-Za-z0-9-]+/.test(htmlAnt));
 
   // ══════════════════════════════════════════════════════════════
+  // 6) 📦1100 — El aviso de "otra empresa" nunca se pierde en silencio
+  // ══════════════════════════════════════════════════════════════
+  ok('6) el modal de nueva gestante tiene un aviso inline bajo la cédula',
+    /ngCedulaAviso/.test(srcSeguimiento));
+  ok('6) el aviso inline se muestra (display:block) cuando es de otra empresa',
+    /avisoEl\.style\.display = 'block'/.test(srcSeguimiento));
+  ok('6) el aviso inline se limpia en cada búsqueda',
+    /_limpiarAviso\(\)/.test(srcSeguimiento));
+  ok('6) el toast tiene respaldo en consola (no se pierde en silencio)',
+    /console\.warn\('\[GESTION-SEGUIMIENTO\] Toast sin notificador/.test(srcSeguimiento));
+
+  // ══════════════════════════════════════════════════════════════
   // Resumen
   // ══════════════════════════════════════════════════════════════
   let failed = 0;
   console.log('\n=======================================');
-  console.log('  📦1099 · Búsqueda de cédula en la base de GH');
+  console.log('  📦1099-1100 · Búsqueda de cédula en la base de GH');
   console.log('=======================================');
   checks.forEach(c => {
     if (!c.ok) failed++;

@@ -2069,6 +2069,61 @@ duplicados en vez de 753.
    filas: se borra lo que había de ese archivo y se vuelve a insertar. Por eso hay que respaldar la
    base antes (medido: 5 593 → 3 543 filas, `integrity_check: ok`, `foreign_key_check` vacío).
 
+### 5.66 📦 Una búsqueda que cruza empresas tiene que decidir QUÉ fila gana — y ese criterio lo decide el owner
+
+**El caso real (25-nov-2026, 📦1100, ausentismo 3.3.6).** La búsqueda de cédula del formulario de registro
+consultaba `base_personal` filtrando por `empresa_id`: solo la lista de personal de la empresa abierta. El
+owner pidió el fallback: *si la persona no está en mi empresa, buscala en las demás y decime en cuál está*.
+La tabla `base_personal` es **central**: las empresas conviven en la misma tabla separadas por `empresa_id`.
+En la base real hay **2 707 filas** (Temposum 1 659, Tempoactiva 773, Aseplus 274) y **1 fila basura** con
+`empresa_id='1'`, que no corresponde a ninguna empresa de la tabla `companies`.
+
+**Lo que la decisión del owner cambió del diseño.** La pregunta *"¿qué fila gana?"* tiene respuesta propia y
+no se puede inventar. El owner la respondió: **comparar la fecha de ingreso en ambas empresas y entregar la
+más actual**. Eso se tradujo en un orden de cuatro criterios, y cada uno se justificó con un dato que
+existe en la base: (1) la empresa del usuario primero —si está en tu empresa, es tuya—, (2) `activo` antes
+que retirado, (3) **fecha de ingreso más reciente** —el criterio pedido—, (4) `updated_at` más reciente, que
+solo desempata.
+
+**Las reglas:**
+
+1. **El criterio de desempate se pregunta, no se elige.** "La más reciente" es ambiguo hasta que se sabe
+   *de qué*: la de ingreso, la de edición, la de alta. Acá se eligió la de ingreso.
+2. **El criterio tiene que ser comparable.** Una fecha se compara solo si está en un formato único. La base
+   guarda `2023-06-01` y también `2026-09-11T17:00:00.000Z`: hay que normalizar a `YYYY-MM-DD` antes de
+   ordenar, o el orden termina siendo alfabético y no temporal.
+3. **Una fila sin empresa no es "otra empresa".** Si la fila no trae `empresa_id`, no se puede probar que sea
+   de otra: se trata como de la empresa actual. Sin esa guarda, una instalación con el esquema viejo dispara
+   una **falsa alarma** de "pertenece a otra empresa" con el nombre de empresa vacío.
+4. **La base central tiene basura: filtrá contra la lista real de empresas.** `empresa_id` es un dato de la
+   fila, no una garantía: contra la tabla `companies` —que es la lista de empresas reales— se descartan las
+   filas huérfanas. Así se descartó la fila con `empresa_id='1'`.
+5. **Devolvé dónde aparece, no solo dónde ganó.** La misma persona puede estar en dos empresas a la vez (en la
+   base real hay cédulas repetidas en Tempoactiva+Temposum y en Aseplus+Tempoactiva). El aviso tiene que decir
+   *"pertenece a Temposum"* **y** *"también aparece en Aseplus"*: con una sola empresa el usuario no puede
+   saber si el registro que está mirando es el que le sirve.
+6. **El camino viejo tiene que quedar igual.** El modo "buscar en todas" es **opt-in**
+   (`buscarEnTodasLasEmpresas`): sin el flag, la consulta sigue filtrando por `empresa_id` y devuelve una
+   sola fila. Un cambio de este tipo rompe a los que no lo piden si no es opt-in.
+
+### 5.67 📦 Un toast no es un aviso: si el mensaje puede desaparecer, tiene que haber un mensaje EN la pantalla
+
+**El caso real (25-nov-2026, 📦1100, ausentismo 3.3.6).** El modal "Nueva gestante" avisa con
+`window.updateNotifier.show(...)`, que vive en la **ventana principal**; la vista corre en un iframe y usa
+`window.parent.updateNotifier`. Si esa cadena no existe (la vista abierta sola, el shell todavía no cargado,
+un test), el toast **no aparece y no deja rastro**: el formulario queda con los campos vacíos y el usuario no
+sabe por qué. El aviso *"esta cédula es de otra empresa"* es justo el tipo de mensaje que no puede perderse.
+
+**Las reglas:**
+
+1. **Un aviso crítico va en la pantalla, no solo en el notificador.** El toast va con el mensaje, pero el
+   texto que el usuario tiene que leer **también** se escribe en el formulario (acá, una línea bajo el campo
+   cédula, con la clase de pista que ya existía en esa vista).
+2. **El notificador externo tiene respaldo.** Si `notifier.show` no existe, el mensaje se registra en la
+   consola: un aviso que se pierde en silencio no es un aviso.
+3. **El mensaje en pantalla se limpia en cada búsqueda**, no solo cuando aparece: si el intento siguiente es
+   de tu empresa, el aviso anterior tiene que irse (si no, el usuario ve dos verdades contradictorias).
+
 ### 6.1 Backend — bridges
 
 Sufijo **`-bridge.js`** (no `bridge-*.js`). Hay 30 en `main/`.

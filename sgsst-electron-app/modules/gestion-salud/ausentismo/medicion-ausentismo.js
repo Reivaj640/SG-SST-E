@@ -7611,7 +7611,8 @@ class MedicionAusentismoComponent {
 
                         const result = await window.electronAPI.ausentismoBuscarEmpleado({
                             cedula: cedula,
-                            empresaId: this.currentCompany
+                            empresaId: this.currentCompany,
+                            buscarEnTodasLasEmpresas: true
                         });
                         console.log('[DEBUG buscarEmpleado] result:', JSON.stringify(result));
 
@@ -7622,8 +7623,35 @@ class MedicionAusentismoComponent {
                             document.getElementById('empresa-usuaria-input').value = result.data.empresa_usuaria || '';
                             document.getElementById('entidad-input').value = result.data.entidad || '';
 
-                            /* 📦443 — Mini-tarjeta con datos del empleado en lugar de mensaje plano */
-                            this._showEmpleadoCard(statusDiv, result.data);
+                            /* 📦1100 — La cédula se buscó también en las bases de
+                               las demás empresas. Si la persona está en otra
+                               empresa, se avisa (como antes) y el usuario decide
+                               si continúa con esos datos o los diligencia a mano. */
+                            if (result.esEmpresaActual === false) {
+                                this.showStatus(statusDiv, 'La persona pertenece a otra empresa. Confirme si desea continuar.', 'warning');
+                                this.showEmpresaMismatchModal(
+                                    result.data.nombre,
+                                    result.data.empresa,
+                                    this.currentCompany,
+                                    () => {
+                                        /* 📦443 — Mini-tarjeta con datos del empleado en lugar de mensaje plano */
+                                        this._showEmpleadoCard(statusDiv, result.data);
+                                    },
+                                    () => {
+                                        // Usuario canceló - limpiar formulario
+                                        this.showStatus(statusDiv, 'Búsqueda cancelada. La persona pertenece a otra empresa.', 'warning');
+                                        document.getElementById('nombre-input').value = '';
+                                        document.getElementById('cargo-input').value = '';
+                                        document.getElementById('departamento-input').value = '';
+                                        document.getElementById('empresa-usuaria-input').value = '';
+                                        document.getElementById('entidad-input').value = '';
+                                    },
+                                    result.empresasEncontradas
+                                );
+                            } else {
+                                /* 📦443 — Mini-tarjeta con datos del empleado en lugar de mensaje plano */
+                                this._showEmpleadoCard(statusDiv, result.data);
+                            }
                         } else {
                             this.showStatus(statusDiv, 'Empleado no encontrado. Diligencie manualmente.', 'warning');
                             document.getElementById('nombre-input').value = '';
@@ -8013,13 +8041,19 @@ class MedicionAusentismoComponent {
      * Se conserva el método porque aquí viven los `@keyframes ausFadeIn` y
      * `ausSlideUp`, que usa el modal de selección de registro.
      *
+     * 📦1100 — Vuelve a usarse: cuando la cédula se busca en las bases de las
+     * demás empresas y la persona aparece en otra, se avisa en cuál está.
+     * `empresasExtra` son TODAS las empresas donde aparece (la encontrada
+     * incluida) para poder decir "también aparece en…".
+     *
      * @param {string} nombreEmpleado - Nombre del empleado encontrado
      * @param {string} empresaEmpleado - Empresa a la que pertenece el empleado
      * @param {string} empresaSeleccionada - Empresa actualmente seleccionada en la UI
      * @param {Function} onConfirm - Callback cuando el usuario confirma
      * @param {Function} onCancel - Callback cuando el usuario cancela
+     * @param {Array} empresasExtra - Empresas donde aparece la cédula
      */
-    showEmpresaMismatchModal(nombreEmpleado, empresaEmpleado, empresaSeleccionada, onConfirm, onCancel) {
+    showEmpresaMismatchModal(nombreEmpleado, empresaEmpleado, empresaSeleccionada, onConfirm, onCancel, empresasExtra) {
         // Crear overlay del modal
         const overlay = document.createElement('div');
         overlay.id = 'empresa-mismatch-overlay';
@@ -8122,10 +8156,26 @@ class MedicionAusentismoComponent {
             color: #475569;
         `;
         note.innerHTML = `
-            <strong>Nota:</strong> Los datos se guardarán en el archivo de 
-            <strong>${empresaSeleccionada}</strong>. Asegúrese de que esta sea la empresa correcta 
+            <strong>Nota:</strong> Los datos se guardarán en la base de
+            <strong>${empresaSeleccionada}</strong>. Asegúrese de que esta sea la empresa correcta
             antes de continuar.
         `;
+
+        // 📦1100 — Si la cédula aparece en más de una empresa, se listan.
+        const otras = (empresasExtra || []).filter(e => e && e !== empresaEmpleado);
+        if (otras.length) {
+            const extra = document.createElement('div');
+            extra.style.cssText = `
+                margin-top: 10px;
+                font-size: 13px;
+                color: #475569;
+            `;
+            extra.innerHTML = `
+                <strong>Nota:</strong> Esta cédula también aparece en:
+                <strong>${otras.join(', ')}</strong>.
+            `;
+            note.appendChild(extra);
+        }
 
         body.appendChild(message);
         body.appendChild(note);

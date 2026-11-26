@@ -291,6 +291,75 @@ ok('2) los 9 canales quedaron registrados', noRegistrados.length === 0, noRegist
   db.exec('CREATE TABLE IF NOT EXISTS companies (company_key TEXT, display_name TEXT)');
   db.prepare('INSERT OR REPLACE INTO companies VALUES (?, ?)').run('Aseplus', 'ASEPPLUS S.A.S.');
 
+  // ---------- 10c) Búsqueda en las demás empresas (📦1100) ----------
+  // Si la cédula no está en la empresa del usuario, se busca en las demás
+  // bases y se informa en qué empresa está la persona. Cuando aparece en
+  // varias, gana la que tenga la FECHA DE INGRESO más reciente.
+  db.exec('ALTER TABLE base_personal ADD COLUMN fecha_ingreso TEXT');
+  db.exec('ALTER TABLE base_personal ADD COLUMN updated_at TEXT');
+  db.prepare('INSERT OR REPLACE INTO companies VALUES (?, ?)').run('Temposum', 'Temposum E.S.');
+  db.prepare('INSERT OR REPLACE INTO companies VALUES (?, ?)').run('Tempoactiva', 'Tempoactiva E.S.');
+
+  // La cédula 555 vive en DOS empresas con ingresos distintos.
+  db.prepare("INSERT INTO base_personal (id, cedula, nombre, cargo, area, nombres, apellidos, empresa_id, fecha_ingreso, updated_at) " +
+    "VALUES ('g1','555','NOMBRE ANTIGUO','OP','SEDE','NOMBRE','ANTIGUO','Temposum','2020-01-15','2024-01-01')").run();
+  db.prepare("INSERT INTO base_personal (id, cedula, nombre, cargo, area, nombres, apellidos, empresa_id, fecha_ingreso, updated_at) " +
+    "VALUES ('g2','555','NOMBRE ACTUAL','OP','SEDE','NOMBRE','ACTUAL','Tempoactiva','2023-06-01','2023-06-01')").run();
+  // Cédula 777 solo existe en una empresa que NO está en `companies` (basura).
+  db.prepare("INSERT INTO base_personal (id, cedula, nombre, cargo, area, nombres, apellidos, empresa_id, fecha_ingreso, updated_at) " +
+    "VALUES ('g3','777','BASURA','OP','SEDE','BASURA','X','1','2024-01-01','2024-01-01')").run();
+
+  const sinGlobal = await handlers['ausentismo:buscarEmpleado']({}, { cedula: '555', empresaId: 'Aseplus' });
+  ok('10c) sin buscarEnTodasLasEmpresas NO busca en otras empresas (compatibilidad)',
+    sinGlobal.success && sinGlobal.data === null, JSON.stringify(sinGlobal.data));
+
+  const global = await handlers['ausentismo:buscarEmpleado']({}, {
+    cedula: '555', empresaId: 'Aseplus', buscarEnTodasLasEmpresas: true
+  });
+  ok('10c) con buscarEnTodasLasEmpresas encuentra en otra empresa',
+    global.success && !!global.data, JSON.stringify(global.data));
+  ok('10c) gana la de la fecha de ingreso MÁS RECIENTE (2023 > 2020)',
+    global.data && global.data.empresa_id === 'Tempoactiva', global.data && global.data.empresa_id);
+  ok('10c) avisa que NO es la empresa del usuario (esEmpresaActual=false)',
+    global.esEmpresaActual === false, global.esEmpresaActual);
+  ok('10c) trae el nombre visible de la empresa donde está',
+    global.data && global.data.empresa === 'Tempoactiva E.S.', global.data && global.data.empresa);
+  ok('10c) lista en cuántas empresas aparece',
+    Array.isArray(global.empresasEncontradas) && global.empresasEncontradas.length === 2 &&
+    global.empresasEncontradas.indexOf('Temposum E.S.') !== -1,
+    JSON.stringify(global.empresasEncontradas));
+
+  const globalEnActiva = await handlers['ausentismo:buscarEmpleado']({}, {
+    cedula: '555', empresaId: 'Temposum', buscarEnTodasLasEmpresas: true
+  });
+  ok('10c) si está en la empresa del usuario, gana esa (aunque su ingreso sea más viejo)',
+    globalEnActiva.data && globalEnActiva.data.empresa_id === 'Temposum', globalEnActiva.data && globalEnActiva.data.empresa_id);
+  ok('10c) avisa que SÍ es la empresa del usuario (esEmpresaActual=true)',
+    globalEnActiva.esEmpresaActual === true, globalEnActiva.esEmpresaActual);
+
+  const globalBasura = await handlers['ausentismo:buscarEmpleado']({}, {
+    cedula: '777', empresaId: 'Aseplus', buscarEnTodasLasEmpresas: true
+  });
+  ok('10c) ignora las filas de empresas que no existen (empresa "1")',
+    globalBasura.success && globalBasura.data === null, JSON.stringify(globalBasura.data));
+
+  // Una fila SIN `empresa_id` no se puede atribuir a otra empresa: no debe
+  // disparar una falsa alarma de "Empresa Diferente".
+  db.prepare("INSERT INTO base_personal (id, cedula, nombre, cargo, area, nombres, apellidos, empresa_id, fecha_ingreso, updated_at) " +
+    "VALUES ('g4','888','SIN EMPRESA','OP','SEDE','SIN','EMPRESA','','2024-01-01','2024-01-01')").run();
+  const globalSinEmpresa = await handlers['ausentismo:buscarEmpleado']({}, {
+    cedula: '888', empresaId: 'Aseplus', buscarEnTodasLasEmpresas: true
+  });
+  ok('10c) una fila sin empresa_id se reporta como de la empresa actual (sin falsa alarma)',
+    globalSinEmpresa.success && !!globalSinEmpresa.data && globalSinEmpresa.esEmpresaActual === true,
+    JSON.stringify(globalSinEmpresa.data) + ' | esEmpresaActual=' + globalSinEmpresa.esEmpresaActual);
+
+  const globalNoExiste = await handlers['ausentismo:buscarEmpleado']({}, {
+    cedula: '000000000', empresaId: 'Aseplus', buscarEnTodasLasEmpresas: true
+  });
+  ok('10c) si no está en ninguna empresa, devuelve null',
+    globalNoExiste.success && globalNoExiste.data === null, JSON.stringify(globalNoExiste.data));
+
   // ---------- 11) El exportador de Python ----------
   const scriptPy = path.join(__dirname, '..', 'Portear', 'src', 'exportar_ausentismo.py');
   ok('11) existe el exportador de Python', fs.existsSync(scriptPy), scriptPy);

@@ -522,17 +522,57 @@ function _handlerMarcarExportado(params) {
 }
 
 /**
- * 📦1099 — Nombre visible de la empresa a partir de su company_key
- * (`companies.display_name`). Si la tabla no existe, devuelve null: el
- * que llama hace fallback a la propia key.
+ * 📦1100 — Mapa de empresas: `company_key` -> nombre visible (`companies`).
+ * Si la tabla no existe, devuelve un mapa vacío: el que llama usa la key
+ * como nombre.
  */
-function _displayEmpresa(db, empresaId) {
-  if (!empresaId) return null;
+function _mapaEmpresas(db) {
+  var mapa = {};
   try {
-    var fila = db.prepare('SELECT display_name FROM companies WHERE company_key = ?').get(empresaId);
-    if (fila && fila.display_name) return fila.display_name;
+    db.prepare('SELECT company_key, display_name FROM companies').all().forEach(function (f) {
+      if (f && f.company_key) mapa[f.company_key] = f.display_name || f.company_key;
+    });
   } catch (e) { /* la tabla companies puede no existir */ }
-  return null;
+  return mapa;
+}
+
+/**
+ * 📦1100 — Fecha comparable (`YYYY-MM-DD`). Acepta '2023-06-01' y
+ * '2023-06-01T10:00:00.000Z'. Si el formato no se reconoce, devuelve ''.
+ */
+function _fechaComparable(valor) {
+  if (!valor) return '';
+  var v = String(valor).trim();
+  if (/^\d{4}-\d{2}-\d{2}/.test(v)) return v.slice(0, 10);
+  return '';
+}
+
+/**
+ * 📦1100 — Ordena las coincidencias de una cédula (la misma persona puede
+ * estar en más de una empresa):
+ *   1. la empresa del usuario primero
+ *   2. la persona activa antes que la retirada
+ *   3. la FECHA DE INGRESO más reciente
+ *   4. la edición más reciente
+ */
+function _compararFila(a, b, empresaId) {
+  var aActual = (empresaId && a.empresa_id === empresaId) ? 1 : 0;
+  var bActual = (empresaId && b.empresa_id === empresaId) ? 1 : 0;
+  if (aActual !== bActual) return bActual - aActual;
+
+  var aAct = a.activo ? 1 : 0;
+  var bAct = b.activo ? 1 : 0;
+  if (aAct !== bAct) return bAct - aAct;
+
+  var aF = _fechaComparable(a.fecha_ingreso);
+  var bF = _fechaComparable(b.fecha_ingreso);
+  if (!!aF !== !!bF) return aF ? -1 : 1;
+  if (aF && aF !== bF) return aF < bF ? 1 : -1;
+
+  var aU = a.updated_at || '';
+  var bU = b.updated_at || '';
+  if (aU !== bU) return aU < bU ? 1 : -1;
+  return 0;
 }
 
 /**
@@ -542,38 +582,67 @@ function _displayEmpresa(db, empresaId) {
  * La persona se busca en la BD. El Excel de "BD Personal" queda como
  * respaldo SOLO en el flujo de Seguimiento de Incapacidades (📦1095);
  * el formulario de registro y Gestión (📦1099) usan la base sin Excel.
+ *
+ * 📦1100 — Con `buscarEnTodasLasEmpresas`, si la cédula no está en la
+ * empresa del usuario, se busca en las bases de las demás empresas y se
+ * informa en cuál está. `esEmpresaActual` dice si la persona encontrada
+ * es de la empresa del usuario.
  */
 function _handlerBuscarEmpleado(params) {
   if (!_getDb) return error('NO_DB', 'Base de datos no disponible');
   var cedula = normalizarCedula(params && params.cedula);
   if (!cedula) return error('NO_CEDULA', 'cedula requerida');
   var empresaId = _empresaDe(params);
+  var buscarTodas = !!(params && params.buscarEnTodasLasEmpresas);
   try {
     var db = _getDb();
     var cols = db.prepare('PRAGMA table_info(base_personal)').all().map(function (c) { return c.name; });
-    if (!cols.length) return { success: true, data: null };
+    if (!cols.length) return { success: true, data: null, esEmpresaActual: true, empresasEncontradas: [] };
 
     var columnaCedula = null;
     ['cedula', 'numero_documento', 'documento', 'nro_documento', 'cedula_trabajador'].some(function (c) {
       if (cols.indexOf(c) !== -1) { columnaCedula = c; return true; }
       return false;
     });
-    if (!columnaCedula) return { success: true, data: null, columnas: cols };
+    if (!columnaCedula) return { success: true, data: null, columnas: cols, esEmpresaActual: true, empresasEncontradas: [] };
 
-    var sql = 'SELECT p.* FROM base_personal p WHERE REPLACE(REPLACE(REPLACE(CAST(p.' + columnaCedula +
+    var whereCedula = 'REPLACE(REPLACE(REPLACE(CAST(p.' + columnaCedula +
       " AS TEXT), '.', ''), ',', ''), ' ', '') = ?";
-    var args = [cedula];
-    if (empresaId && cols.indexOf('empresa_id') !== -1) {
-      sql += ' AND p.empresa_id = ?';
-      args.push(empresaId);
-    }
-    // La columna `activo` no existe en todas las versiones de base_personal:
-    // ordenar por ella reventaba la consulta. Se usa solo si esta.
-    if (cols.indexOf('activo') !== -1) sql += ' ORDER BY p.activo DESC';
-    sql += ' LIMIT 1';
 
-    var fila = db.prepare(sql).get.apply(db.prepare(sql), args);
-    if (!fila) return { success: true, data: null };
+    var mapaEmpresas = _mapaEmpresas(db);
+    var hayEmpresas = Object.keys(mapaEmpresas).length > 0;
+    var filas = [];
+
+    if (buscarTodas) {
+      // 📦1100 — La cédula puede estar en la base de OTRA empresa.
+      var todas = db.prepare('SELECT p.* FROM base_personal p WHERE ' + whereCedula).all(cedula);
+      if (hayEmpresas) {
+        // Se descartan las filas cuya empresa no existe (datos basura).
+        todas = todas.filter(function (f) { return !f.empresa_id || mapaEmpresas[f.empresa_id]; });
+      }
+      filas = todas.slice().sort(function (a, b) { return _compararFila(a, b, empresaId); });
+    } else {
+      var sql = 'SELECT p.* FROM base_personal p WHERE ' + whereCedula;
+      var args = [cedula];
+      if (empresaId && cols.indexOf('empresa_id') !== -1) {
+        sql += ' AND p.empresa_id = ?';
+        args.push(empresaId);
+      }
+      // La columna `activo` no existe en todas las versiones de base_personal:
+      // ordenar por ella reventaba la consulta. Se usa solo si esta.
+      if (cols.indexOf('activo') !== -1) sql += ' ORDER BY p.activo DESC';
+      sql += ' LIMIT 1';
+      var filaUnica = db.prepare(sql).get.apply(db.prepare(sql), args);
+      if (filaUnica) filas = [filaUnica];
+    }
+
+    var fila = filas.length ? filas[0] : null;
+    if (!fila) return { success: true, data: null, esEmpresaActual: true, empresasEncontradas: [] };
+
+    // 📦1100 — ¿La persona encontrada es de la empresa del usuario? Si la fila
+    // no trae `empresa_id` no se puede probar que sea de otra empresa: se
+    // trata como de la empresa actual (nada de falsas alarmas).
+    var esEmpresaActual = !empresaId || !fila.empresa_id || fila.empresa_id === empresaId;
 
     // La sede es el "area" del formulario.
     var sede = null;
@@ -586,7 +655,7 @@ function _handlerBuscarEmpleado(params) {
     fila.nombre_completo = [fila.nombres, fila.apellidos].filter(Boolean).join(' ').trim() || (fila.nombre || '');
     fila.area = sede ? sede.nombre : (fila.area || fila.departamento || '');
 
-    // 📦1099 — Aliases ADITIVOS: la UI (formulario de registro y Gestación)
+    // 📦1099 — Aliases ADITIVOS: la UI (formulario de registro y Gestión)
     // espera los nombres de campo que traía el Excel, pero `base_personal`
     // los llama distinto (`nombres`+`apellidos`, `eps`, `email`).
     // `nombre` se arma desde nombres+apellidos (la fuente real); los demás
@@ -595,10 +664,28 @@ function _handlerBuscarEmpleado(params) {
     if (!fila.entidad && fila.eps) fila.entidad = fila.eps;
     if (!fila.correo && fila.email) fila.correo = fila.email;
     if (!fila.empresa) {
-      fila.empresa = _displayEmpresa(db, fila.empresa_id) || (fila.empresa_id || '');
+      fila.empresa = (hayEmpresas ? mapaEmpresas[fila.empresa_id] : null) || (fila.empresa_id || '');
     }
 
-    return { success: true, data: fila };
+    // 📦1100 — En qué empresas aparece esta cédula (para avisarle al usuario).
+    var empresasEncontradas = [];
+    if (buscarTodas) {
+      var vistas = {};
+      filas.forEach(function (f) {
+        var nombre = (hayEmpresas ? mapaEmpresas[f.empresa_id] : null) || f.empresa_id;
+        if (nombre && !vistas[nombre]) {
+          vistas[nombre] = true;
+          empresasEncontradas.push(nombre);
+        }
+      });
+    }
+
+    return {
+      success: true,
+      data: fila,
+      esEmpresaActual: esEmpresaActual,
+      empresasEncontradas: empresasEncontradas
+    };
   } catch (e) {
     console.error('[' + MOD + '][EMPLEADO]', e.message);
     return error('DB_ERROR', e.message);
