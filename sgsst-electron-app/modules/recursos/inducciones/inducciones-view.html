@@ -1,4 +1,4 @@
-<link rel="stylesheet" href="./modules/recursos/inducciones/inducciones-view.css?v=INDUCCIONES-20261120-v22-modal-fix">
+<link rel="stylesheet" href="./modules/recursos/inducciones/inducciones-view.css?v=INDUCCIONES-20261126-v23-pickers">
   <link rel="stylesheet" href="../../../assets/css/google-fonts.css">
 
 <main class="kair-page">
@@ -76,9 +76,23 @@
     <!-- Filtros del dashboard -->
     <div class="kair-toolbar" role="group" aria-label="Filtros del dashboard">
       <span class="kair-toolbar__label">Año:</span>
-      <select class="kair-select" id="d-anio" aria-label="Filtrar por año"></select>
+      <div class="ind-dd ind-dd--filtro" data-ind-dd="d-anio">
+        <button type="button" class="ind-dd__toggle" aria-haspopup="listbox" aria-expanded="false" aria-label="Filtrar por año">
+          <span class="ind-dd__value">Año</span>
+          <svg class="ind-dd__chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+        </button>
+        <div class="ind-dd__menu" hidden></div>
+      </div>
+      <select class="kair-select ind-dd__native" id="d-anio" aria-label="Filtrar por año"></select>
       <span class="kair-toolbar__label">Género:</span>
-      <select class="kair-select" id="d-genero" aria-label="Filtrar por género">
+      <div class="ind-dd ind-dd--filtro" data-ind-dd="d-genero">
+        <button type="button" class="ind-dd__toggle" aria-haspopup="listbox" aria-expanded="false" aria-label="Filtrar por género">
+          <span class="ind-dd__value">Todos</span>
+          <svg class="ind-dd__chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+        </button>
+        <div class="ind-dd__menu" hidden></div>
+      </div>
+      <select class="kair-select ind-dd__native" id="d-genero" aria-label="Filtrar por género">
         <option value="all">Todos</option>
         <option value="H">Hombres</option>
         <option value="M">Mujeres</option>
@@ -270,9 +284,23 @@
 
     <div class="kair-toolbar" role="group" aria-label="Filtros del registro">
       <span class="kair-toolbar__label">Año:</span>
-      <select class="kair-select" id="f-anio" aria-label="Filtrar por año"></select>
+      <div class="ind-dd ind-dd--filtro" data-ind-dd="f-anio">
+        <button type="button" class="ind-dd__toggle" aria-haspopup="listbox" aria-expanded="false" aria-label="Filtrar por año">
+          <span class="ind-dd__value">Año</span>
+          <svg class="ind-dd__chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+        </button>
+        <div class="ind-dd__menu" hidden></div>
+      </div>
+      <select class="kair-select ind-dd__native" id="f-anio" aria-label="Filtrar por año"></select>
       <span class="kair-toolbar__label">Estado:</span>
-      <select class="kair-select" id="f-estado" aria-label="Filtrar por estado">
+      <div class="ind-dd ind-dd--filtro" data-ind-dd="f-estado">
+        <button type="button" class="ind-dd__toggle" aria-haspopup="listbox" aria-expanded="false" aria-label="Filtrar por estado">
+          <span class="ind-dd__value">Todos</span>
+          <svg class="ind-dd__chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+        </button>
+        <div class="ind-dd__menu" hidden></div>
+      </div>
+      <select class="kair-select ind-dd__native" id="f-estado" aria-label="Filtrar por estado">
         <option value="all">Todos</option>
         <option value="APROBADO">Aprobados</option>
         <option value="REPROBADO">Reprobados</option>
@@ -359,7 +387,14 @@
             </div>
             <div class="kair-field" id="fw-genero">
               <label class="kair-field__label" for="ind-genero">Género <em>*</em></label>
-              <select id="ind-genero">
+              <div class="ind-dd ind-dd--lista" data-ind-dd="ind-genero">
+                <button type="button" class="ind-dd__toggle" aria-haspopup="listbox" aria-expanded="false">
+                  <span class="ind-dd__value">Selecciona…</span>
+                  <svg class="ind-dd__chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+                </button>
+                <div class="ind-dd__menu" hidden></div>
+              </div>
+              <select id="ind-genero" class="ind-dd__native">
                 <option value="">Selecciona…</option>
                 <option value="M">Mujer</option>
                 <option value="H">Hombre</option>
@@ -368,7 +403,15 @@
             </div>
             <div class="kair-field" id="fw-fecha">
               <label class="kair-field__label" for="ind-fecha">Fecha de la inducción <em>*</em></label>
-              <input type="date" id="ind-fecha">
+              <div class="ind-dd ind-dd--fecha" data-ind-dd="ind-fecha">
+                <button type="button" class="ind-dd__toggle" aria-haspopup="dialog" aria-expanded="false">
+                  <svg class="ind-dd__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                  <span class="ind-dd__value">Seleccione...</span>
+                  <svg class="ind-dd__chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+                </button>
+                <div class="ind-dd__menu ind-cal" hidden></div>
+              </div>
+              <input type="date" id="ind-fecha" class="ind-dd__native">
               <span class="kair-field__error">Selecciona la fecha.</span>
             </div>
           </div>

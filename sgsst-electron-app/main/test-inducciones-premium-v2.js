@@ -28,7 +28,7 @@ function lacks(src, name, re) { checks.push({ name: name + ' (ausente)', ok: !re
   has(html, 'HTML: id #' + id, new RegExp('id="' + id + '"'));
 });
 lacks(html, 'HTML: sin chip empresa (fidelidad target)', /header-company-text/);
-has(html, 'HTML: token caché v22-modal-fix', /INDUCCIONES-20261120-v22-modal-fix/);
+has(html, 'HTML: token caché v22-modal-fix', /INDUCCIONES-20261126-v23-pickers/);
 lacks(html, 'HTML: sin IDs legacy', /id="(mainChart|stat-total|inductionModal|full-table-body|filter-year-dashboard)"/);
 
 // --- view.css: scope total, sin fugas ---
@@ -58,7 +58,7 @@ lacks(js, 'JS: sin IND_DEMO', /IND_DEMO/);
 lacks(js, 'JS: sin stub guardar', /Próximamente/);
 
 // --- index.html: tokens ---
-has(indexHtml, 'index: token logic.js', /inducciones-logic\.js\?v=INDUCCIONES-20261120-v22-modal-fix/);
+has(indexHtml, 'index: token logic.js', /inducciones-logic\.js\?v=INDUCCIONES-20261126-v23-pickers/);
 has(indexHtml, 'index: token viewer.js sin cambios', /inducciones-viewer\.js\?v=INDUCCIONES-20260915-v21-chart-scope-fix/);
 lacks(indexHtml, 'index: sin token viejo', /INDUCCIONES-20260913-v4-premium-svg-aligned/);
 

@@ -2585,6 +2585,23 @@ muestra el histórico completo (753 / 1 501 / 1 289 filas) y el orden es del má
 **El sello.** `index.html` pide `capacitaciones-logic.js?v=CAP-20261126-v4-filtros` y el `fetch` del HTML de la vista pide `capacitaciones-view.html?v=CAP-20261126-v4-filtros`.
 
 **Tests.** `main/test-capacitaciones-pickers.js` (152/152, con 26 mutaciones que muerden y 25 checks para los filtros), `main/test-capacitaciones-tema-894.js` (63/63).
+## 🖋️ Inducción y Reinducción (Recursos) — los seis campos también son desplegables propios, y el campo nativo sigue siendo la fuente de verdad
+
+**El modelo.** Los cuatro filtros del toolbar (año y género del dashboard, año y estado del registro) y los dos campos del modal Editar inducción (género y fecha) vivían como controles del sistema operativo: cuatro `<select class="kair-select">` y un `<select id="ind-genero">` más un `<input type="date" id="ind-fecha">`. El módulo define sus **propios tokens** en `.inducciones-container` (no hay bloque de tema propio: el módulo se ve igual en claro y en oscuro).
+
+**Lo que cambió.** Los seis pasaron a desplegables propios con el prefijo `ind-`: wrapper `.ind-dd` con `data-ind-dd`, botón `.ind-dd__toggle` (texto + chevron) y menú `.ind-dd__menu`, con las variantes `ind-dd--filtro` (los cuatro del toolbar), `ind-dd--lista` (el género del modal) e `ind-dd--fecha` (la fecha). Los nativos quedan ocultos (`ind-dd__native`) **conservando su ID y sus opciones**. Nueve métodos nuevos en `inducciones-logic.js`: `_buildMonthGridInd`, `_initIndPickers`, `_abrirInd`, `_cerrarInd`, `_cerrarTodosInd`, `_actualizarLabelInd`, `_syncIndPickers`, `_pintarCalendarioInd` y `_pintarOpcionesInd`.
+
+**La lógica.** Los **cinco campos de lista** leen sus opciones del propio `<select>` nativo (`Array.from(native.options)`): el desplegable no puede quedar desactualizado con el campo. El botón muestra el **texto** de la opción y el campo guarda el **valor**. La **fecha** es un calendario propio de 42 celdas, con mes navegable, "Hoy" y "Limpiar".
+
+**La regla de sincronización.** El botón es una vista del campo: todo lo que cambie el valor por fuera del desplegable tiene que volver a pintar el botón. Se resincroniza en los cinco caminos: `populateAnios()` (el filtro de años se puebla **por código**), `setAnio()`, `clearRegistroFilters()`, el botón "Ver reprobados" y la apertura del modal.
+
+**La corrección que salió de medir.** El cuerpo del modal tiene `overflow-y: auto` y el calendario mide 306 px: como menú `absolute` **se recortaba** (solo 202 px visibles, y los botones "Limpiar" y "Hoy" quedaban fuera de la pantalla). Cuando el menú no cabe ni abajo ni arriba en su scroller, se **suelta** (`position: fixed`) y se mide contra la **ventana**. Y el scroll cierra los menús, como los desplegables nativos.
+
+**Lo que NO cambió.** Los nativos quedan ocultos pero intactos, con su ID: `setAnio()`, `clearRegistroFilters()`, `populateAnios()`, `openIndModal()` y `_onSubmit()` siguen leyendo los seis IDs. Al elegir una opción, el desplegable dispara el `change` del campo nativo, así que **el filtro se aplica y el guardado se comportan igual que antes**. `destroy()` también suelta los listeners globales de los desplegables.
+
+**El sello.** `INDUCCIONES-20261126-v23-pickers` en los **tres** sitios: el `index.html` (el JS), el `fetch` del HTML de la vista y **el link del CSS dentro del propio HTML** (el CSS de este módulo no se pide desde `index.html`).
+
+**Tests.** `main/test-inducciones-pickers.js` (170/170, con 41 mutaciones que muerden y la grilla del mes extraída del archivo vivo y ejecutada), `main/test-inducciones-premium-v2.js` (87/87) y `main/test-inducciones-modal-1093.js` (70/70).
 ## 🖋️ Servicio de firma electrónica (`firma-service`)
 Servicio **separado** del app de escritorio: lo opera Gesstiar S.A.S. y vive en `sgsst-electron-app/firma-service/` (Node, Express, SQLite). Se despliega aparte (tar en `/opt/kair-firma`), expone `https://firma.kair.fyi` por túnel de Cloudflare y tiene su propio manifiesto de evidencias legales (`legal-readiness.json`) y su propio gate de publicación (`scripts/auditar-readiness-legal.js`).
 **Lo que cambió el 27-oct-2026 (📦976), que es lo que hay que tener presente:**- **El remitente del enlace puede ser la Empresa.** Cada Empresa puede registrar una cuenta de envío propia (SMTP) en el servicio; la clave se guarda cifrada con la llave maestra y cada cambio deja rastro. El enlace de acceso y el aviso de la firma salen por esa cuenta. **El código de verificación (OTP) sale SIEMPRE desde la cuenta de K+AIR**, porque es el dato de creación de la firma y su custodia no puede depender de la Empresa (art. 2.2.2.47.4 núm. 1 del Decreto 1074 de 2015).

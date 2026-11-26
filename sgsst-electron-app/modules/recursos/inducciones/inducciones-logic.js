@@ -8,7 +8,7 @@
    Regla de oro: estado derivado (puntaje>=20 aprueba); refreshAll() único.
    ═══════════════════════════════════════════════════════════════════ */
 
-var INDUC_TOKEN = 'INDUCCIONES-20261120-v22-modal-fix';
+var INDUC_TOKEN = 'INDUCCIONES-20261126-v23-pickers';
 console.log('%c[Inducciones] Versión cargada: ' + INDUC_TOKEN, 'color:#2057b8;font-weight:bold');
 
 /* ---------- 0. Logging + helpers puros (sin DOM) ---------- */
@@ -185,8 +185,16 @@ class InduccionesComponent {
   destroy() {
     if (this._resizeHandler) window.removeEventListener('resize', this._resizeHandler);
     if (this._keyHandler) document.removeEventListener('keydown', this._keyHandler);
+    // 📦1108 — Los listeners globales de los desplegables tambien se
+    // quitan: si no, se acumulan cada vez que se entra al modulo.
+    if (this._indDocClick) document.removeEventListener('click', this._indDocClick);
+    if (this._indDocKey) document.removeEventListener('keydown', this._indDocKey);
+    if (this._indDocScroll) document.removeEventListener('scroll', this._indDocScroll, true);
     this._resizeHandler = null;
     this._keyHandler = null;
+    this._indDocClick = null;
+    this._indDocKey = null;
+    this._indDocScroll = null;
     window.currentInduccionesComponent = null;
   }
 
@@ -243,6 +251,9 @@ class InduccionesComponent {
     var d = this.q('#d-anio'), f = this.q('#f-anio');
     if (d) d.value = v;
     if (f) f.value = v;
+    // 📦1108 — El boton del desplegable tiene que decir lo mismo que el
+    // filtro: si no, se ve un año y se filtra por otro.
+    this._syncIndPickers();
     this.refreshAll();
     indLog('FILTER', 'ANIO', 'OK', v);
   }
@@ -253,6 +264,7 @@ class InduccionesComponent {
     var e = this.q('#f-estado'), b = this.q('#f-buscar');
     if (e) e.value = 'all';
     if (b) b.value = '';
+    this._syncIndPickers();
     this.renderTable();
     indLog('FILTER', 'CLEAR', 'OK');
   }
@@ -266,6 +278,9 @@ class InduccionesComponent {
     var d = this.q('#d-anio'), f = this.q('#f-anio');
     if (d) { d.innerHTML = html; d.value = this._st.filters.anio; }
     if (f) { f.innerHTML = html; f.value = this._st.filters.anio; }
+    // 📦1108 — Las opciones del desplegable de años se leen del campo: hay
+    // que resincronizar el boton o seguiría diciendo el texto inicial.
+    this._syncIndPickers();
   }
   populateCargos() {
     var set = {};
@@ -274,6 +289,370 @@ class InduccionesComponent {
     if (dl) dl.innerHTML = Object.keys(set).sort().map(function (c) { return '<option value="' + indEsc(c) + '"></option>'; }).join('');
   }
 
+  /* ================= DESPLEGABLES PROPIOS (ind-) ================= */
+  /** La grilla del mes en 42 celdas (6 semanas): la que ya usan el resto de
+   *  los desplegables de la app. Pura: sin this y sin DOM. */
+  _buildMonthGridInd(year, month) {
+    var DIAS_MES = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+    var bisiesto = (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0;
+    var diasDelMes = (month === 1 && bisiesto) ? 29 : DIAS_MES[month];
+    var aIso = function (f) {
+      var mm = String(f.getMonth() + 1).padStart(2, '0');
+      var dd = String(f.getDate()).padStart(2, '0');
+      return f.getFullYear() + '-' + mm + '-' + dd;
+    };
+    var offset = (new Date(year, month, 1).getDay() + 6) % 7;
+    var celdas = [];
+    var i;
+    for (i = offset; i >= 1; i--) {
+      var f = new Date(year, month, 1 - i);
+      celdas.push({ iso: aIso(f), day: f.getDate(), inMonth: false });
+    }
+    for (var d = 1; d <= diasDelMes; d++) {
+      celdas.push({ iso: aIso(new Date(year, month, d)), day: d, inMonth: true });
+    }
+    var siguiente = 1;
+    while (celdas.length < 42) {
+      celdas.push({ iso: aIso(new Date(year, month + 1, siguiente)), day: siguiente, inMonth: false });
+      siguiente++;
+    }
+    return celdas;
+  }
+
+  /** 📦1108 — Convierte en desplegables propios los CUATRO FILTROS del
+   *  toolbar (año y género del dashboard, año y estado del registro) y los
+   *  DOS campos del modal Editar inducción (género y fecha).
+   *  El <select> y el <input type="date"> nativos quedan OCULTOS y siguen
+   *  siendo la fuente de verdad: set(), la validación y los filtros leen
+   *  los mismos IDs. El desplegable es una vista encima, no un reemplazo. */
+  _initIndPickers() {
+    var self = this;
+    var cont = document;
+    var dds = cont.querySelectorAll('.ind-dd');
+    if (!dds.length) return;
+
+    // Listeners globales de documento: se reemplazan en cada render para
+    // no acumularlos (el modulo se vuelve a montar en cada visita)
+    if (this._indDocClick) {
+      document.removeEventListener('click', this._indDocClick);
+      document.removeEventListener('keydown', this._indDocKey);
+    }
+    if (this._indDocScroll) {
+      document.removeEventListener('scroll', this._indDocScroll, true);
+    }
+    this._indDocClick = function (ev) {
+      // Un clic DENTRO de un desplegable nunca lo cierra. Se revisa el
+      // camino completo del evento (composedPath) y no solo el destino:
+      // al repintar el menu (innerHTML) el boton pulsado queda
+      // DESCONECTADO del documento.
+      var dentro = (ev.composedPath ? ev.composedPath() : []).some(function (n) {
+        return n && n.classList && n.classList.contains('ind-dd');
+      }) || (ev.target && ev.target.closest && !!ev.target.closest('.ind-dd'));
+      if (!dentro) self._cerrarTodosInd();
+    };
+    this._indDocKey = function (ev) {
+      if (ev.key === 'Escape') self._cerrarTodosInd();
+    };
+    document.addEventListener('click', this._indDocClick);
+    document.addEventListener('keydown', this._indDocKey);
+    // 📦1108 — El scroll cierra los menus: un menu que se suelta del
+    // scroller (fixed) se quedaria pegado a un punto que ya no existe.
+    this._indDocScroll = function () { self._cerrarTodosInd(); };
+    document.addEventListener('scroll', this._indDocScroll, true);
+
+    dds.forEach(function (dd) {
+      var native = document.getElementById(dd.getAttribute('data-ind-dd'));
+      var toggle = dd.querySelector('.ind-dd__toggle');
+      var menu = dd.querySelector('.ind-dd__menu');
+      if (!native || !toggle || !menu) return;
+      var esFecha = native.type === 'date';
+      var esLista = native.tagName === 'SELECT';
+
+      if (esFecha) {
+        // Calendario: un solo listener delegado en el menu (sobrevive a los
+        // repintados de _pintarCalendarioInd, que usa innerHTML)
+        menu.addEventListener('click', function (ev) {
+          // Un clic dentro del calendario JAMAS debe cerrar el menu.
+          ev.stopPropagation();
+          var acc = ev.target.closest ? ev.target.closest('[data-ind-accion]') : null;
+          if (!acc) return;
+          var tipo = acc.getAttribute('data-ind-accion');
+          if (tipo === 'mes') {
+            var delta = parseInt(acc.getAttribute('data-ind-delta'), 10) || 0;
+            var vista = (dd.getAttribute('data-ind-view') || '').split('-');
+            var base = new Date(parseInt(vista[0], 10), parseInt(vista[1], 10) + delta, 1);
+            dd.setAttribute('data-ind-view', base.getFullYear() + '-' + base.getMonth());
+            self._pintarCalendarioInd(dd);
+          } else if (tipo === 'dia') {
+            var iso = acc.getAttribute('data-iso') || '';
+            native.value = iso;
+            // La vista queda en el mes del dia elegido: al reabrir el
+            // calendario se ve el mes donde esta la fecha.
+            var p = iso.split('-');
+            if (p.length === 3) dd.setAttribute('data-ind-view', p[0] + '-' + (parseInt(p[1], 10) - 1));
+            native.dispatchEvent(new Event('change', { bubbles: true }));
+            self._actualizarLabelInd(dd);
+            self._cerrarInd(dd);
+          } else if (tipo === 'hoy') {
+            var h = new Date();
+            native.value = h.getFullYear() + '-' +
+              String(h.getMonth() + 1).padStart(2, '0') + '-' +
+              String(h.getDate()).padStart(2, '0');
+            dd.setAttribute('data-ind-view', h.getFullYear() + '-' + h.getMonth());
+            native.dispatchEvent(new Event('change', { bubbles: true }));
+            self._actualizarLabelInd(dd);
+            self._cerrarInd(dd);
+          } else if (tipo === 'limpiar') {
+            native.value = '';
+            dd.removeAttribute('data-ind-view');
+            native.dispatchEvent(new Event('change', { bubbles: true }));
+            self._actualizarLabelInd(dd);
+            self._cerrarInd(dd);
+          }
+        });
+      } else if (esLista) {
+        // Una lista de opciones. Se leen del propio <select>, que queda
+        // oculto y es la fuente de verdad: asi el desplegable no puede
+        // quedar desactualizado con el campo.
+        menu.addEventListener('click', function (ev) {
+          ev.stopPropagation();
+          var acc = ev.target.closest ? ev.target.closest('[data-ind-accion="opcion"]') : null;
+          if (!acc) return;
+          native.value = acc.getAttribute('data-value') || '';
+          native.dispatchEvent(new Event('change', { bubbles: true }));
+          self._actualizarLabelInd(dd);
+          self._cerrarInd(dd);
+        });
+      }
+
+      toggle.addEventListener('click', function () {
+        if (toggle.disabled) return;
+        var abierto = !menu.hidden;
+        self._cerrarTodosInd();
+        if (!abierto) self._abrirInd(dd);
+      });
+
+      // El rotulo del campo tambien abre el desplegable
+      var rotulo = cont.querySelector('label[for="' + native.id + '"]');
+      if (rotulo) {
+        rotulo.addEventListener('click', function (ev) {
+          if (toggle.disabled) return;
+          ev.preventDefault();
+          // Sin esto el clic burbujea a documento y el listener de
+          // "clic fuera" cierra el menu que acaba de abrirse
+          ev.stopPropagation();
+          var abierto = !menu.hidden;
+          self._cerrarTodosInd();
+          if (!abierto) self._abrirInd(dd);
+        });
+      }
+
+      self._actualizarLabelInd(dd);
+    });
+  }
+
+  _abrirInd(dd) {
+    var menu = dd.querySelector('.ind-dd__menu');
+    var toggle = dd.querySelector('.ind-dd__toggle');
+    if (!menu || !toggle || !menu.hidden) return;
+    if (dd.classList.contains('ind-dd--fecha')) {
+      this._pintarCalendarioInd(dd);
+    } else {
+      // Los cinco campos de lista (los cuatro filtros y el género del
+      // modal) se pintan desde el propio campo.
+      this._pintarOpcionesInd(dd);
+    }
+    this._actualizarLabelInd(dd);
+    // 📦1108 — El menu se reposiciona desde cero en cada apertura: si la
+    // vez anterior quedo suelto (fixed), vuelve al flujo normal.
+    this._resetMenuPos(menu);
+    menu.hidden = false;
+    dd.classList.add('ind-dd--open');
+    toggle.setAttribute('aria-expanded', 'true');
+
+    // El toolbar y el modal tienen scroll: si el menu no cabe hacia abajo
+    // se abre hacia arriba; y si se pasa del borde derecho se ancla a la
+    // derecha
+    var tRect = toggle.getBoundingClientRect();
+    var mAlto = menu.offsetHeight;
+    var mAncho = menu.offsetWidth;
+    var scroller = dd.closest('.kair-modal__body') || dd.closest('.inducciones-container');
+    var sRect = scroller ? scroller.getBoundingClientRect() : null;
+    var limiteAbajo = Math.min(sRect ? sRect.bottom : window.innerHeight, window.innerHeight);
+    var limiteArriba = Math.max(sRect ? sRect.top : 0, 0);
+    var cabeAbajo = (limiteAbajo - tRect.bottom) >= (mAlto + 8);
+    var cabeArriba = (tRect.top - limiteArriba) >= (mAlto + 8);
+    if (cabeAbajo) {
+      menu.classList.remove('ind-dd__menu--up');
+    } else if (cabeArriba) {
+      menu.classList.add('ind-dd__menu--up');
+    } else {
+      // 📦1108 — No cabe ni ABAJO ni ARRIBA dentro de su scroller (el
+      // cuerpo del modal tiene overflow-y:auto y el calendario mide 306
+      // px). Un menu absolute se recorta y se pierden los botones de
+      // abajo. Se suelta del scroller (position:fixed) y se mide contra la
+      // VENTANA, que es donde esta el espacio de verdad.
+      menu.classList.remove('ind-dd__menu--up');
+      menu.style.position = 'fixed';
+      var vh = window.innerHeight;
+      var top;
+      if (vh - tRect.bottom - 8 >= mAlto) top = tRect.bottom + 6;
+      else if (tRect.top - 8 >= mAlto) top = tRect.top - mAlto - 6;
+      else top = Math.max(8, Math.round((vh - mAlto) / 2));
+      menu.style.top = top + 'px';
+      var izq = tRect.left;
+      if (izq + mAncho > window.innerWidth - 8) izq = window.innerWidth - mAncho - 8;
+      if (izq < 8) izq = 8;
+      menu.style.left = izq + 'px';
+    }
+
+    if (menu.style.position !== 'fixed') {
+      menu.style.left = '';
+      menu.style.right = '';
+      var limiteDerecha = Math.min(sRect ? sRect.right : window.innerWidth, window.innerWidth);
+      if (tRect.left + mAncho > limiteDerecha - 8) {
+        menu.style.left = 'auto';
+        menu.style.right = '0';
+      }
+    }
+  }
+
+  /** 📦1108 — Devuelve el menu a su posicion normal (dentro de su scroller)
+   *  y limpia los estilos inline de posicion. */
+  _resetMenuPos(menu) {
+    if (!menu) return;
+    menu.style.position = '';
+    menu.style.top = '';
+    menu.style.bottom = '';
+    menu.style.left = '';
+    menu.style.right = '';
+    menu.classList.remove('ind-dd__menu--up');
+  }
+
+  _cerrarInd(dd) {
+    var menu = dd.querySelector('.ind-dd__menu');
+    var toggle = dd.querySelector('.ind-dd__toggle');
+    if (menu) { menu.hidden = true; this._resetMenuPos(menu); }
+    dd.classList.remove('ind-dd--open');
+    if (toggle) toggle.setAttribute('aria-expanded', 'false');
+  }
+
+  _cerrarTodosInd() {
+    // Cierra TODOS: los del modal y los de los filtros.
+    document.querySelectorAll('.ind-dd').forEach(dd => this._cerrarInd(dd));
+  }
+
+  /** Escribe en el boton lo que vale el campo oculto (o "Seleccione..."
+   *  si esta vacio) y marca en el menu la opcion elegida. */
+  _actualizarLabelInd(dd) {
+    var native = document.getElementById(dd.getAttribute('data-ind-dd'));
+    var valor = dd.querySelector('.ind-dd__value');
+    if (!native || !valor) return;
+    var texto = '';
+    var hayOpciones = true;
+    if (native.type === 'date') {
+      var p = (native.value || '').split('-');
+      if (p.length === 3) texto = p[2] + '/' + p[1] + '/' + p[0];
+    } else if (native.tagName === 'SELECT') {
+      // Se muestra el TEXTO de la opcion ("Todos", "Hombres"), no el valor
+      // interno ("all", "H"): el valor es lo que se guarda, el texto es lo
+      // que se lee.
+      hayOpciones = !!(native.options && native.options.length);
+      var op = hayOpciones ? native.options[native.selectedIndex] : null;
+      texto = op ? op.text : (native.value || '');
+    } else if (native.value) {
+      texto = native.value;
+    }
+    // Un <select> que todavia no tiene opciones (el filtro de años se
+    // puebla por codigo) conserva el texto inicial del boton.
+    if (texto) valor.textContent = texto;
+    else if (hayOpciones) valor.textContent = 'Seleccione...';
+    dd.querySelectorAll('.ind-dd__option').forEach(function (op) {
+      var activa = op.getAttribute('data-value') === (native.value || '');
+      op.classList.toggle('ind-dd__option--active', activa);
+    });
+  }
+
+  /** Re-sincroniza las etiquetas de los desplegables. Se llama cuando un
+   *  valor cambia FUERA del desplegable (el filtro de años se puebla por
+   *  codigo, el modal se abre con un valor): sin esto el boton mostraria
+   *  una cosa y el filtro filtraria por otra. */
+  _syncIndPickers() {
+    document.querySelectorAll('.ind-dd').forEach(dd => this._actualizarLabelInd(dd));
+  }
+
+  /** Pinta el calendario del menu de la fecha: mes en curso, navegacion
+   *  con chevrons, dia de hoy marcado y el dia elegido en azul. */
+  _pintarCalendarioInd(dd) {
+    var native = document.getElementById(dd.getAttribute('data-ind-dd'));
+    var menu = dd.querySelector('.ind-dd__menu');
+    if (!native || !menu) return;
+    var hoy = new Date();
+    var vista = (dd.getAttribute('data-ind-view') || '').split('-');
+    var y = parseInt(vista[0], 10);
+    var m = parseInt(vista[1], 10);
+    if (isNaN(y) || isNaN(m)) {
+      if (native.value) {
+        var p = native.value.split('-');
+        y = parseInt(p[0], 10);
+        m = parseInt(p[1], 10) - 1;
+      } else {
+        y = hoy.getFullYear();
+        m = hoy.getMonth();
+      }
+      dd.setAttribute('data-ind-view', y + '-' + m);
+    }
+    var isoHoy = hoy.getFullYear() + '-' +
+      String(hoy.getMonth() + 1).padStart(2, '0') + '-' +
+      String(hoy.getDate()).padStart(2, '0');
+    var celdas = this._buildMonthGridInd(y, m);
+    var dias = '';
+    celdas.forEach(function (c) {
+      var clases = ['ind-cal__day'];
+      if (!c.inMonth) clases.push('ind-cal__day--out');
+      if (c.iso === native.value) clases.push('ind-cal__day--sel');
+      if (c.iso === isoHoy) clases.push('ind-cal__day--today');
+      dias += '<button type="button" class="' + clases.join(' ') +
+        '" data-ind-accion="dia" data-iso="' + c.iso + '">' + c.day + '</button>';
+    });
+    menu.innerHTML =
+      '<div class="ind-cal__head">' +
+        '<button type="button" class="ind-cal__nav" data-ind-accion="mes" data-ind-delta="-1" aria-label="Mes anterior">&#8249;</button>' +
+        '<span class="ind-cal__label">' + IND_MESES_F[m] + ' ' + y + '</span>' +
+        '<button type="button" class="ind-cal__nav" data-ind-accion="mes" data-ind-delta="1" aria-label="Mes siguiente">&#8250;</button>' +
+      '</div>' +
+      '<div class="ind-cal__week"><span>L</span><span>M</span><span>X</span><span>J</span><span>V</span><span>S</span><span>D</span></div>' +
+      '<div class="ind-cal__grid">' + dias + '</div>' +
+      '<div class="ind-cal__foot">' +
+        '<button type="button" class="ind-cal__btn" data-ind-accion="limpiar">Limpiar</button>' +
+        '<button type="button" class="ind-cal__btn" data-ind-accion="hoy">Hoy</button>' +
+      '</div>';
+  }
+
+  /** Pinta la lista de opciones. Se LEEN del <select> nativo (que queda
+   *  oculto y es la fuente de verdad): el desplegable no escribe su
+   *  propia lista, asi que no puede quedar desactualizado con el campo.
+   *  Si el valor que ya tiene el campo no esta en la lista, se agrega
+   *  igual: el usuario tiene que poder ver lo que hay y corregirlo. */
+  _pintarOpcionesInd(dd) {
+    var native = document.getElementById(dd.getAttribute('data-ind-dd'));
+    var menu = dd.querySelector('.ind-dd__menu');
+    if (!menu || !native || !native.options) return;
+    var html = '';
+    var hayActual = false;
+    Array.from(native.options).forEach(function (op) {
+      if (op.value === native.value) hayActual = true;
+      html += '<button type="button" class="ind-dd__option"' +
+        ' data-ind-accion="opcion" data-value="' + indEsc(op.value) + '">' +
+        indEsc(op.text) + '</button>';
+    });
+    if (native.value && !hayActual) {
+      html = '<button type="button" class="ind-dd__option"' +
+        ' data-ind-accion="opcion" data-value="' + indEsc(native.value) + '">' +
+        indEsc(native.value) + '</button>' + html;
+    }
+    menu.innerHTML = html;
+  }
   /* ================= MÉTRICAS ================= */
   computeMetrics() {
     var rs = this.filteredBase();
@@ -853,6 +1232,9 @@ class InduccionesComponent {
     set('#ind-fecha', r ? r.fecha : '');
     set('#ind-puntaje', r ? r.puntaje : '');
     ['fw-nombre', 'fw-cedula', 'fw-cargo', 'fw-genero', 'fw-fecha', 'fw-puntaje'].forEach((w) => this.setErr(w, false));
+    // 📦1108 — El boton del género y el de la fecha deben mostrar lo que
+    // acaba de dejar el campo (si no, el modal abriría en blanco).
+    this._syncIndPickers();
     this.updatePrev();
     this.openModal('modal-induccion');
   }
@@ -945,6 +1327,7 @@ class InduccionesComponent {
       self._st.page = 1;
       var fe = self.q('#f-estado'); if (fe) fe.value = 'REPROBADO';
       var fb = self.q('#f-buscar'); if (fb) fb.value = '';
+      self._syncIndPickers();
       self.setView('registro');
       self.renderTable();
       indLog('DASHBOARD', 'VER_REPROBADOS', 'OK');
@@ -1051,6 +1434,9 @@ class InduccionesComponent {
       if (self._st.view === 'dashboard') self.renderCharts();
     }, 220);
     window.addEventListener('resize', this._resizeHandler);
+    // 📦1108 — Los seis desplegables (los cuatro filtros del toolbar + el
+    // género y la fecha del modal).
+    this._initIndPickers();
   }
   _onSubmit(e) {
     e.preventDefault();

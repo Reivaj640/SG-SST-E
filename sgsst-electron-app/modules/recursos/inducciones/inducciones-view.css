@@ -456,3 +456,84 @@
 .inducciones-container .kair-chart{height:auto;border-bottom:none;background:none}
 .inducciones-container .kair-chart svg{position:static;inset:auto;height:auto}
 .inducciones-container .kair-legend{font-size:12px;color:var(--kair-text-2);padding-top:0}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   📦1108 — Desplegables propios de INDUCCIONES: los cuatro filtros del
+   toolbar (año y género del dashboard, año y estado del registro) y los dos
+   campos del modal Editar inducción (género y fecha).
+   Mismo lenguaje visual que el resto de la app: botón con borde, chevron
+   que gira, menú PROPIO (no el del sistema operativo) y calendario propio.
+   El <select> y el <input type="date"> nativos quedan OCULTOS como fuente
+   de verdad: set(), la validación y los filtros siguen leyendo los mismos
+   IDs. Los colores son tokens --kair-* del propio módulo, así que el modo
+   oscuro vira solo.
+   ═══════════════════════════════════════════════════════════════════════ */
+.inducciones-container .ind-dd{position:relative;display:block;width:100%}
+/* El nativo queda oculto: es la fuente de verdad, no lo que se ve */
+.inducciones-container .ind-dd__native{display:none!important}
+.inducciones-container .ind-dd__toggle{
+  display:flex;align-items:center;gap:8px;width:100%;min-height:38px;padding:8px 12px;
+  background:var(--kair-surface);border:1px solid var(--kair-border);border-radius:var(--kair-radius-sm);
+  font-family:inherit;font-size:13px;font-weight:500;color:var(--kair-text);
+  text-align:left;cursor:pointer;transition:border-color var(--kair-t),box-shadow var(--kair-t)}
+.inducciones-container .ind-dd__toggle:hover:not(:disabled){border-color:var(--kair-blue)}
+.inducciones-container .ind-dd__toggle:focus-visible{outline:none;border-color:var(--kair-blue);box-shadow:0 0 0 3px var(--kair-blue-soft)}
+.inducciones-container .ind-dd--open .ind-dd__toggle{border-color:var(--kair-blue);box-shadow:0 0 0 3px var(--kair-blue-soft)}
+.inducciones-container .ind-dd__value{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.inducciones-container .ind-dd__icon{width:15px;height:15px;flex-shrink:0;color:var(--kair-text-3)}
+.inducciones-container .ind-dd__chevron{width:14px;height:14px;flex-shrink:0;color:var(--kair-text-3);transition:transform var(--kair-t)}
+.inducciones-container .ind-dd--open .ind-dd__chevron{transform:rotate(180deg)}
+.inducciones-container .ind-dd__menu{
+  position:absolute;top:calc(100% + 6px);left:0;z-index:60;
+  min-width:100%;max-width:280px;padding:6px;
+  background:var(--kair-surface);border:1px solid var(--kair-border);border-radius:12px;
+  box-shadow:var(--kair-shadow-pop);display:flex;flex-direction:column;gap:2px}
+/* El toolbar tiene scroll: si el menu no cabe hacia abajo, se abre hacia arriba */
+.inducciones-container .ind-dd__menu--up{top:auto;bottom:calc(100% + 6px)}
+/* El atributo hidden le gana al display:flex del menu */
+.inducciones-container .ind-dd__menu[hidden]{display:none}
+.inducciones-container .ind-dd__option{
+  display:flex;align-items:center;justify-content:flex-start;gap:8px;width:100%;
+  background:transparent;border:none;border-radius:8px;padding:7px 9px;
+  font-family:inherit;font-size:13px;font-weight:500;color:var(--kair-text);
+  text-align:left;cursor:pointer;transition:background var(--kair-t),color var(--kair-t)}
+.inducciones-container .ind-dd__option:hover:not(:disabled){background:var(--kair-blue-soft)}
+.inducciones-container .ind-dd__option--active{background:var(--kair-blue-soft);color:var(--kair-blue-text);font-weight:700}
+.inducciones-container .ind-dd__option:disabled{opacity:.4;cursor:not-allowed}
+
+/* Los filtros del toolbar: son compactos, como el <select> que reemplazan */
+.inducciones-container .ind-dd--filtro{width:auto}
+.inducciones-container .ind-dd--filtro .ind-dd__toggle{width:auto;padding:0 11px 0 13px;white-space:nowrap}
+.inducciones-container .ind-dd--filtro .ind-dd__menu{min-width:max(100%, 168px);max-height:240px;overflow-y:auto}
+
+/* Los campos del modal: el mismo borde que los inputs de al lado */
+.inducciones-container .kair-field .ind-dd__toggle{border-color:#DFE3E9}
+/* 📦1108 — Con el campo nativo oculto, el borde de error ya no se ve:
+   el wrapper .kair-field.is-error tiene que marcar el BOTON. */
+.inducciones-container .kair-field.is-error .ind-dd__toggle{border-color:var(--kair-red);box-shadow:0 0 0 3px var(--kair-red-soft)}
+
+/* Calendario propio de la fecha de la inducción */
+.inducciones-container .ind-dd--fecha .ind-dd__menu{width:272px;min-width:272px;max-width:272px;padding:8px}
+.inducciones-container .ind-cal__head{display:flex;align-items:center;justify-content:space-between;gap:4px;padding:2px 4px 6px}
+.inducciones-container .ind-cal__label{font-size:13px;font-weight:700;color:var(--kair-text)}
+.inducciones-container .ind-cal__nav{
+  width:28px;height:28px;border:none;background:transparent;border-radius:8px;
+  font-size:16px;line-height:1;color:var(--kair-text-3);cursor:pointer}
+.inducciones-container .ind-cal__nav:hover{background:var(--kair-blue-soft)}
+.inducciones-container .ind-cal__week,.inducciones-container .ind-cal__grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px}
+.inducciones-container .ind-cal__week span{
+  font-size:10px;font-weight:700;color:var(--kair-text-3);text-align:center;text-transform:uppercase;padding-bottom:2px}
+.inducciones-container .ind-cal__day{
+  height:30px;border:none;background:transparent;border-radius:8px;
+  font-family:inherit;font-size:12.5px;color:var(--kair-text);cursor:pointer}
+.inducciones-container .ind-cal__day:hover{background:var(--kair-blue-soft)}
+.inducciones-container .ind-cal__day--out{opacity:.45}
+.inducciones-container .ind-cal__day--today{box-shadow:inset 0 0 0 1px var(--kair-blue);color:var(--kair-blue);font-weight:700}
+.inducciones-container .ind-cal__day--sel{background:var(--kair-blue);color:#fff;font-weight:700}
+.inducciones-container .ind-cal__day--sel:hover{background:var(--kair-blue)}
+.inducciones-container .ind-cal__foot{
+  display:flex;justify-content:space-between;gap:6px;border-top:1px solid var(--kair-border);margin-top:4px;padding-top:6px}
+.inducciones-container .ind-cal__btn{
+  flex:1;border:1px solid var(--kair-border);background:transparent;border-radius:8px;padding:5px 8px;
+  font-family:inherit;font-size:12px;font-weight:600;color:var(--kair-text-2);cursor:pointer}
+.inducciones-container .ind-cal__btn:hover{background:var(--kair-blue-soft)}
