@@ -19,7 +19,7 @@ ok('HOME: canvas canonico', /--aus-bg:\s*#fbfcfb/.test(homeHtml));
 ok('HOME: dark en los 2 atributos', /\[data-theme\^="dark"\]/.test(homeHtml));
 ok('HOME: SVG inline (sin FA en el marcado)', !/<i class="fa[srlb]? fa-/.test(homeHtml));
 ok('HOME: NO quedan iconos Font Awesome', !/fa-arrow-left|fa-file-medical|fa-folder-open|fa-heartbeat|fa-chart-line|fa-file-contract|fa-user-search|fa-person-pregnant|fa-calendar-check/.test(homeHtml));
-ok('HOME: mantiene los 3 IDs de KPI', /id="ausentismoPendientes"/.test(homeHtml) && /id="ausentismoActivos"/.test(homeHtml) && /id="ausentismoCerrados"/.test(homeHtml));
+ok('HOME: mantiene los 5 IDs de KPI (el total, los tres estados y la card de gestion)', /id="ausentismoTotal"/.test(homeHtml) && /id="ausentismoPendientes"/.test(homeHtml) && /id="ausentismoActivos"/.test(homeHtml) && /id="ausentismoCerrados"/.test(homeHtml) && /id="gestionActivas"/.test(homeHtml));
 ok('HOME: mantiene .stat-value/.stat-item (JS)', /class="stat-value"/.test(homeHtml) && /class="stat-item"/.test(homeHtml));
 ok('HOME: mantiene kpi-unavailable (JS)', /\.stat-value\.kpi-unavailable/.test(homeHtml));
 ok('HOME: mantiene los onclick del portal', ['goBackToModule()', 'registrarAusentismo()', 'verAusentismo()', 'seguimientoIncapacidades()', 'verEstadisticas()', 'generarInforme()', 'consultaTrabajadores()', 'seguimientoGestacion()'].every(f => homeHtml.indexOf('onclick="' + f + '"') !== -1));

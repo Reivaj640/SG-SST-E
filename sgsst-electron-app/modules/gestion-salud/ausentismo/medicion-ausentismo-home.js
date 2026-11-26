@@ -128,15 +128,24 @@ async function initializePortal() {
         // Esperar a que los elementos del DOM esten disponibles con retry logic
         const pendientesElement = await waitForElement('#ausentismoPendientes', 8000, 15, 100);
         const activosElement = await waitForElement('#ausentismoActivos', 8000, 15, 100);
+        const gestionElement = await waitForElement('#gestionActivas', 8000, 15, 100);
 
-        if (!pendientesElement || !activosElement) {
+        if (!pendientesElement || !activosElement || !gestionElement) {
             console.warn('[medicion-ausentismo-home] Algunos elementos no se encontraron despues de 8 segundos');
-            console.warn('[medicion-ausentismo-home] pendientes:', !!pendientesElement, 'activos:', !!activosElement);
+            console.warn('[medicion-ausentismo-home] pendientes:', !!pendientesElement, 'activos:', !!activosElement,
+                '| gestion:', !!gestionElement);
         } else {
             console.log('[medicion-ausentismo-home] Elementos del DOM encontrados, cargando stats...');
         }
 
         await loadStats();
+
+        // 📦1103 (2026-11-26) — La quinta card (gestion) se carga APARTE:
+        // viene de otra fuente (SQLite) y su fallo no puede tocar las cuatro
+        // de ausentismo, que siguen mostrando sus numeros reales.
+        loadGestionStats().catch(function (err) {
+            console.error('[medicion-ausentismo-home] Error critico con stats de gestion:', err && err.message);
+        });
     } catch (error) {
         console.error('[medicion-ausentismo-home] Error critico inicializando:', error);
     }
@@ -216,42 +225,51 @@ async function loadStats() {
             if (data._missingFile) {
                 console.warn('[medicion-ausentismo-home][📦459] Archivo de ausentismo no disponible:',
                     data._missingFileReason, '|', data._details || '');
+                safeSetTextContent('ausentismoTotal', '—', false);
                 safeSetTextContent('ausentismoPendientes', '—', false);
                 safeSetTextContent('ausentismoActivos', '—', false);
                 safeSetTextContent('ausentismoCerrados', '—', false);
                 // Marcar visualmente para que se sepa que es un "no-data", no un "cero real"
+                markKpiAsUnavailable('ausentismoTotal');
                 markKpiAsUnavailable('ausentismoPendientes');
                 markKpiAsUnavailable('ausentismoActivos');
                 markKpiAsUnavailable('ausentismoCerrados');
             } else {
                 // Datos normales: quitar marca de "no disponible" si la tenía
+                unmarkKpiAsUnavailable('ausentismoTotal');
                 unmarkKpiAsUnavailable('ausentismoPendientes');
                 unmarkKpiAsUnavailable('ausentismoActivos');
                 unmarkKpiAsUnavailable('ausentismoCerrados');
+                const tVal = data.total != null ? data.total : '0';
                 const pVal = data.pendientes != null ? data.pendientes : '0';
                 const aVal = data.activos != null ? data.activos : '0';
                 const cVal = data.cerrados != null ? data.cerrados : '0';
+                safeSetTextContent('ausentismoTotal', tVal, false);
                 safeSetTextContent('ausentismoPendientes', pVal, false);
                 safeSetTextContent('ausentismoActivos', aVal, false);
                 safeSetTextContent('ausentismoCerrados', cVal, false);
                 console.log('[medicion-ausentismo-home][📦459-DEBUG] KPIs pintados:',
-                    `Pendientes=${pVal}, Activos=${aVal}, Cerrados=${cVal}`);
+                    `Total=${tVal}, Pendientes=${pVal}, Activos=${aVal}, Cerrados=${cVal}`);
             }
         } else if (stats && stats.success === false) {
             // success:false — error grave del handler (no debería pasar con el refactor)
             console.error('[medicion-ausentismo-home] Handler retornó success:false:', stats && stats.error);
+            safeSetTextContent('ausentismoTotal', '—', false);
             safeSetTextContent('ausentismoPendientes', '—', false);
             safeSetTextContent('ausentismoActivos', '—', false);
             safeSetTextContent('ausentismoCerrados', '—', false);
+            markKpiAsUnavailable('ausentismoTotal');
             markKpiAsUnavailable('ausentismoPendientes');
             markKpiAsUnavailable('ausentismoActivos');
             markKpiAsUnavailable('ausentismoCerrados');
         } else {
             // stats === null (proxy o electronAPI fallaron) — pintar modo degradado
             console.warn('[medicion-ausentismo-home] No se pudieron cargar stats (ni IPC directo ni proxy). Mostrando "—".');
+            safeSetTextContent('ausentismoTotal', '—', false);
             safeSetTextContent('ausentismoPendientes', '—', false);
             safeSetTextContent('ausentismoActivos', '—', false);
             safeSetTextContent('ausentismoCerrados', '—', false);
+            markKpiAsUnavailable('ausentismoTotal');
             markKpiAsUnavailable('ausentismoPendientes');
             markKpiAsUnavailable('ausentismoActivos');
             markKpiAsUnavailable('ausentismoCerrados');
@@ -259,12 +277,82 @@ async function loadStats() {
     } catch (error) {
         console.error('[medicion-ausentismo-home] Error cargando estadisticas:', error.message, error.stack);
         // 📦459 — Error inesperado: mostrar "—" en vez de "0" para no engañar al usuario
+        safeSetTextContent('ausentismoTotal', '—', false);
         safeSetTextContent('ausentismoPendientes', '—', false);
         safeSetTextContent('ausentismoActivos', '—', false);
         safeSetTextContent('ausentismoCerrados', '—', false);
+        markKpiAsUnavailable('ausentismoTotal');
         markKpiAsUnavailable('ausentismoPendientes');
         markKpiAsUnavailable('ausentismoActivos');
         markKpiAsUnavailable('ausentismoCerrados');
+    }
+}
+
+/**
+ * 📦1103 (2026-11-26) — Quinta card del home: "Gestantes en Seguimiento".
+ *
+ * DE DONDE SALE
+ * -------------
+ * Las cuatro primeras cards cuentan casos de ausentismo y salen del Excel
+ * GI-FO-076. Esta quinta cuenta gestantes con seguimiento activo y sale de la
+ * base SQLite de gestaciones (bridge `gestacion-bridge.js`, handler
+ * `gestacion:getStats`). Es otro sujeto y otra fuente: por eso va en su propia
+ * card, con el acento rosa de la seccion "Salud Materna y Gestion".
+ *
+ * POR QUE LA CARGA ES APARTE
+ * ---------------------------
+ * Si la base no abre, esta card muestra la raya y las cuatro de ausentismo
+ * siguen mostrando sus numeros reales. Un solo `try` compartido haria que un
+ * fallo de SQLite dejara las cinco en raya, que es mentir: los casos de
+ * ausentismo si se pudieron leer.
+ */
+async function loadGestionStats() {
+    const MOTIVO = 'Base de datos de seguimiento de gestacion no disponible. Los datos no se pudieron cargar.';
+    const marcarNoDisponible = () => {
+        safeSetTextContent('gestionActivas', '—', false);
+        safeSetTextContent('gestionDetalle', '—', false);
+        markKpiAsUnavailable('gestionActivas', MOTIVO);
+    };
+
+    try {
+        const electronAPI = (window.electronAPI) ||
+                            (window.parent && window.parent.electronAPI) ||
+                            (window.top && window.top.electronAPI);
+        const empresaId = getCompanyName();
+
+        let res;
+        const hasDirectAccess = electronAPI && typeof electronAPI.gestacionGetStats === 'function';
+        if (hasDirectAccess) {
+            res = await electronAPI.gestacionGetStats({ empresaId: empresaId });
+        } else if (window.parent && window.parent !== window) {
+            try {
+                res = await ipcInvokeViaParent('gestacionGetStats', { empresaId: empresaId });
+            } catch (proxyErr) {
+                console.error('[medicion-ausentismo-home][📦1103] postMessage proxy (gestion) fallo:', proxyErr.message);
+                res = null;
+            }
+        } else {
+            console.warn('[medicion-ausentismo-home][📦1103] Sin acceso al padre — IPC imposible');
+            res = null;
+        }
+
+        if (res && res.success) {
+            const data = res.data || {};
+            const activas = data.activas != null ? data.activas : 0;
+            const altoRiesgo = data.altoRiesgo != null ? data.altoRiesgo : 0;
+            unmarkKpiAsUnavailable('gestionActivas');
+            safeSetTextContent('gestionActivas', String(activas), false);
+            safeSetTextContent('gestionDetalle', altoRiesgo > 0
+                ? (altoRiesgo + ' en alto riesgo')
+                : 'Sin casos de alto riesgo', false);
+        } else {
+            console.warn('[medicion-ausentismo-home][📦1103] Sin datos de gestion:',
+                (res && res.error) ? JSON.stringify(res.error) : 'sin respuesta');
+            marcarNoDisponible();
+        }
+    } catch (error) {
+        console.error('[medicion-ausentismo-home][📦1103] Error cargando stats de gestion:', error.message, error.stack);
+        marcarNoDisponible();
     }
 }
 
@@ -307,11 +395,13 @@ function ipcInvokeViaParent(channel, ...args) {
  * que el usuario no lo confunda con un "0" real (cero casos). Aplica opacidad
  * reducida y un título (tooltip) explicando el motivo.
  */
-function markKpiAsUnavailable(elementId) {
+function markKpiAsUnavailable(elementId, motivo) {
     const el = document.getElementById(elementId);
     if (!el) return;
     el.classList.add('kpi-unavailable');
-    el.setAttribute('title', 'Archivo de ausentismo no disponible. Los datos no se pudieron cargar.');
+    // 📦1103 (2026-11-26) — El motivo es opcional: la quinta card (gestion)
+    // falla por otra causa (la base SQLite), no por el archivo de ausentismo.
+    el.setAttribute('title', motivo || 'Archivo de ausentismo no disponible. Los datos no se pudieron cargar.');
     el.parentElement && el.parentElement.classList.add('kpi-card-unavailable');
 }
 

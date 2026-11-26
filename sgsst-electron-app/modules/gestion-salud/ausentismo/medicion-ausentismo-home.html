@@ -42,6 +42,13 @@
             --aus-font-display: 'Manrope', 'DM Sans', system-ui, sans-serif;
         }
 
+        /* Escala del home: el tamano de la raiz (y con el, todo lo que esta
+           en rem) crece con el ancho de la ventana. Arranca en 1200px (donde
+           ya cabe la rejilla de cinco cards) y topa en 20px, un 25% mas que
+           la base de 16px. Al maximizar, el contenido deja de verse pequeno;
+           en ventanas estrechas la base no cambia. */
+        html { font-size: clamp(16px, calc(0.95vw + 4px), 20px); }
+
         * { box-sizing: border-box; margin: 0; padding: 0; outline: none; }
 
         body {
@@ -60,7 +67,7 @@
         ========================================= */
         .aus-header-v2 {
             flex-shrink: 0;
-            padding: 0.75rem 1.5rem;
+            padding: 0.75rem 2rem;
             display: flex;
             flex-direction: column;
             gap: 0.5rem;
@@ -100,7 +107,7 @@
 
         .aus-title {
             font-family: var(--aus-font-display);
-            font-size: 20px;
+            font-size: 1.25rem;
             font-weight: 800;
             color: var(--aus-text);
             margin: 0;
@@ -141,16 +148,20 @@
         .aus-main {
             flex: 1;
             width: 100%;
-            max-width: 1120px;
+            /* El home vive en un iframe que ocupa todo el ancho del modulo.
+               Con el tope en 1120px el contenido se quedaba corto al maximizar
+               la ventana: ahora el tope es 1680px y el ancho es fluido, asi que
+               el contenido ocupa el espacio disponible. */
+            max-width: 1680px;
             margin: 0 auto;
-            padding: 0.5rem 1.5rem 2rem;
+            padding: 0.5rem 2rem 2rem;
         }
 
         /* KPIs */
         .aus-kpis {
             display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 1rem;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 1.25rem;
             margin-bottom: 1.5rem;
         }
 
@@ -158,7 +169,7 @@
             background: var(--aus-card);
             border: 1px solid var(--aus-border);
             border-radius: var(--aus-radius-card);
-            padding: 1.25rem 1rem;
+            padding: 1.5rem 1.25rem;
             text-align: center;
             box-shadow: var(--aus-shadow-sm);
         }
@@ -177,6 +188,22 @@
             color: var(--aus-text-sec);
         }
 
+        /* Quinta card: seguimientos de gestion. Viene de otra fuente (SQLite,
+           no el Excel GI-FO-076), asi que se distingue con el acento rosa de
+           la seccion "Salud Materna y Gestion" para que no se lea como otro
+           caso de ausentismo. */
+        .stat-item--gestion {
+            border-color: var(--aus-pink-soft);
+            background: linear-gradient(135deg, #fdf2f8 0%, var(--aus-pink-soft) 100%);
+        }
+        .stat-item--gestion .stat-value { color: var(--aus-pink); }
+
+        .stat-sub {
+            font-size: 0.75rem;
+            color: var(--aus-text-sec);
+            margin-top: 0.4rem;
+        }
+
         .stat-value.kpi-unavailable {
             opacity: 0.45;
             font-style: italic;
@@ -189,7 +216,7 @@
         .main-actions {
             display: grid;
             grid-template-columns: repeat(2, 1fr);
-            gap: 1.25rem;
+            gap: 1.5rem;
             margin-bottom: 2rem;
         }
 
@@ -262,8 +289,8 @@
 
         .actions-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-            gap: 1.25rem;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
         }
 
         .action-card {
@@ -398,6 +425,15 @@
         /* =========================================
            RESPONSIVE
         ========================================= */
+        /* Con cinco cards la rejilla se reparte por anchos: cinco columnas en
+           pantallas anchas, tres en las medianas, dos en las estrechas y una
+           en movil. */
+        @media (max-width: 1200px) {
+            .aus-kpis { grid-template-columns: repeat(3, 1fr); }
+        }
+        @media (max-width: 820px) {
+            .aus-kpis { grid-template-columns: repeat(2, 1fr); }
+        }
         @media (max-width: 768px) {
             .main-actions { grid-template-columns: 1fr; }
             .aus-kpis { grid-template-columns: 1fr; }
@@ -441,6 +477,9 @@
         [data-theme^="dark"] .aus-tool-pink .action-title { color: #f3c6da; }
         [data-theme^="dark"] .aus-tool-pink .action-desc { color: #e0a8c2; }
         [data-theme^="dark"] .aus-tool-pink .action-icon { background: rgba(240,160,196,0.18); color: var(--aus-pink); }
+        [data-theme^="dark"] .stat-item--gestion {
+            background: linear-gradient(135deg, var(--aus-card) 0%, var(--aus-pink-soft) 100%);
+        }
     </style>
 </head>
 <body>
@@ -483,6 +522,10 @@
         <!-- ==================== KPIs ==================== -->
         <section class="aus-kpis">
             <div class="stat-item">
+                <div class="stat-value" id="ausentismoTotal">0</div>
+                <div class="stat-label">Total de Casos</div>
+            </div>
+            <div class="stat-item">
                 <div class="stat-value" id="ausentismoPendientes">0</div>
                 <div class="stat-label">Casos Pendientes</div>
             </div>
@@ -493,6 +536,11 @@
             <div class="stat-item">
                 <div class="stat-value" id="ausentismoCerrados">0</div>
                 <div class="stat-label">Casos Cerrados</div>
+            </div>
+            <div class="stat-item stat-item--gestion">
+                <div class="stat-value" id="gestionActivas">—</div>
+                <div class="stat-label">Gestantes en Seguimiento</div>
+                <div class="stat-sub" id="gestionDetalle">—</div>
             </div>
         </section>
 
@@ -604,6 +652,6 @@
 
     </main>
 
-    <script src="medicion-ausentismo-home.js"></script>
+    <script src="medicion-ausentismo-home.js?v=AUS-20261126-card-gestion-tamano"></script>
 </body>
 </html>

@@ -2503,6 +2503,28 @@ muestra el histórico completo (753 / 1 501 / 1 289 filas) y el orden es del má
 
 **Tests.** `main/test-presupuesto-barras-avance.js` (14/14, estático y por contenido) · `main/test-alcance-tokens-889.js` (41/41 + 22 mutaciones).
 
+## 📊 Medición del Ausentismo (3.3.6) — el home ya tiene cuatro tarjetas de indicador y la cuarta salió sin tocar el backend
+
+**El modelo.** Las tarjetas del home de "Medición del Ausentismo" se alimentan del handler `get-ausentismo-stats` (`main.js:20011`), que cruza **GI-FO-076** (el Excel oficial "AUSENTISMO POR ARL Y EPS") con **PRI.xlsx** (el registro de seguimiento) y clasifica cada caso: con cierre → Cerrado, con seguimiento sin cierre → Activo, sin registro en PRI → Pendiente. El handler devuelve `pendientes`, `activos`, `cerrados`, **`total`**, `year` y `mes`: **el total, el año y el mes ya viajaban y no se mostraban**.
+
+**Lo que cambió.** La cuarta tarjeta, **"Total de Casos"** (`ausentismoTotal`), va **de primera** en la fila y pinta `data.total`; la rejilla `.aus-kpis` pasó de `repeat(3, 1fr)` a `repeat(4, 1fr)`. El modo degradado (📦459) la cubre en las cinco ramas, con "—" y la marca de "no disponible", igual que las otras tres. **Cero cambios en `main.js`**: el dato ya venía.
+
+**Lo que hay que saber del número.** El universo son las incapacidades de **más de 15 días** (`main.js:20380`) del **año en curso** (`main.js:20393`), y el mapa deduplica por cédula: las cuatro tarjetas cuentan **personas**, no eventos de incapacidad. La unidad de la fila es el trabajador con incapacidad de más de 15 días.
+
+**Lo que se dejó anotado sin tocar.** El home corta a **>15 días** y la vista "Estadísticas" a **≥10 días**: el mismo módulo usa dos umbrales para lo mismo. Y el "Docs Pendientes" de "Estadísticas" está marcado como **simulado** en el propio código.
+
+**Tests.** `main/test-ausentismo-kpi-total.js` (24/24, con `loadStats()` extraído del archivo vivo y ejecutado) · `tests/ausentismo/test-premium.js` (121/121, el invariante ahora exige los 4 IDs de KPI).
+
+## 📊 Medición del Ausentismo (3.3.6) — la quinta tarjeta viene de otra fuente (SQLite) y el home ya aprovecha la ventana
+
+**El modelo.** Las cuatro tarjetas de ausentismo salen del Excel **GI-FO-076** (handler `get-ausentismo-stats`). La quinta, **"Gestantes en Seguimiento"** (`gestionActivas`), sale de **otra fuente**: la base **SQLite** de gestaciones (`main/gestacion-bridge.js`, handler `gestacion:getStats` → `_handlerGetStats`, que devuelve `total`, `activas`, `enLicencia`, `altoRiesgo`, `proxLicencia` y `cerradas`). Es otro sujeto y otro conteo: **personas en estado de gestación**, no incapacitated. La clave de empresa es la misma que usa el módulo de gestión (`getCompanyName()` → `window.parent.currentCompany`), y el iframe llega al IPC por el proxy genérico del padre (`medicion-ausentismo.js`: `api[data.channel](...args)`).
+
+**Lo que cambió.** La quinta tarjeta va **al final de la fila** (de primera en el módulo de gestación, no en el home de ausentismo) con el **acento rosa** `--aus-pink` de la sección "Salud Materna y Gestación", para que no se lea como otro caso de ausentismo; pinta `activas` y una línea de detalle con las gestantes en alto riesgo. La carga es **independiente**: `loadGestionStats()` va aparte de `loadStats()`, y si SQLite falla esa tarjeta muestra "—" (con su propio motivo) mientras las cuatro de ausentismo siguen con sus números reales —un `try` compartido habría dejado las cinco en "—", que es mentir. `markKpiAsUnavailable()` ahora acepta un **motivo opcional**.
+
+**El tamaño.** El home subió su tope de ancho de 1120 a **1680 px** (el iframe ocupa todo el ancho del módulo) y su tipografía **escala con la ventana**: `html { font-size: clamp(16px, calc(0.95vw + 4px), 20px) }` — todo lo que está en `rem` crece con ella, así que al maximizar el contenido deja de verse pequeño. La rejilla de las cinco tarjetas se reparte por anchos: **5 / 3 / 2 / 1**.
+
+**Tests.** `main/test-ausentismo-kpi-gestion.js` (51/51, con `loadGestionStats()` extraído del archivo vivo y ejecutado, y con la independencia de las dos fuentes como invariante) · `main/test-ausentismo-kpi-total.js` (24/24) · `tests/ausentismo/test-premium.js` (121/121, el invariante ahora exige los **5** IDs de KPI).
+
 ## 🖋️ Servicio de firma electrónica (`firma-service`)
 Servicio **separado** del app de escritorio: lo opera Gesstiar S.A.S. y vive en `sgsst-electron-app/firma-service/` (Node, Express, SQLite). Se despliega aparte (tar en `/opt/kair-firma`), expone `https://firma.kair.fyi` por túnel de Cloudflare y tiene su propio manifiesto de evidencias legales (`legal-readiness.json`) y su propio gate de publicación (`scripts/auditar-readiness-legal.js`).
 **Lo que cambió el 27-oct-2026 (📦976), que es lo que hay que tener presente:**- **El remitente del enlace puede ser la Empresa.** Cada Empresa puede registrar una cuenta de envío propia (SMTP) en el servicio; la clave se guarda cifrada con la llave maestra y cada cambio deja rastro. El enlace de acceso y el aviso de la firma salen por esa cuenta. **El código de verificación (OTP) sale SIEMPRE desde la cuenta de K+AIR**, porque es el dato de creación de la firma y su custodia no puede depender de la Empresa (art. 2.2.2.47.4 núm. 1 del Decreto 1074 de 2015).

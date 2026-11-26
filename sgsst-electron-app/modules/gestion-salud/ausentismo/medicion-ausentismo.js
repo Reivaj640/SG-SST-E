@@ -242,7 +242,10 @@ class MedicionAusentismoComponent {
 
         // Crear iframe para cargar el portal de bienvenida
         const iframe = document.createElement('iframe');
-        iframe.src = 'modules/gestion-salud/ausentismo/medicion-ausentismo-home.html';
+        // 📦1103 (2026-11-26) — El `?v=` no es cosmetico: sin el, Electron
+        // sirve el HTML viejo desde su cache y ni la quinta card ni la
+        // ampliacion de tamano llegan a la vista.
+        iframe.src = 'modules/gestion-salud/ausentismo/medicion-ausentismo-home.html?v=AUS-20261126-card-gestion-tamano';
         iframe.style.cssText = `
             width: 100%;
             height: 100%;
