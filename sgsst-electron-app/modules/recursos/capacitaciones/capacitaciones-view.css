@@ -1721,3 +1721,186 @@ select.k-form-control {
     .cap-header .capacitaciones-tabs { padding: 0 1rem; }
     .cap-chart-box--donut { flex: none; }
 }
+
+
+/* ═══════════════════════════════════════════════════════════════════════
+   📦1106 — Desplegables de FECHA y HORA del Programa de Capacitacion.
+   Mismo lenguaje visual que el Formulario de Registro de ausentismo
+   (📦1101): boton con borde, chevron que gira, menu PROPIO (no el del
+   sistema operativo) y calendario propio. El <input> nativo queda
+   OCULTO como fuente de verdad: saveTraining, updateTraining y
+   handleExportExcel siguen leyendo los mismos IDs (trainingDate y
+   trainingHora).
+   ═══════════════════════════════════════════════════════════════════════ */
+.cap-dd { position: relative; display: block; width: 100%; }
+.k-form-control.cap-dd__native { display: none; }
+
+.cap-dd__toggle {
+  display: flex; align-items: center; gap: 0.5rem; width: 100%;
+  padding: 0.55rem 0.75rem;
+  background: var(--kair-card, #ffffff);
+  border: 1px solid var(--kair-line, #e8ebee);
+  border-radius: 10px;
+  font-family: var(--kair-font-ui, 'Segoe UI', 'Roboto', sans-serif);
+  font-size: 0.875rem; font-weight: 500;
+  color: var(--kair-ink, #14213d);
+  text-align: left; cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.cap-dd__toggle:hover:not(:disabled) { border-color: var(--kair-blue, #2057b8); }
+.cap-dd--open .cap-dd__toggle {
+  border-color: var(--kair-blue, #2057b8);
+  box-shadow: 0 0 0 3px rgba(32, 87, 184, 0.10);
+}
+.cap-dd__value {
+  flex: 1; min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.cap-dd__icon {
+  width: 16px; height: 16px; flex-shrink: 0;
+  color: var(--kair-muted, #748096);
+}
+.cap-dd__chevron {
+  width: 16px; height: 16px; flex-shrink: 0;
+  color: var(--kair-muted, #748096);
+  transition: transform 0.15s ease;
+}
+.cap-dd--open .cap-dd__chevron { transform: rotate(180deg); }
+
+.cap-dd__menu {
+  position: absolute;
+  top: calc(100% + 0.375rem);
+  left: 0;
+  min-width: 100%;
+  max-width: 300px;
+  background: var(--kair-card, #ffffff);
+  border: 1px solid var(--kair-line, #e8ebee);
+  border-radius: 12px;
+  box-shadow: var(--kair-shadow-soft, 0 8px 18px rgba(32, 87, 184, 0.15));
+  padding: 0.375rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  z-index: 100;
+}
+/* El atributo hidden debe ganarle al display:flex de arriba */
+.cap-dd__menu[hidden] { display: none; }
+/* El editor tiene scroll: si el menu no cabe hacia abajo, se abre hacia arriba */
+.cap-dd__menu--up { top: auto; bottom: calc(100% + 0.375rem); }
+
+/* Las casillas de hora */
+.cap-dd__option {
+  display: flex; align-items: center; justify-content: center;
+  width: 100%;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  padding: 0.3rem 0.25rem;
+  font-family: var(--kair-font-ui, 'Segoe UI', 'Roboto', sans-serif);
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--kair-ink, #14213d);
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+.cap-dd__option:hover:not(:disabled) { background: var(--kair-blue-soft, #eaf1fb); }
+.cap-dd__option:focus-visible { outline: 2px solid var(--kair-blue, #2057b8); outline-offset: -2px; }
+.cap-dd__option--active {
+  background: var(--kair-blue-soft, #eaf1fb);
+  color: var(--kair-blue, #2057b8);
+  font-weight: 700;
+}
+/* 📦1106 — Las casillas fuera de la ventana valida (06:00 a 20:00)
+   quedan deshabilitadas. La ventana NO esta escrita aqui: se lee del
+   min/max del <input> nativo. */
+.cap-dd__option:disabled { opacity: 0.35; cursor: not-allowed; }
+
+/* Rejilla de horarios: 4 columnas x 24 filas (pasos de 15 minutos) */
+.cap-dd--hora .cap-dd__menu { width: 272px; min-width: 272px; max-width: 272px; padding: 0.5rem; }
+.cap-horas {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 2px;
+  max-height: 288px; overflow-y: auto;
+}
+
+/* Calendario propio de la fecha */
+.cap-dd--fecha .cap-dd__menu { width: 272px; min-width: 272px; max-width: 272px; padding: 0.5rem; }
+.cap-cal__head {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 4px; padding: 2px 4px 6px;
+}
+.cap-cal__label {
+  font-size: 0.8125rem; font-weight: 700; color: var(--kair-ink, #14213d);
+}
+.cap-cal__nav {
+  width: 28px; height: 28px;
+  border: none; background: transparent;
+  border-radius: 8px;
+  font-size: 16px; line-height: 1;
+  color: var(--kair-muted, #748096);
+  cursor: pointer;
+}
+.cap-cal__nav:hover { background: var(--kair-soft, #f3f6f6); }
+.cap-cal__week,
+.cap-cal__grid {
+  display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px;
+}
+.cap-cal__week span {
+  font-size: 10px; font-weight: 700; color: var(--kair-faint, #aab1bd);
+  text-align: center; text-transform: uppercase;
+  padding-bottom: 2px;
+}
+.cap-cal__day {
+  height: 30px;
+  border: none; background: transparent;
+  border-radius: 8px;
+  font-family: var(--kair-font-ui, 'Segoe UI', 'Roboto', sans-serif);
+  font-size: 12.5px;
+  color: var(--kair-ink, #14213d);
+  cursor: pointer;
+}
+.cap-cal__day:hover { background: var(--kair-soft, #f3f6f6); }
+.cap-cal__day--out { opacity: 0.45; }
+.cap-cal__day--today {
+  box-shadow: inset 0 0 0 1px var(--kair-blue, #2057b8);
+  color: var(--kair-blue, #2057b8);
+  font-weight: 700;
+}
+.cap-cal__day--sel {
+  background: var(--kair-blue, #2057b8);
+  color: #fff;
+  font-weight: 700;
+}
+.cap-cal__day--sel:hover { background: var(--kair-blue, #2057b8); }
+.cap-cal__foot {
+  display: flex; justify-content: space-between; gap: 6px;
+  border-top: 1px solid var(--kair-line, #e8ebee);
+  margin-top: 4px; padding-top: 6px;
+}
+.cap-cal__btn {
+  flex: 1;
+  border: 1px solid var(--kair-line, #e8ebee); background: transparent;
+  border-radius: 8px;
+  padding: 5px 8px;
+  font-family: var(--kair-font-ui, 'Segoe UI', 'Roboto', sans-serif);
+  font-size: 12px; font-weight: 600;
+  color: var(--kair-muted, #748096);
+  cursor: pointer;
+}
+.cap-cal__btn:hover { background: var(--kair-soft, #f3f6f6); }
+
+/* 📦1106 — El desplegable del TIPO es una LISTA, no una rejilla: las
+   opciones se alinean a la izquierda (en la rejilla de horas van centradas)
+   y el menu scrollea si la lista es larga. */
+.cap-dd--tipo .cap-dd__menu { max-height: 240px; overflow-y: auto; }
+.cap-dd--tipo .cap-dd__option {
+  justify-content: flex-start; text-align: left; padding-left: 0.55rem;
+}
+
+/* 📦1106 — Modo oscuro: los tokens ya viran solos (--kair-card, --kair-ink,
+   --kair-line, --kair-blue-soft), asi que solo hay que arreglar los dos
+   colores que NO son token: el texto del dia elegido (blanco sobre azul
+   claro no se lee) y la sombra del menu. */
+[data-theme^="dark"] .cap-cal__day--sel { color: #0b1f33; }
+[data-theme^="dark"] .cap-dd__menu {
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.45);
+}

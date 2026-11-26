@@ -316,7 +316,15 @@
                     <div class="k-form-grid" style="margin-top:1rem; margin-bottom:0;">
                         <div>
                             <label class="k-form-label" for="trainingType">Tipo *</label>
-                            <select id="trainingType" class="k-form-control">
+                            <div class="cap-dd cap-dd--tipo" data-cap-dd="trainingType">
+                                <button type="button" class="cap-dd__toggle" aria-haspopup="listbox" aria-expanded="false">
+                                    <svg class="cap-dd__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41 13.42 20.58a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82Z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
+                                    <span class="cap-dd__value">Seguridad (SST)</span>
+                                    <svg class="cap-dd__chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+                                </button>
+                                <div class="cap-dd__menu" hidden></div>
+                            </div>
+                            <select id="trainingType" class="k-form-control cap-dd__native">
                                 <option value="sst">Seguridad (SST)</option>
                                 <option value="pyp">Medicina Preventiva (PYP)</option>
                             </select>
@@ -338,13 +346,29 @@
                     <div class="k-form-grid">
                         <div>
                             <label class="k-form-label" for="trainingDate">Fecha Programada *</label>
-                            <input type="date" id="trainingDate" class="k-form-control" required>
+                            <div class="cap-dd cap-dd--fecha" data-cap-dd="trainingDate">
+                                <button type="button" class="cap-dd__toggle" aria-haspopup="dialog" aria-expanded="false">
+                                    <svg class="cap-dd__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                                    <span class="cap-dd__value">Seleccione...</span>
+                                    <svg class="cap-dd__chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+                                </button>
+                                <div class="cap-dd__menu cap-cal" hidden></div>
+                            </div>
+                            <input type="date" id="trainingDate" class="k-form-control cap-dd__native" required>
                         </div>
                         <div>
                             <label class="k-form-label" for="trainingHora">Hora (opcional)</label>
                             <div style="display:flex; gap:6px; align-items:stretch;">
-                                <input type="time" id="trainingHora" class="k-form-control"
-                                       style="flex:1;" min="06:00" max="20:00">
+                                <div class="cap-dd cap-dd--hora" data-cap-dd="trainingHora" style="flex:1;">
+                                    <button type="button" class="cap-dd__toggle" aria-haspopup="listbox" aria-expanded="false">
+                                        <svg class="cap-dd__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15.5 14"/></svg>
+                                        <span class="cap-dd__value">Sin hora</span>
+                                        <svg class="cap-dd__chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+                                    </button>
+                                    <div class="cap-dd__menu" hidden></div>
+                                </div>
+                                <input type="time" id="trainingHora" class="k-form-control cap-dd__native"
+                                       min="06:00" max="20:00">
                                 <button type="button" id="clearTrainingHora"
                                         title="Limpiar hora"
                                         aria-label="Limpiar hora"

@@ -187,7 +187,7 @@ class CapacitacionesComponent {
         this._syncTheme();
         this._watchTheme();
 
-        fetch('./modules/recursos/capacitaciones/capacitaciones-view.html?v=CAP-20260915-v11-periodo-stretch')
+        fetch('./modules/recursos/capacitaciones/capacitaciones-view.html?v=CAP-20261126-v3-pickers-tipo')
             .then(response => response.text())
             .then(html => {
                 this.container.innerHTML = html;
@@ -217,6 +217,9 @@ class CapacitacionesComponent {
                     // position:fixed real contra el viewport, independiente de
                     // cualquier transform/will-change en ancestros del renderer.
                     this._mountModalToBody();
+                    // 📦1106 — Los 2 desplegables (fecha y hora) se arman al
+                    // final, cuando el modal ya esta en el body.
+                    this._initCapPickers();
                 }, 100);
             })
             .catch(error => {
@@ -326,6 +329,10 @@ class CapacitacionesComponent {
                 if (horaInput) {
                     horaInput.value = '';
                     horaInput.focus();
+                    // 📦1106 — La etiqueta del desplegable tiene que seguir al
+                    // campo: si no, el boton sigue mostrando la hora que se
+                    // acaba de quitar.
+                    if (typeof this._syncCapPickers === 'function') this._syncCapPickers();
                 }
             });
         }
@@ -350,12 +357,431 @@ class CapacitacionesComponent {
     }
   }
 
+    // ═════════════════════════════════════════════════════════════════
+    // 📦1106 — Desplegables de FECHA y HORA del Programa de Capacitacion.
+    // Mismo lenguaje visual que el Formulario de Registro de ausentismo
+    // (📦1101): el <input> nativo queda OCULTO como fuente de verdad y todo
+    // lo que existia (saveTraining, updateTraining, handleExportExcel) sigue
+    // leyendo los mismos IDs: trainingDate y trainingHora.
+    // ═════════════════════════════════════════════════════════════════
+
+    /** Grilla del mes: 42 celdas (6 filas × 7 días), semana arrancando en
+     *  lunes, con las celdas del mes vecino marcadas inMonth=false.
+     *  Pura (sin this, sin DOM): por eso el test la ejecuta de verdad. */
+    _buildMonthGridCap(year, month) {
+        const DIAS_MES = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+        const bisiesto = (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0;
+        const diasDelMes = (month === 1 && bisiesto) ? 29 : DIAS_MES[month];
+        const aIso = function (f) {
+            const mm = String(f.getMonth() + 1).padStart(2, '0');
+            const dd = String(f.getDate()).padStart(2, '0');
+            return f.getFullYear() + '-' + mm + '-' + dd;
+        };
+        const offset = (new Date(year, month, 1).getDay() + 6) % 7;
+        const celdas = [];
+        for (let i = offset; i >= 1; i--) {
+            const f = new Date(year, month, 1 - i);
+            celdas.push({ iso: aIso(f), day: f.getDate(), inMonth: false });
+        }
+        for (let d = 1; d <= diasDelMes; d++) {
+            celdas.push({ iso: aIso(new Date(year, month, d)), day: d, inMonth: true });
+        }
+        let siguiente = 1;
+        while (celdas.length < 42) {
+            celdas.push({ iso: aIso(new Date(year, month + 1, siguiente)), day: siguiente, inMonth: false });
+            siguiente++;
+        }
+        return celdas;
+    }
+
+    /** Los horarios del dia en pasos de 15 minutos: 96 casillas (24 horas × 4).
+     *  Pura (sin this, sin DOM): por eso el test la ejecuta de verdad. */
+    _buildTimeSlotsCap() {
+        const slots = [];
+        for (let h = 0; h < 24; h++) {
+            for (let m = 0; m < 60; m += 15) {
+                slots.push(String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0'));
+            }
+        }
+        return slots;
+    }
+
+    /** Convierte los 3 campos nativos en desplegables. Se llama al final del
+     *  setup del formulario. */
+    _initCapPickers() {
+        const self = this;
+        const cont = document.getElementById('trainingModal');
+        if (!cont) return;
+        const dds = cont.querySelectorAll('.cap-dd');
+        if (!dds.length) return;
+
+        // Listeners globales de documento: se reemplazan en cada render para
+        // no acumularlos (el modulo se vuelve a montar en cada visita)
+        if (this._capDocClick) {
+            document.removeEventListener('click', this._capDocClick);
+            document.removeEventListener('keydown', this._capDocKey);
+        }
+        this._capDocClick = function (ev) {
+            // Un clic DENTRO de un desplegable nunca lo cierra. Se revisa el
+            // camino completo del evento (composedPath) y no solo el destino:
+            // al repintar el menu (innerHTML) el boton pulsado queda
+            // DESCONECTADO del documento.
+            const dentro = (ev.composedPath ? ev.composedPath() : []).some(function (n) {
+                return n && n.classList && n.classList.contains('cap-dd');
+            }) || (ev.target && ev.target.closest && !!ev.target.closest('.cap-dd'));
+            if (!dentro) self._cerrarTodosCap();
+        };
+        this._capDocKey = function (ev) {
+            if (ev.key === 'Escape') self._cerrarTodosCap();
+        };
+        document.addEventListener('click', this._capDocClick);
+        document.addEventListener('keydown', this._capDocKey);
+
+        dds.forEach(dd => {
+            const native = document.getElementById(dd.getAttribute('data-cap-dd'));
+            const toggle = dd.querySelector('.cap-dd__toggle');
+            const menu = dd.querySelector('.cap-dd__menu');
+            if (!native || !toggle || !menu) return;
+            const esFecha = native.type === 'date';
+            const esHora = native.type === 'time';
+            // 📦1106 — El TIPO es un <select>: una lista, no una rejilla.
+            const esLista = native.tagName === 'SELECT';
+
+            if (esFecha) {
+                // Calendario: un solo listener delegado en el menu (sobrevive
+                // a los repintados de _pintarCalendarioCap, que usa innerHTML)
+                menu.addEventListener('click', function (ev) {
+                    // Un clic dentro del calendario JAMAS debe cerrar el menu.
+                    ev.stopPropagation();
+                    const acc = ev.target.closest ? ev.target.closest('[data-cap-accion]') : null;
+                    if (!acc) return;
+                    const tipo = acc.getAttribute('data-cap-accion');
+                    if (tipo === 'mes') {
+                        const delta = parseInt(acc.getAttribute('data-cap-delta'), 10) || 0;
+                        const vista = (dd.getAttribute('data-cap-view') || '').split('-');
+                        const base = new Date(parseInt(vista[0], 10), parseInt(vista[1], 10) + delta, 1);
+                        dd.setAttribute('data-cap-view', base.getFullYear() + '-' + base.getMonth());
+                        self._pintarCalendarioCap(dd);
+                    } else if (tipo === 'dia') {
+                        const iso = acc.getAttribute('data-iso') || '';
+                        native.value = iso;
+                        // La vista queda en el mes del dia elegido: al reabrir
+                        // el calendario se ve el mes donde esta la fecha.
+                        const p = iso.split('-');
+                        if (p.length === 3) dd.setAttribute('data-cap-view', p[0] + '-' + (parseInt(p[1], 10) - 1));
+                        native.dispatchEvent(new Event('change', { bubbles: true }));
+                        self._actualizarLabelCap(dd);
+                        self._cerrarCap(dd);
+                    } else if (tipo === 'hoy') {
+                        const h = new Date();
+                        native.value = h.getFullYear() + '-' +
+                            String(h.getMonth() + 1).padStart(2, '0') + '-' +
+                            String(h.getDate()).padStart(2, '0');
+                        dd.setAttribute('data-cap-view', h.getFullYear() + '-' + h.getMonth());
+                        native.dispatchEvent(new Event('change', { bubbles: true }));
+                        self._actualizarLabelCap(dd);
+                        self._cerrarCap(dd);
+                    } else if (tipo === 'limpiar') {
+                        native.value = '';
+                        dd.removeAttribute('data-cap-view');
+                        native.dispatchEvent(new Event('change', { bubbles: true }));
+                        self._actualizarLabelCap(dd);
+                        self._cerrarCap(dd);
+                    }
+                });
+            } else if (esHora) {
+                // Casillas de hora: un solo listener delegado en el menu
+                menu.addEventListener('click', function (ev) {
+                    ev.stopPropagation();
+                    const acc = ev.target.closest ? ev.target.closest('[data-cap-accion]') : null;
+                    if (!acc) return;
+                    if (acc.getAttribute('data-cap-accion') !== 'hora') return;
+                    const valor = acc.getAttribute('data-value') || '';
+                    native.value = valor;
+                    native.dispatchEvent(new Event('change', { bubbles: true }));
+                    self._actualizarLabelCap(dd);
+                    self._cerrarCap(dd);
+                });
+            } else if (esLista) {
+                // 📦1106 — El TIPO: una lista de opciones. Se leen del propio
+                // <select>, que queda oculto y es la fuente de verdad: asi
+                // el desplegable no puede quedar desactualizado con el campo.
+                menu.addEventListener('click', function (ev) {
+                    ev.stopPropagation();
+                    const acc = ev.target.closest ? ev.target.closest('[data-cap-accion="opcion"]') : null;
+                    if (!acc) return;
+                    native.value = acc.getAttribute('data-value') || '';
+                    native.dispatchEvent(new Event('change', { bubbles: true }));
+                    self._actualizarLabelCap(dd);
+                    self._cerrarCap(dd);
+                });
+            }
+
+            toggle.addEventListener('click', function () {
+                if (toggle.disabled) return;
+                const abierto = !menu.hidden;
+                self._cerrarTodosCap();
+                if (!abierto) self._abrirCap(dd);
+            });
+
+            // El rotulo del campo tambien abre el desplegable
+            const rotulo = cont.querySelector('label[for="' + native.id + '"]');
+            if (rotulo) {
+                rotulo.addEventListener('click', function (ev) {
+                    if (toggle.disabled) return;
+                    ev.preventDefault();
+                    // Sin esto el clic burbujea a documento y el listener de
+                    // "clic fuera" cierra el menu que acaba de abrirse
+                    ev.stopPropagation();
+                    const abierto = !menu.hidden;
+                    self._cerrarTodosCap();
+                    if (!abierto) self._abrirCap(dd);
+                });
+            }
+
+            self._actualizarLabelCap(dd);
+        });
+    }
+
+    _abrirCap(dd) {
+        const menu = dd.querySelector('.cap-dd__menu');
+        const toggle = dd.querySelector('.cap-dd__toggle');
+        if (!menu || !toggle || !menu.hidden) return;
+        if (dd.classList.contains('cap-dd--fecha')) {
+            this._pintarCalendarioCap(dd);
+        } else if (dd.classList.contains('cap-dd--hora')) {
+            // 📦1106 — La hora de FIN no puede ser anterior a la de INICIO:
+            // esas casillas quedan deshabilitadas.
+            const esTermina = dd.getAttribute('data-cap-dd') === 'termina';
+            const inicio = esTermina ? document.getElementById('inicia') : null;
+            this._pintarHorasCap(dd, inicio && inicio.value ? inicio.value : null);
+        } else if (dd.classList.contains('cap-dd--tipo')) {
+            this._pintarOpcionesCap(dd);
+        }
+        this._actualizarLabelCap(dd);
+        menu.hidden = false;
+        dd.classList.add('cap-dd--open');
+        toggle.setAttribute('aria-expanded', 'true');
+        // 📦1106 — Ya con medidas: la rejilla se centra en la hora actual
+        if (dd.classList.contains('cap-dd--hora')) this._centrarHorasCap(dd);
+
+        // El editor tiene scroll: si el menu no cabe hacia abajo se abre
+        // hacia arriba; y si se pasa del borde derecho se ancla a la derecha
+        const tRect = toggle.getBoundingClientRect();
+        const mAlto = menu.offsetHeight;
+        const scroller = dd.closest('.k-modal-body');
+        const sRect = scroller ? scroller.getBoundingClientRect() : null;
+        const limiteAbajo = Math.min(sRect ? sRect.bottom : window.innerHeight, window.innerHeight);
+        const limiteArriba = Math.max(sRect ? sRect.top : 0, 0);
+        const cabeAbajo = (limiteAbajo - tRect.bottom) >= (mAlto + 8);
+        const cabeArriba = (tRect.top - limiteArriba) >= (mAlto + 8);
+        if (!cabeAbajo && cabeArriba) menu.classList.add('cap-dd__menu--up');
+        else menu.classList.remove('cap-dd__menu--up');
+
+        menu.style.left = '';
+        menu.style.right = '';
+        const limiteDerecha = Math.min(sRect ? sRect.right : window.innerWidth, window.innerWidth);
+        if (tRect.left + menu.offsetWidth > limiteDerecha - 8) {
+            menu.style.left = 'auto';
+            menu.style.right = '0';
+        }
+    }
+
+    _cerrarCap(dd) {
+        const menu = dd.querySelector('.cap-dd__menu');
+        const toggle = dd.querySelector('.cap-dd__toggle');
+        if (menu) menu.hidden = true;
+        dd.classList.remove('cap-dd--open');
+        if (toggle) toggle.setAttribute('aria-expanded', 'false');
+    }
+
+    _cerrarTodosCap() {
+        const cont = document.getElementById('trainingModal');
+        if (!cont) return;
+        cont.querySelectorAll('.cap-dd').forEach(dd => this._cerrarCap(dd));
+    }
+
+    /** Escribe en el boton lo que vale el campo oculto (o "Seleccione..."
+     *  si esta vacio) y marca en el menu la opcion elegida. */
+    _actualizarLabelCap(dd) {
+        const native = document.getElementById(dd.getAttribute('data-cap-dd'));
+        const valor = dd.querySelector('.cap-dd__value');
+        if (!native || !valor) return;
+        let texto = '';
+        if (native.type === 'date') {
+            const p = (native.value || '').split('-');
+            if (p.length === 3) texto = p[2] + '/' + p[1] + '/' + p[0];
+        } else if (native.tagName === 'SELECT') {
+            // 📦1106 — El TIPO se muestra con el TEXTO de la opcion
+            // ("Seguridad (SST)"), no con el valor interno ("sst"): el
+            // valor es lo que se guarda, el texto es lo que se lee.
+            const op = native.options ? native.options[native.selectedIndex] : null;
+            texto = op ? op.text : (native.value || '');
+        } else if (native.value) {
+            // La hora se muestra en 24 h: es exactamente lo que se guarda
+            texto = native.value;
+        } else {
+            // La hora es OPCIONAL: vacia significa "sin hora", que es lo
+            // que dice la ayuda del modal ("Sin hora -> no aparece en el
+            // calendario"). "Seleccione..." seria mentira.
+            texto = 'Sin hora';
+        }
+        valor.textContent = texto || 'Seleccione...';
+        dd.querySelectorAll('.cap-dd__option').forEach(op => {
+            const activa = op.getAttribute('data-value') === (native.value || '');
+            op.classList.toggle('cap-dd__option--active', activa);
+        });
+    }
+
+    /** Re-sincroniza las etiquetas de los tres desplegables. Se llama cuando
+     *  un valor cambia FUERA del desplegable (el autollenado cambia la fecha):
+     *  sin esto el boton mostraria una fecha y el Excel llevaria otra. */
+    _syncCapPickers() {
+        const cont = document.getElementById('trainingModal');
+        if (!cont) return;
+        cont.querySelectorAll('.cap-dd').forEach(dd => this._actualizarLabelCap(dd));
+    }
+
+    /** Pinta el calendario del menu de la fecha: mes en curso, navegacion
+     *  con chevrons, dia de hoy marcado y el dia elegido en azul. */
+    _pintarCalendarioCap(dd) {
+        const native = document.getElementById(dd.getAttribute('data-cap-dd'));
+        const menu = dd.querySelector('.cap-dd__menu');
+        if (!native || !menu) return;
+        const MESES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+                       'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+        const hoy = new Date();
+        const vista = (dd.getAttribute('data-cap-view') || '').split('-');
+        let y = parseInt(vista[0], 10);
+        let m = parseInt(vista[1], 10);
+        if (isNaN(y) || isNaN(m)) {
+            if (native.value) {
+                const p = native.value.split('-');
+                y = parseInt(p[0], 10);
+                m = parseInt(p[1], 10) - 1;
+            } else {
+                y = hoy.getFullYear();
+                m = hoy.getMonth();
+            }
+            dd.setAttribute('data-cap-view', y + '-' + m);
+        }
+        const isoHoy = hoy.getFullYear() + '-' +
+            String(hoy.getMonth() + 1).padStart(2, '0') + '-' +
+            String(hoy.getDate()).padStart(2, '0');
+        const celdas = this._buildMonthGridCap(y, m);
+        let dias = '';
+        celdas.forEach(c => {
+            const clases = ['cap-cal__day'];
+            if (!c.inMonth) clases.push('cap-cal__day--out');
+            if (c.iso === native.value) clases.push('cap-cal__day--sel');
+            if (c.iso === isoHoy) clases.push('cap-cal__day--today');
+            dias += '<button type="button" class="' + clases.join(' ') +
+                '" data-cap-accion="dia" data-iso="' + c.iso + '">' + c.day + '</button>';
+        });
+        menu.innerHTML =
+            '<div class="cap-cal__head">' +
+                '<button type="button" class="cap-cal__nav" data-cap-accion="mes" data-cap-delta="-1" aria-label="Mes anterior">&#8249;</button>' +
+                '<span class="cap-cal__label">' + MESES[m] + ' ' + y + '</span>' +
+                '<button type="button" class="cap-cal__nav" data-cap-accion="mes" data-cap-delta="1" aria-label="Mes siguiente">&#8250;</button>' +
+            '</div>' +
+            '<div class="cap-cal__week"><span>L</span><span>M</span><span>X</span><span>J</span><span>V</span><span>S</span><span>D</span></div>' +
+            '<div class="cap-cal__grid">' + dias + '</div>' +
+            '<div class="cap-cal__foot">' +
+                '<button type="button" class="cap-cal__btn" data-cap-accion="limpiar">Limpiar</button>' +
+                '<button type="button" class="cap-cal__btn" data-cap-accion="hoy">Hoy</button>' +
+            '</div>';
+    }
+
+    /** Pinta la rejilla de horarios del menu de una hora. La ventana
+     *  valida NO esta escrita aqui:
+     *  se lee del <input> nativo (min/max), que es donde ya vivia la
+     *  regla de negocio. Asi, si alguien cambia la ventana, la rejilla
+     *  la sigue sin que haya dos lugares que contradecirse. */
+    _pintarHorasCap(dd) {
+        const native = document.getElementById(dd.getAttribute('data-cap-dd'));
+        const menu = dd.querySelector('.cap-dd__menu');
+        if (!native || !menu) return;
+        const minHora = native.min || '';
+        const maxHora = native.max || '';
+        let slots = this._buildTimeSlotsCap();
+        if (native.value && slots.indexOf(native.value) === -1) {
+            slots = [native.value].concat(slots);
+        }
+        let html = '<div class="cap-horas">';
+        slots.forEach(s => {
+            // El valor que YA tiene el campo siempre queda alcanzable: si
+            // vino de una importacion fuera de la ventana, el usuario tiene
+            // que poder verlo y corregirlo.
+            const esElActual = s === native.value;
+            const fuera = !esElActual &&
+                ((minHora && s < minHora) || (maxHora && s > maxHora));
+            html += '<button type="button" class="cap-dd__option"' +
+                ' data-cap-accion="hora" data-value="' + s + '"' +
+                (fuera ? ' disabled' : '') + '>' + s + '</button>';
+        });
+        html += '</div>';
+        menu.innerHTML = html;
+    }
+
+    /** 📦1106 — Pinta la lista de opciones del TIPO. Las opciones se LEEN
+     *  del <select> nativo (que queda oculto y es la fuente de verdad): el
+     *  desplegable no escribe su propia lista, asi que no puede quedar
+     *  desactualizado con el campo. Si el valor que ya tiene el campo no
+     *  esta en la lista, se agrega igual: el usuario tiene que poder ver
+     *  lo que hay y corregirlo. */
+    _pintarOpcionesCap(dd) {
+        const native = document.getElementById(dd.getAttribute('data-cap-dd'));
+        const menu = dd.querySelector('.cap-dd__menu');
+        if (!native || !menu || !native.options) return;
+        let html = '';
+        let hayActual = false;
+        Array.from(native.options).forEach(op => {
+            if (op.value === native.value) hayActual = true;
+            html += '<button type="button" class="cap-dd__option"' +
+                ' data-cap-accion="opcion" data-value="' + op.value + '">' +
+                op.text + '</button>';
+        });
+        if (native.value && !hayActual) {
+            html = '<button type="button" class="cap-dd__option"' +
+                ' data-cap-accion="opcion" data-value="' + native.value + '">' +
+                native.value + '</button>' + html;
+        }
+        menu.innerHTML = html;
+    }
+
+    /** 📦1106 — La rejilla de horarios arranca mostrando la hora que ya
+     *  tiene el campo. Va DESPUES de abrir el menu: mientras esta oculto
+     *  (display:none) no tiene medidas, y el scroll no aplicaba. */
+    _centrarHorasCap(dd) {
+        const menu = dd.querySelector('.cap-dd__menu');
+        if (!menu) return;
+        const grid = menu.querySelector('.cap-horas');
+        // La hora es OPCIONAL: si el campo esta vacio no hay celda activa,
+        // y el menu se abriria arriba del todo, sobre las casillas que
+        // estan fuera de la ventana valida. En ese caso se centra en la
+        // PRIMERA habilitada, que es el comienzo de la ventana.
+        const activa = grid ? (grid.querySelector('.cap-dd__option--active') ||
+            grid.querySelector('.cap-dd__option:not(:disabled)')) : null;
+        if (!grid || !activa) return;
+        grid.scrollTop = Math.max(0, (activa.offsetTop - grid.offsetTop) - (grid.clientHeight / 2) + (activa.offsetHeight / 2));
+    }
+
     destroy() {
         if (this.excelFilePath) {
             window.electronAPI.send('stop-watching-capacitaciones');
         }
         if (this.handleFileChange) {
             window.electronAPI.removeIpcMessageListener('capacitaciones-file-changed', this.handleFileChange);
+        }
+        // 📦1106 — Soltar los listeners de documento de los desplegables:
+        // si no, siguen vivos apuntando a un componente ya destruido.
+        if (this._capDocClick) {
+            document.removeEventListener('click', this._capDocClick);
+            this._capDocClick = null;
+        }
+        if (this._capDocKey) {
+            document.removeEventListener('keydown', this._capDocKey);
+            this._capDocKey = null;
         }
         // 894 · soltar el observador de tema al destruir el componente
         if (this._themeObserver) {
@@ -514,6 +940,11 @@ class CapacitacionesComponent {
             document.getElementById('trainingHora').value        = cap.hora      || '';
             document.getElementById('trainingParticipants').value = cap.participantes || 0;
         }
+
+        // 📦1106 — Las etiquetas de los desplegables se sincronizan con los
+        // valores que se acaban de cargar: sin esto el boton mostraria
+        // "Seleccione..." o "Sin hora" con una fecha y una hora ya puestas.
+        if (typeof this._syncCapPickers === 'function') this._syncCapPickers();
 
         modal.classList.add('open');
     }
