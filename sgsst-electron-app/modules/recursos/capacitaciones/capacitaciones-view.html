@@ -197,30 +197,55 @@
 
             <div class="k-toolbar">
                 <div class="k-filter-group">
-                    <label class="k-filter-pill">
-                        <select id="yearFilter" class="k-form-select">
+                    <div class="k-filter-pill">
+                        <div class="cap-dd cap-dd--filtro" data-cap-dd="yearFilter">
+                            <button type="button" class="cap-dd__toggle" aria-haspopup="listbox" aria-expanded="false" aria-label="Filtrar por año">
+                                <span class="cap-dd__value">Cargando años...</span>
+                                <svg class="cap-dd__chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+                            </button>
+                            <div class="cap-dd__menu" hidden></div>
+                        </div>
+                        <select id="yearFilter" class="k-form-select cap-dd__native">
                             <option value="">Cargando años...</option>
                         </select>
-                        <i class="bi bi-chevron-down"></i>
-                    </label>
-                    <label class="k-filter-pill">
-                        <select id="typeFilter" class="k-form-select">
+                    </div>
+                    <div class="k-filter-pill">
+                        <div class="cap-dd cap-dd--filtro" data-cap-dd="typeFilter">
+                            <button type="button" class="cap-dd__toggle" aria-haspopup="listbox" aria-expanded="false" aria-label="Filtrar por tipo">
+                                <span class="cap-dd__value">Todos los Tipos</span>
+                                <svg class="cap-dd__chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+                            </button>
+                            <div class="cap-dd__menu" hidden></div>
+                        </div>
+                        <select id="typeFilter" class="k-form-select cap-dd__native">
                             <option value="">Todos los Tipos</option>
                             <option value="sst">Seguridad (SST)</option>
                             <option value="pyp">Medicina Preventiva (PYP)</option>
                         </select>
-                        <i class="bi bi-chevron-down"></i>
-                    </label>
-                    <label class="k-filter-pill">
-                        <select id="statusFilter" class="k-form-select">
+                    </div>
+                    <div class="k-filter-pill">
+                        <div class="cap-dd cap-dd--filtro" data-cap-dd="statusFilter">
+                            <button type="button" class="cap-dd__toggle" aria-haspopup="listbox" aria-expanded="false" aria-label="Filtrar por estado">
+                                <span class="cap-dd__value">Todos los Estados</span>
+                                <svg class="cap-dd__chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+                            </button>
+                            <div class="cap-dd__menu" hidden></div>
+                        </div>
+                        <select id="statusFilter" class="k-form-select cap-dd__native">
                             <option value="">Todos los Estados</option>
                             <option value="completed">Completada</option>
                             <option value="pending">Pendiente</option>
                         </select>
-                        <i class="bi bi-chevron-down"></i>
-                    </label>
-                    <label class="k-filter-pill">
-                        <select id="monthFilter" class="k-form-select">
+                    </div>
+                    <div class="k-filter-pill">
+                        <div class="cap-dd cap-dd--filtro" data-cap-dd="monthFilter">
+                            <button type="button" class="cap-dd__toggle" aria-haspopup="listbox" aria-expanded="false" aria-label="Filtrar por mes">
+                                <span class="cap-dd__value">Todos los Meses</span>
+                                <svg class="cap-dd__chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+                            </button>
+                            <div class="cap-dd__menu" hidden></div>
+                        </div>
+                        <select id="monthFilter" class="k-form-select cap-dd__native">
                             <option value="">Todos los Meses</option>
                             <option value="1">Enero</option>
                             <option value="2">Febrero</option>
@@ -235,8 +260,7 @@
                             <option value="11">Noviembre</option>
                             <option value="12">Diciembre</option>
                         </select>
-                        <i class="bi bi-chevron-down"></i>
-                    </label>
+                    </div>
                 </div>
                 <div class="d-flex gap-2">
                     <button class="k-btn k-btn-outline" id="btn-clear-filters">

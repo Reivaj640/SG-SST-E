@@ -263,8 +263,9 @@ function correrCon(src, html, css, htmlIndex) {
     !!fnInit && fnInit.indexOf('label[for="') >= 0);
   an('9e) elegir una hora dispara change en el nativo',
     !!fnInit && fnInit.indexOf("dispatchEvent(new Event('change'") >= 0);
-  an('9f) los desplegables se buscan en el modal (que vive en el body)',
-    !!fnInit && fnInit.indexOf("document.getElementById('trainingModal')") >= 0);
+  an('9f) los desplegables se buscan en todo el documento (el modal vive en el body)',
+    !!fnInit && fnInit.indexOf("getElementById('trainingModal')") < 0 &&
+    fnInit.indexOf('.cap-dd') >= 0);
   an('9g) destroy() suelta los listeners de documento',
     /removeEventListener\('click', this\._capDocClick\)/.test(src) &&
     /removeEventListener\('keydown', this\._capDocKey\)/.test(src));
@@ -286,8 +287,8 @@ function correrCon(src, html, css, htmlIndex) {
     /\.cap-horas\s*\{/.test(css));
   an('10h) el dia elegido tiene su propio color en oscuro (blanco no se lee)',
     /\[data-theme\^="dark"\][^{]*\.cap-cal__day--sel\s*\{\s*color:\s*#0b1f33/.test(css));
-  an('10i) el nativo queda oculto (display:none) y gana al k-form-control',
-    /\.k-form-control\.cap-dd__native\s*\{[^}]*display:\s*none/.test(css));
+  an('10i) el nativo queda oculto (display:none), sea input o select',
+    /\.cap-dd__native[^{]*\{[^}]*display:\s*none/.test(css));
   an('10j) el modulo no pierde sus invariantes de tema (test 894)',
     (css.match(/\.capacitaciones-container\[data-theme="dark"\]/g) || []).length === 0 &&
     (css.match(/\.capacitaciones-container\[data-theme\^="dark"\]/g) || []).length === 47);
@@ -304,13 +305,15 @@ function correrCon(src, html, css, htmlIndex) {
   an('11a) index.html carga capacitaciones-logic.js con ?v=',
     /capacitaciones-logic\.js\?v=[A-Za-z0-9-]+/.test(htmlIndex));
   an('11b) el ?v= es el de esta ronda',
-    htmlIndex.indexOf('capacitaciones-logic.js?v=CAP-20261126-v3-pickers-tipo') >= 0);
+    htmlIndex.indexOf('capacitaciones-logic.js?v=CAP-20261126-v4-filtros') >= 0);
   an('11c) el ?v= anterior ya no esta',
+    htmlIndex.indexOf('capacitaciones-logic.js?v=CAP-20261126-v3-pickers-tipo') < 0 &&
     htmlIndex.indexOf('capacitaciones-logic.js?v=CAP-20261126-v2-pickers') < 0 &&
     htmlIndex.indexOf('capacitaciones-logic.js?v=CAP-20260915-v11-periodo-stretch') < 0);
   an('11d) el HTML de la vista tambien lleva sello nuevo (se pide por fetch)',
-    /capacitaciones-view\.html\?v=CAP-20261126-v3-pickers-tipo/.test(src));
+    /capacitaciones-view\.html\?v=CAP-20261126-v4-filtros/.test(src));
   an('11e) el sello viejo del fetch ya no esta',
+    !/capacitaciones-view\.html\?v=CAP-20261126-v3-pickers-tipo/.test(src) &&
     !/capacitaciones-view\.html\?v=CAP-20261126-v2-pickers/.test(src) &&
     !/capacitaciones-view\.html\?v=CAP-20260915-v11-periodo-stretch/.test(src));
 
@@ -348,6 +351,51 @@ function correrCon(src, html, css, htmlIndex) {
   an('12m) el menu del tipo es una lista alineada a la izquierda',
     /\.cap-dd--tipo \.cap-dd__option\s*\{[^}]*justify-content:\s*flex-start/.test(css));
 
+  // ── 13 · los CUATRO FILTROS de la lista ─────────────────────────────
+  const FILTROS = ['yearFilter', 'typeFilter', 'statusFilter', 'monthFilter'];
+  FILTROS.forEach(function (id) {
+    an('13a) el filtro ' + id + ' tiene su desplegable',
+      html.indexOf('data-cap-dd="' + id + '"') >= 0);
+    an('13b) el filtro ' + id + ' conserva su ID',
+      html.indexOf('id="' + id + '"') >= 0);
+    an('13c) el select del filtro ' + id + ' queda oculto',
+      new RegExp('id="' + id + '"[^>]*cap-dd__native').test(html));
+  });
+  an('13d) los cuatro filtros usan la variante de pill (cap-dd--filtro)',
+    (html.match(/cap-dd--filtro/g) || []).length === 4,
+    'aparecen ' + (html.match(/cap-dd--filtro/g) || []).length);
+  an('13e) los cuatro filtros tienen su boton con etiqueta y chevron',
+    (html.match(/cap-dd__toggle/g) || []).length >= 7);
+  an('13f) el chevron del select nativo ya no esta (no quedarian dos)',
+    html.indexOf('<i class="bi bi-chevron-down"></i>') < 0);
+  an('13g) el toolbar ya no usa <label> para los filtros (el select va dentro)',
+    html.indexOf('<label class="k-filter-pill">') < 0);
+  an('13h) la inicializacion agarra los desplegables de todo el documento',
+    !!fnInit && fnInit.indexOf("const cont = document;") >= 0);
+  an('13i) cerrar todos los menus alcanza a los filtros',
+    !!extraerMetodo(src, '_cerrarTodosCap') &&
+    extraerMetodo(src, '_cerrarTodosCap').indexOf("document.querySelectorAll('.cap-dd')") >= 0);
+  an('13j) la resincronizacion alcanza a los filtros',
+    !!extraerMetodo(src, '_syncCapPickers') &&
+    extraerMetodo(src, '_syncCapPickers').indexOf("document.querySelectorAll('.cap-dd')") >= 0);
+  an('13k) el filtro de años resincroniza su etiqueta cuando se puebla',
+    /yearFilter\.value\s+= this\.currentYear;[\s\S]{0,200}_syncCapPickers/.test(src));
+  an('13l) el filtro de años resincroniza cuando se crea un programa nuevo',
+    /yearFilter\.value = nextYear;[\s\S]{0,300}_syncCapPickers/.test(src));
+  an('13m) el filtro conserva la forma redondeada (pill) del toolbar',
+    /\.cap-dd--filtro \.cap-dd__toggle\s*\{[^}]*border-radius:\s*999px/.test(css));
+  an('13n) el menu del filtro scrollea (los meses son 13)',
+    /\.cap-dd--filtro \.cap-dd__menu\s*\{[^}]*overflow-y:\s*auto/.test(css));
+  an('13o) las opciones del filtro van alineadas a la izquierda',
+    /\.cap-dd--filtro \.cap-dd__option\s*\{[^}]*justify-content:\s*flex-start/.test(css));
+  an('13p) los filtros de tipo, estado y mes siguen siendo los que filtran',
+    !!extraerMetodo(src, 'applyFilters') &&
+    ['typeFilter', 'statusFilter', 'monthFilter'].every(function (id) {
+      return (extraerMetodo(src, 'applyFilters') || '').indexOf("getElementById('" + id + "')") >= 0;
+    }));
+  an('13q) el filtro de años sigue cargando el año que se elige',
+    src.indexOf("addEventListener('change', (e) => this.loadDataForYear(parseInt(e.target.value)))") >= 0);
+
   return c;
 }
 
@@ -375,9 +423,9 @@ const MUTACIONES = [
     src, html, css.replace('.cap-cal__grid', '.cap-cal__grid-x'), htmlIndex],
   ['el cache-bust no sube',
     src, html, css,
-    htmlIndex.replace('capacitaciones-logic.js?v=CAP-20261126-v3-pickers-tipo', 'capacitaciones-logic.js?v=CAP-20261126-v2-pickers')],
+    htmlIndex.replace('capacitaciones-logic.js?v=CAP-20261126-v4-filtros', 'capacitaciones-logic.js?v=CAP-20261126-v3-pickers-tipo')],
   ['el HTML de la vista se pide con el sello viejo',
-    src.replace('capacitaciones-view.html?v=CAP-20261126-v3-pickers-tipo', 'capacitaciones-view.html?v=CAP-20261126-v2-pickers'),
+    src.replace('capacitaciones-view.html?v=CAP-20261126-v4-filtros', 'capacitaciones-view.html?v=CAP-20261126-v3-pickers-tipo'),
     html, css, htmlIndex],
   ['la rejilla se centra antes de mostrar el menu (no hay medidas)',
     src.replace('menu.hidden = false;', 'menu.hidden = true;'), html, css, htmlIndex],
@@ -404,7 +452,23 @@ const MUTACIONES = [
   ['el desplegable de tipo escribe su propia lista',
     src.replace('Array.from(native.options)', 'Array.from([])'), html, css, htmlIndex],
   ['el menu del tipo pierde la alineacion a la izquierda',
-    src, html, css.replace('.cap-dd--tipo .cap-dd__option', '.cap-dd--tipo .cap-dd__option-x'), htmlIndex]
+    src, html, css.replace('.cap-dd--tipo .cap-dd__option', '.cap-dd--tipo .cap-dd__option-x'), htmlIndex],
+  ['un filtro pierde su desplegable',
+    src, html.replace('data-cap-dd="monthFilter"', 'data-cap-dd="monthFilter-x"'), css, htmlIndex],
+  ['el select de un filtro deja de quedar oculto',
+    src, html.replace('id="statusFilter" class="k-form-select cap-dd__native"',
+      'id="statusFilter" class="k-form-select"'), css, htmlIndex],
+  ['los desplegables solo se buscan en el modal (los filtros quedan muertos)',
+    src.replace('const cont = document;', "const cont = document.getElementById('trainingModal');"),
+    html, css, htmlIndex],
+  ['el filtro de años no resincroniza su etiqueta',
+    src.replace('yearFilter.value  = this.currentYear;\n        // 📦1107 — El filtro de años cambio de valor por fuera del\n' +
+      '        // desplegable: el boton tiene que seguirlo.\n' +
+      '        if (typeof this._syncCapPickers === \'function\') this._syncCapPickers();',
+      'yearFilter.value  = this.currentYear;'),
+    html, css, htmlIndex],
+  ['el filtro pierde la forma redondeada del toolbar',
+    src, html, css.replace('.cap-dd--filtro .cap-dd__toggle', '.cap-dd--filtro .cap-dd__toggle-x'), htmlIndex]
 ];
 
 (async function () {

@@ -187,7 +187,7 @@ class CapacitacionesComponent {
         this._syncTheme();
         this._watchTheme();
 
-        fetch('./modules/recursos/capacitaciones/capacitaciones-view.html?v=CAP-20261126-v3-pickers-tipo')
+        fetch('./modules/recursos/capacitaciones/capacitaciones-view.html?v=CAP-20261126-v4-filtros')
             .then(response => response.text())
             .then(html => {
                 this.container.innerHTML = html;
@@ -410,8 +410,9 @@ class CapacitacionesComponent {
      *  setup del formulario. */
     _initCapPickers() {
         const self = this;
-        const cont = document.getElementById('trainingModal');
-        if (!cont) return;
+        // 📦1107 — Se buscan en TODO el documento: los del modal (que viven
+        // en document.body) y los de los CUATRO FILTROS de la lista.
+        const cont = document;
         const dds = cont.querySelectorAll('.cap-dd');
         if (!dds.length) return;
 
@@ -555,7 +556,9 @@ class CapacitacionesComponent {
             const esTermina = dd.getAttribute('data-cap-dd') === 'termina';
             const inicio = esTermina ? document.getElementById('inicia') : null;
             this._pintarHorasCap(dd, inicio && inicio.value ? inicio.value : null);
-        } else if (dd.classList.contains('cap-dd--tipo')) {
+        } else {
+            // 📦1107 — El TIPO del modal y los CUATRO FILTROS de la lista son
+            // listas: sus opciones se pintan desde el propio campo.
             this._pintarOpcionesCap(dd);
         }
         this._actualizarLabelCap(dd);
@@ -596,9 +599,8 @@ class CapacitacionesComponent {
     }
 
     _cerrarTodosCap() {
-        const cont = document.getElementById('trainingModal');
-        if (!cont) return;
-        cont.querySelectorAll('.cap-dd').forEach(dd => this._cerrarCap(dd));
+        // 📦1107 — Cierra TODOS: los del modal y los de los filtros.
+        document.querySelectorAll('.cap-dd').forEach(dd => this._cerrarCap(dd));
     }
 
     /** Escribe en el boton lo que vale el campo oculto (o "Seleccione..."
@@ -637,9 +639,8 @@ class CapacitacionesComponent {
      *  un valor cambia FUERA del desplegable (el autollenado cambia la fecha):
      *  sin esto el boton mostraria una fecha y el Excel llevaria otra. */
     _syncCapPickers() {
-        const cont = document.getElementById('trainingModal');
-        if (!cont) return;
-        cont.querySelectorAll('.cap-dd').forEach(dd => this._actualizarLabelCap(dd));
+        // 📦1107 — Tambien los filtros: el de años se puebla por fuera.
+        document.querySelectorAll('.cap-dd').forEach(dd => this._actualizarLabelCap(dd));
     }
 
     /** Pinta el calendario del menu de la fecha: mes en curso, navegacion
@@ -1108,6 +1109,8 @@ class CapacitacionesComponent {
 
         if (years.length === 0) {
             yearFilter.innerHTML = '<option value="">Sin años</option>';
+            // 📦1107 — El botón del filtro tiene que mostrar lo mismo.
+            if (typeof this._syncCapPickers === 'function') this._syncCapPickers();
             this.capacitaciones = [];
             this.applyFilters();
             return;
@@ -1123,6 +1126,9 @@ class CapacitacionesComponent {
         const currentYear = new Date().getFullYear();
         this.currentYear  = years.includes(currentYear) ? currentYear : years[0];
         yearFilter.value  = this.currentYear;
+        // 📦1107 — El filtro de años cambio de valor por fuera del
+        // desplegable: el boton tiene que seguirlo.
+        if (typeof this._syncCapPickers === 'function') this._syncCapPickers();
 
         if (this.currentYear) await this.loadDataForYear(this.currentYear);
     }
@@ -1783,6 +1789,8 @@ class CapacitacionesComponent {
                 if (yearFilter) {
                     yearFilter.value = nextYear;
                     yearFilter.dispatchEvent(new Event('change'));
+                    // 📦1107 — El boton del filtro de años tiene que mostrarlo.
+                    if (typeof this._syncCapPickers === 'function') this._syncCapPickers();
                 }
             }
         } catch (error) {

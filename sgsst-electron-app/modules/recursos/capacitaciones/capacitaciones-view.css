@@ -1733,7 +1733,9 @@ select.k-form-control {
    trainingHora).
    ═══════════════════════════════════════════════════════════════════════ */
 .cap-dd { position: relative; display: block; width: 100%; }
-.k-form-control.cap-dd__native { display: none; }
+/* 📦1107 — El nativo queda oculto sea un <input> o un <select>: los dos
+   quedan como fuente de verdad debajo del desplegable. */
+.cap-dd__native { display: none; }
 
 .cap-dd__toggle {
   display: flex; align-items: center; gap: 0.5rem; width: 100%;
@@ -1887,6 +1889,29 @@ select.k-form-control {
   cursor: pointer;
 }
 .cap-cal__btn:hover { background: var(--kair-soft, #f3f6f6); }
+
+/* 📦1107 — Los CUATRO FILTROS de la lista (años, tipos, estados y meses)
+   son desplegables propios con la misma forma redondeada (pill) que tenian
+   como <select> nativo: asi el toolbar no cambia de aspecto. */
+.cap-dd--filtro { width: auto; }
+.cap-dd--filtro .cap-dd__toggle {
+  width: auto;
+  gap: 0.5rem;
+  padding: 0.45rem 0.9rem;
+  border-radius: 999px;
+  background: var(--kair-card, #ffffff);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.cap-dd--filtro .cap-dd__menu {
+  min-width: max(100%, 190px);
+  max-height: 240px;
+  overflow-y: auto;
+}
+.cap-dd--filtro .cap-dd__option {
+  justify-content: flex-start; text-align: left; padding-left: 0.55rem;
+}
 
 /* 📦1106 — El desplegable del TIPO es una LISTA, no una rejilla: las
    opciones se alinean a la izquierda (en la rejilla de horas van centradas)
