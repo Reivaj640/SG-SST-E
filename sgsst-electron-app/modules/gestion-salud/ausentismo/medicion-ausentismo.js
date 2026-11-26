@@ -7330,6 +7330,170 @@ class MedicionAusentismoComponent {
         .aus-scope .aus-btn--danger { color: var(--aus-danger); border-color: var(--aus-danger); }
         .aus-scope .aus-btn--danger:hover:not(:disabled) { background: var(--aus-danger-soft); color: var(--aus-danger); border-color: var(--aus-danger); }
 
+        /* ═════════════════════════════════════════════════════════
+           📦1101 — Desplegables del Formulario de Registro (género,
+           clase, tipo y las dos fechas). Mismo lenguaje visual que el
+           botón "Acciones" de Base de Personal: botón con borde gris,
+           chevron que gira 180°, menú flotante con sombra y opciones
+           con hover. El <select>/<input> nativo queda oculto como
+           fuente de verdad (getFormData/validateFormData no cambian).
+           ═════════════════════════════════════════════════════════ */
+        .aus-scope .aus-dd { position: relative; display: block; width: 100%; }
+        .aus-scope .aus-dd__native { display: none; }
+
+        .aus-scope .aus-dd__toggle {
+            display: flex; align-items: center; gap: 8px; width: 100%;
+            padding: 0.5rem 0.75rem;
+            background: #fff;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            font-family: var(--aus-font);
+            font-size: 0.8125rem;
+            font-weight: 500;
+            color: #374151;
+            text-align: left;
+            cursor: pointer;
+            transition: border-color 0.12s, box-shadow 0.12s;
+        }
+        .aus-scope .aus-dd__toggle:hover:not(:disabled) { border-color: #9ca3af; }
+        .aus-scope .aus-dd__toggle:disabled { opacity: 0.55; cursor: not-allowed; }
+        .aus-scope .aus-dd--open .aus-dd__toggle {
+            border-color: #174ea6;
+            box-shadow: 0 0 0 3px rgba(23, 78, 166, 0.12);
+        }
+        .aus-scope .aus-dd__value {
+            flex: 1; min-width: 0;
+            overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        }
+        .aus-scope .aus-dd__icon { width: 15px; height: 15px; flex-shrink: 0; color: #6b7280; }
+        .aus-scope .aus-dd__chevron {
+            width: 15px; height: 15px; flex-shrink: 0;
+            color: #6b7280;
+            transition: transform 0.15s;
+        }
+        .aus-scope .aus-dd--open .aus-dd__chevron { transform: rotate(180deg); }
+
+        .aus-scope .aus-dd__menu {
+            position: absolute;
+            top: calc(100% + 0.375rem);
+            left: 0;
+            min-width: 100%;
+            max-width: 340px;
+            background: #fff;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04);
+            padding: 0.375rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.125rem;
+            z-index: 100;
+        }
+        /* El atributo hidden debe ganarle al display:flex de arriba */
+        .aus-scope .aus-dd__menu[hidden] { display: none; }
+        /* 📦1101 — La card del formulario recorta con overflow:hidden:
+           si el menú no cabe hacia abajo, se abre hacia arriba */
+        .aus-scope .aus-dd__menu--up { top: auto; bottom: calc(100% + 0.375rem); }
+
+        .aus-scope .aus-dd__option {
+            display: flex; align-items: center; gap: 0.5rem;
+            width: 100%;
+            background: transparent;
+            border: none;
+            border-radius: 6px;
+            padding: 0.4375rem 0.625rem;
+            font-family: var(--aus-font);
+            font-size: 0.8125rem;
+            font-weight: 500;
+            color: #4b5563;
+            text-align: left;
+            cursor: pointer;
+            transition: background 0.12s, color 0.12s;
+            white-space: nowrap;
+        }
+        .aus-scope .aus-dd__option:hover:not(:disabled) { background: #f3f4f6; color: #1f2937; }
+        .aus-scope .aus-dd__option:focus-visible { outline: 2px solid #174ea6; outline-offset: -2px; }
+        .aus-scope .aus-dd__option--active { background: var(--aus-primary-soft); color: var(--aus-primary); font-weight: 600; }
+
+        /* 📦1101 — Calendario propio para las dos fechas */
+        .aus-scope .aus-cal { width: 264px; min-width: 264px; max-width: none; padding: 8px; gap: 4px; }
+        .aus-scope .aus-cal__head {
+            display: flex; align-items: center; justify-content: space-between;
+            gap: 4px; padding: 2px 4px 6px;
+        }
+        .aus-scope .aus-cal__label { font-size: 13px; font-weight: 600; color: var(--aus-text); }
+        .aus-scope .aus-cal__nav {
+            width: 28px; height: 28px;
+            border: none; background: transparent;
+            border-radius: 6px;
+            font-size: 16px; line-height: 1;
+            color: #6b7280;
+            cursor: pointer;
+        }
+        .aus-scope .aus-cal__nav:hover { background: #f3f4f6; color: #1f2937; }
+        .aus-scope .aus-cal__week, .aus-scope .aus-cal__grid {
+            display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px;
+        }
+        .aus-scope .aus-cal__week span {
+            font-size: 10px; font-weight: 700; color: #9ca3af;
+            text-align: center; text-transform: uppercase;
+            padding-bottom: 2px;
+        }
+        .aus-scope .aus-cal__day {
+            height: 30px;
+            border: none; background: transparent;
+            border-radius: 6px;
+            font-family: var(--aus-font);
+            font-size: 12.5px;
+            color: var(--aus-text);
+            cursor: pointer;
+        }
+        .aus-scope .aus-cal__day:hover { background: #f3f4f6; }
+        .aus-scope .aus-cal__day--out { color: #c4c9d2; }
+        .aus-scope .aus-cal__day--out:hover { background: transparent; }
+        .aus-scope .aus-cal__day--today {
+            box-shadow: inset 0 0 0 1px var(--aus-primary);
+            color: var(--aus-primary);
+            font-weight: 700;
+        }
+        .aus-scope .aus-cal__day--sel { background: var(--aus-primary); color: #fff; font-weight: 700; }
+        .aus-scope .aus-cal__day--sel:hover { background: var(--aus-primary-hover); }
+        .aus-scope .aus-cal__foot {
+            display: flex; justify-content: space-between; gap: 6px;
+            border-top: 1px solid var(--aus-border);
+            margin-top: 4px; padding-top: 6px;
+        }
+        .aus-scope .aus-cal__btn {
+            flex: 1;
+            border: 1px solid var(--aus-border); background: transparent;
+            border-radius: 6px;
+            padding: 5px 8px;
+            font-family: var(--aus-font); font-size: 12px; font-weight: 600;
+            color: var(--aus-text-sec);
+            cursor: pointer;
+        }
+        .aus-scope .aus-cal__btn:hover { background: var(--aus-border-light); color: var(--aus-text); }
+
+        /* 📦1101 — Desplegables (tema oscuro: los dos atributos de la app
+           los cubre [data-theme^="dark"], igual que el resto del módulo) */
+        [data-theme^="dark"] .aus-scope .aus-dd__toggle { background: var(--aus-card); border-color: var(--aus-border); color: var(--aus-text); }
+        [data-theme^="dark"] .aus-scope .aus-dd__toggle:hover:not(:disabled) { border-color: var(--aus-text-muted); }
+        [data-theme^="dark"] .aus-scope .aus-dd--open .aus-dd__toggle { border-color: var(--aus-primary); box-shadow: 0 0 0 3px var(--aus-primary-soft); }
+        [data-theme^="dark"] .aus-scope .aus-dd__icon, [data-theme^="dark"] .aus-scope .aus-dd__chevron { color: var(--aus-text-sec); }
+        [data-theme^="dark"] .aus-scope .aus-dd__menu { background: var(--aus-card); border-color: var(--aus-border); box-shadow: var(--aus-shadow-md); }
+        [data-theme^="dark"] .aus-scope .aus-dd__option { color: var(--aus-text-sec); }
+        [data-theme^="dark"] .aus-scope .aus-dd__option:hover:not(:disabled) { background: var(--aus-border-light); color: var(--aus-text); }
+        [data-theme^="dark"] .aus-scope .aus-cal__label { color: var(--aus-text); }
+        [data-theme^="dark"] .aus-scope .aus-cal__nav { color: var(--aus-text-sec); }
+        [data-theme^="dark"] .aus-scope .aus-cal__nav:hover { background: var(--aus-border-light); color: var(--aus-text); }
+        [data-theme^="dark"] .aus-scope .aus-cal__week span { color: var(--aus-text-muted); }
+        [data-theme^="dark"] .aus-scope .aus-cal__day { color: var(--aus-text); }
+        [data-theme^="dark"] .aus-scope .aus-cal__day:hover { background: var(--aus-border-light); }
+        [data-theme^="dark"] .aus-scope .aus-cal__day--out { color: var(--aus-text-muted); }
+        [data-theme^="dark"] .aus-scope .aus-cal__day--out:hover { background: transparent; }
+        [data-theme^="dark"] .aus-scope .aus-cal__btn { border-color: var(--aus-border); color: var(--aus-text-sec); }
+        [data-theme^="dark"] .aus-scope .aus-cal__btn:hover { background: var(--aus-border-light); color: var(--aus-text); }
+
         /* Scrollbar de la tabla */
         .aus-scope .ausentismo-table-wrapper::-webkit-scrollbar { width: 10px; height: 10px; }
         .aus-scope .ausentismo-table-wrapper::-webkit-scrollbar-track { background: var(--aus-border-light); border-radius: 8px; }
@@ -7511,7 +7675,14 @@ class MedicionAusentismoComponent {
             </div>
             <div class="aus-field">
                 <label class="aus-field__label" for="genero-select">Género</label>
-                <select id="genero-select" class="aus-input">
+                <div class="aus-dd" data-aus-dd="genero-select">
+                    <button type="button" class="aus-dd__toggle" aria-haspopup="listbox" aria-expanded="false">
+                        <span class="aus-dd__value">Seleccione...</span>
+                        <svg class="aus-dd__chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+                    </button>
+                    <div class="aus-dd__menu" hidden></div>
+                </div>
+                <select id="genero-select" class="aus-input aus-dd__native">
                     <option value="">Seleccione...</option>
                     <option value="Masculino">Masculino</option>
                     <option value="Femenino">Femenino</option>
@@ -7520,7 +7691,14 @@ class MedicionAusentismoComponent {
             </div>
             <div class="aus-field">
                 <label class="aus-field__label" for="clase-incapacidad-select">Clase de Incapacidad</label>
-                <select id="clase-incapacidad-select" class="aus-input" required>
+                <div class="aus-dd" data-aus-dd="clase-incapacidad-select">
+                    <button type="button" class="aus-dd__toggle" aria-haspopup="listbox" aria-expanded="false">
+                        <span class="aus-dd__value">Seleccione...</span>
+                        <svg class="aus-dd__chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+                    </button>
+                    <div class="aus-dd__menu" hidden></div>
+                </div>
+                <select id="clase-incapacidad-select" class="aus-input aus-dd__native" required>
                     <option value="">Seleccione...</option>
                     <option value="EPS">EPS</option>
                     <option value="ARL">ARL</option>
@@ -7529,7 +7707,14 @@ class MedicionAusentismoComponent {
             </div>
             <div class="aus-field">
                 <label class="aus-field__label" for="tipo-incapacidad-select">Tipo de Incapacidad</label>
-                <select id="tipo-incapacidad-select" class="aus-input" required>
+                <div class="aus-dd" data-aus-dd="tipo-incapacidad-select">
+                    <button type="button" class="aus-dd__toggle" aria-haspopup="listbox" aria-expanded="false">
+                        <span class="aus-dd__value">Seleccione...</span>
+                        <svg class="aus-dd__chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+                    </button>
+                    <div class="aus-dd__menu" hidden></div>
+                </div>
+                <select id="tipo-incapacidad-select" class="aus-input aus-dd__native" required>
                     <option value="">Seleccione...</option>
                     <option value="ACCIDENTE DE TRANSITO">ACCIDENTE DE TRANSITO</option>
                     <option value="ACCIDENTE LABORAL">ACCIDENTE LABORAL</option>
@@ -7546,11 +7731,27 @@ class MedicionAusentismoComponent {
             </div>
             <div class="aus-field">
                 <label class="aus-field__label" for="fecha-inicio-input">Fecha de Inicio</label>
-                <input type="date" id="fecha-inicio-input" class="aus-input" required>
+                <div class="aus-dd aus-dd--fecha" data-aus-dd="fecha-inicio-input">
+                    <button type="button" class="aus-dd__toggle" aria-haspopup="dialog" aria-expanded="false">
+                        <svg class="aus-dd__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                        <span class="aus-dd__value">Seleccione...</span>
+                        <svg class="aus-dd__chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+                    </button>
+                    <div class="aus-dd__menu aus-cal" hidden></div>
+                </div>
+                <input type="date" id="fecha-inicio-input" class="aus-input aus-dd__native" required>
             </div>
             <div class="aus-field">
                 <label class="aus-field__label" for="fecha-fin-input">Fecha de Finalización</label>
-                <input type="date" id="fecha-fin-input" class="aus-input" required>
+                <div class="aus-dd aus-dd--fecha" data-aus-dd="fecha-fin-input">
+                    <button type="button" class="aus-dd__toggle" aria-haspopup="dialog" aria-expanded="false">
+                        <svg class="aus-dd__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                        <span class="aus-dd__value">Seleccione...</span>
+                        <svg class="aus-dd__chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+                    </button>
+                    <div class="aus-dd__menu aus-cal" hidden></div>
+                </div>
+                <input type="date" id="fecha-fin-input" class="aus-input aus-dd__native" required>
             </div>
             <div class="aus-field">
                 <label class="aus-field__label" for="codigo-input">Código Diagnóstico (CIE-10)</label>
@@ -7777,6 +7978,10 @@ class MedicionAusentismoComponent {
                     this.showNotification('Formulario limpiado.', 'info');
                 });
             }
+
+            // 5. Desplegables modernos de los 5 campos (género, clase, tipo
+            //    y las dos fechas) — 📦1101
+            this._initAusDropdowns();
         }, 0);
     }
 
@@ -7984,6 +8189,10 @@ class MedicionAusentismoComponent {
     disableForm(disabled) {
         const inputs = document.querySelectorAll('.registrar-ausentismo-form input, .registrar-ausentismo-form select, .registrar-ausentismo-form button');
         inputs.forEach(input => input.disabled = disabled);
+        // 📦1101 — Si se bloquea el formulario con un menú desplegable
+        // abierto, se cierra (un menú abierto sobre un formulario bloqueado
+        // deja opciones que no responden al clic)
+        if (disabled && typeof this._cerrarTodosAus === 'function') this._cerrarTodosAus();
     }
 
     getFormData() {
@@ -8030,6 +8239,285 @@ class MedicionAusentismoComponent {
     document.getElementById('departamento-input').value = '';
     document.getElementById('empresa-usuaria-input').value = '';
     document.getElementById('entidad-input').value = '';
+
+    // 📦1101 — Los desplegables muestran una etiqueta visible sobre el
+    // campo oculto: al limpiar se resetea la de los 5 campos y se cierra
+    // cualquier menú que haya quedado abierto
+    if (typeof this._cerrarTodosAus === 'function') this._cerrarTodosAus();
+    document.querySelectorAll('.registrar-ausentismo-form .aus-dd').forEach(dd => this._actualizarLabelDd(dd));
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // 📦1101 — Desplegables modernos del Formulario de Registro
+    // (género, clase de incapacidad, tipo de incapacidad y las dos fechas).
+    // Mismo lenguaje visual que el botón "Acciones" de Base de Personal.
+    // El <select>/<input> nativo queda OCULTO como fuente de verdad: todo
+    // lo que existía (getFormData, validateFormData, el change de LUTO,
+    // limpiarFormulario, disableForm) sigue leyendo los mismos IDs.
+    // ═══════════════════════════════════════════════════════════════
+
+    /** Grilla del mes: 42 celdas (6 filas × 7 días), semana arrancando en
+     *  lunes, con las celdas del mes vecino marcadas inMonth=false.
+     *  Pura (sin this, sin DOM): por eso el test la ejecuta de verdad. */
+    _buildMonthGrid(year, month) {
+        const DIAS_MES = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+        const bisiesto = (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0;
+        const diasDelMes = (month === 1 && bisiesto) ? 29 : DIAS_MES[month];
+        const aIso = function (f) {
+            const mm = String(f.getMonth() + 1).padStart(2, '0');
+            const dd = String(f.getDate()).padStart(2, '0');
+            return f.getFullYear() + '-' + mm + '-' + dd;
+        };
+        const offset = (new Date(year, month, 1).getDay() + 6) % 7;
+        const celdas = [];
+        for (let i = offset; i >= 1; i--) {
+            const f = new Date(year, month, 1 - i);
+            celdas.push({ iso: aIso(f), day: f.getDate(), inMonth: false });
+        }
+        for (let d = 1; d <= diasDelMes; d++) {
+            celdas.push({ iso: aIso(new Date(year, month, d)), day: d, inMonth: true });
+        }
+        let siguiente = 1;
+        while (celdas.length < 42) {
+            celdas.push({ iso: aIso(new Date(year, month + 1, siguiente)), day: siguiente, inMonth: false });
+            siguiente++;
+        }
+        return celdas;
+    }
+
+    /** Convierte los 5 campos nativos en desplegables. Se llama al final del
+     *  setup del formulario. El menú de opciones se arma desde el <select>
+     *  nativo (una sola fuente: si cambian las opciones, el menú las copia). */
+    _initAusDropdowns() {
+        const self = this;
+        const form = document.querySelector('.registrar-ausentismo-form');
+        if (!form) return;
+        const dds = form.querySelectorAll('.aus-dd');
+        if (!dds.length) return;
+
+        // Listeners globales de documento: se reemplazan en cada render para
+        // no acumularlos (el componente se vuelve a montar en cada visita)
+        if (this._ausDocClick) {
+            document.removeEventListener('click', this._ausDocClick);
+            document.removeEventListener('keydown', this._ausDocKey);
+        }
+        this._ausDocClick = function (ev) {
+            if (!ev.target || !ev.target.closest || !ev.target.closest('.aus-dd')) {
+                self._cerrarTodosAus();
+            }
+        };
+        this._ausDocKey = function (ev) {
+            if (ev.key === 'Escape') self._cerrarTodosAus();
+        };
+        document.addEventListener('click', this._ausDocClick);
+        document.addEventListener('keydown', this._ausDocKey);
+
+        dds.forEach(dd => {
+            const native = document.getElementById(dd.getAttribute('data-aus-dd'));
+            const toggle = dd.querySelector('.aus-dd__toggle');
+            const menu = dd.querySelector('.aus-dd__menu');
+            if (!native || !toggle || !menu) return;
+            const esFecha = native.tagName === 'INPUT' && native.type === 'date';
+
+            if (!esFecha) {
+                // Opciones copiadas del <select> nativo (una sola fuente)
+                Array.prototype.slice.call(native.options).forEach(opt => {
+                    const btn = document.createElement('button');
+                    btn.type = 'button';
+                    btn.className = 'aus-dd__option';
+                    btn.setAttribute('data-value', opt.value);
+                    btn.textContent = opt.textContent;
+                    btn.addEventListener('click', function () {
+                        native.value = opt.value;
+                        // El change dispara el autocompletado de LUTO (Z63.4)
+                        native.dispatchEvent(new Event('change', { bubbles: true }));
+                        self._actualizarLabelDd(dd);
+                        self._cerrarAus(dd);
+                    });
+                    menu.appendChild(btn);
+                });
+            } else {
+                // Calendario: un solo listener delegado en el menú (sobrevive
+                // a los repintados de _pintarCalendario, que usa innerHTML)
+                menu.addEventListener('click', function (ev) {
+                    const acc = ev.target.closest ? ev.target.closest('[data-aus-accion]') : null;
+                    if (!acc) return;
+                    const tipo = acc.getAttribute('data-aus-accion');
+                    if (tipo === 'mes') {
+                        const delta = parseInt(acc.getAttribute('data-aus-delta'), 10) || 0;
+                        const vista = (dd.getAttribute('data-aus-view') || '').split('-');
+                        const base = new Date(parseInt(vista[0], 10), parseInt(vista[1], 10) + delta, 1);
+                        dd.setAttribute('data-aus-view', base.getFullYear() + '-' + base.getMonth());
+                        self._pintarCalendario(dd);
+                    } else if (tipo === 'dia') {
+                        native.value = acc.getAttribute('data-iso');
+                        native.dispatchEvent(new Event('change', { bubbles: true }));
+                        self._actualizarLabelDd(dd);
+                        self._cerrarAus(dd);
+                    } else if (tipo === 'hoy') {
+                        const h = new Date();
+                        native.value = h.getFullYear() + '-' +
+                            String(h.getMonth() + 1).padStart(2, '0') + '-' +
+                            String(h.getDate()).padStart(2, '0');
+                        dd.setAttribute('data-aus-view', h.getFullYear() + '-' + h.getMonth());
+                        native.dispatchEvent(new Event('change', { bubbles: true }));
+                        self._actualizarLabelDd(dd);
+                        self._cerrarAus(dd);
+                    } else if (tipo === 'limpiar') {
+                        native.value = '';
+                        dd.removeAttribute('data-aus-view');
+                        native.dispatchEvent(new Event('change', { bubbles: true }));
+                        self._actualizarLabelDd(dd);
+                        self._cerrarAus(dd);
+                    }
+                });
+            }
+
+            toggle.addEventListener('click', function () {
+                if (toggle.disabled) return;
+                const abierto = !menu.hidden;
+                self._cerrarTodosAus();
+                if (!abierto) self._abrirAus(dd);
+            });
+
+            // El rótulo del campo también abre el desplegable
+            const rotulo = form.querySelector('label[for="' + native.id + '"]');
+            if (rotulo) {
+                rotulo.addEventListener('click', function (ev) {
+                    if (toggle.disabled) return;
+                    ev.preventDefault();
+                    // Sin esto el clic burbujea a documento y el listener de
+                    // "clic fuera" cierra el menú que acaba de abrirse (el
+                    // rótulo es hermano de .aus-dd, no está dentro)
+                    ev.stopPropagation();
+                    const abierto = !menu.hidden;
+                    self._cerrarTodosAus();
+                    if (!abierto) self._abrirAus(dd);
+                });
+            }
+
+            self._actualizarLabelDd(dd);
+        });
+    }
+
+    _abrirAus(dd) {
+        const menu = dd.querySelector('.aus-dd__menu');
+        const toggle = dd.querySelector('.aus-dd__toggle');
+        if (!menu || !toggle || !menu.hidden) return;
+        if (dd.classList.contains('aus-dd--fecha')) this._pintarCalendario(dd);
+        menu.hidden = false;
+        dd.classList.add('aus-dd--open');
+        toggle.setAttribute('aria-expanded', 'true');
+
+        // La card del formulario recorta con overflow:hidden: si el menú no
+        // cabe hacia abajo se abre hacia arriba; y si se pasa del borde
+        // derecho se ancla a la derecha del campo
+        const tRect = toggle.getBoundingClientRect();
+        const mAlto = menu.offsetHeight;
+        const card = dd.closest('.aus-card');
+        const cRect = card ? card.getBoundingClientRect() : null;
+        // Límite visible: la intersección entre la card y la ventana (la card
+        // vive en un contenedor con scroll: si el menú se sale del viewport
+        // hay que scrollear para verlo, mejor se abre hacia arriba)
+        const limiteAbajo = Math.min(cRect ? cRect.bottom : window.innerHeight, window.innerHeight);
+        const limiteArriba = Math.max(cRect ? cRect.top : 0, 0);
+        const cabeAbajo = (limiteAbajo - tRect.bottom) >= (mAlto + 8);
+        const cabeArriba = (tRect.top - limiteArriba) >= (mAlto + 8);
+        if (!cabeAbajo && cabeArriba) menu.classList.add('aus-dd__menu--up');
+        else menu.classList.remove('aus-dd__menu--up');
+
+        menu.style.left = '';
+        menu.style.right = '';
+        const limiteDerecha = Math.min(cRect ? cRect.right : window.innerWidth, window.innerWidth);
+        if (tRect.left + menu.offsetWidth > limiteDerecha - 8) {
+            menu.style.left = 'auto';
+            menu.style.right = '0';
+        }
+    }
+
+    _cerrarAus(dd) {
+        const menu = dd.querySelector('.aus-dd__menu');
+        const toggle = dd.querySelector('.aus-dd__toggle');
+        if (menu) menu.hidden = true;
+        dd.classList.remove('aus-dd--open');
+        if (toggle) toggle.setAttribute('aria-expanded', 'false');
+    }
+
+    _cerrarTodosAus() {
+        const form = document.querySelector('.registrar-ausentismo-form');
+        if (!form) return;
+        form.querySelectorAll('.aus-dd').forEach(dd => this._cerrarAus(dd));
+    }
+
+    /** Escribe en el botón lo que vale el campo oculto (o "Seleccione..."
+     *  si está vacío) y marca en el menú la opción elegida. */
+    _actualizarLabelDd(dd) {
+        const native = document.getElementById(dd.getAttribute('data-aus-dd'));
+        const valor = dd.querySelector('.aus-dd__value');
+        if (!native || !valor) return;
+        let texto = '';
+        if (native.tagName === 'SELECT') {
+            const opt = native.options[native.selectedIndex];
+            texto = opt ? opt.textContent : '';
+        } else if (native.value) {
+            const p = native.value.split('-');
+            texto = p[2] + '/' + p[1] + '/' + p[0];
+        }
+        valor.textContent = texto || 'Seleccione...';
+        dd.querySelectorAll('.aus-dd__option').forEach(op => {
+            const activa = op.getAttribute('data-value') === (native.value || '');
+            op.classList.toggle('aus-dd__option--active', activa);
+        });
+    }
+
+    /** Pinta el calendario del menú de una fecha: mes en curso, navegación
+     *  con chevrons, día de hoy marcado y el día elegido en azul. */
+    _pintarCalendario(dd) {
+        const native = document.getElementById(dd.getAttribute('data-aus-dd'));
+        const menu = dd.querySelector('.aus-dd__menu');
+        if (!native || !menu) return;
+        const MESES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+                       'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+        const hoy = new Date();
+        const vista = (dd.getAttribute('data-aus-view') || '').split('-');
+        let y = parseInt(vista[0], 10);
+        let m = parseInt(vista[1], 10);
+        if (isNaN(y) || isNaN(m)) {
+            if (native.value) {
+                const p = native.value.split('-');
+                y = parseInt(p[0], 10);
+                m = parseInt(p[1], 10) - 1;
+            } else {
+                y = hoy.getFullYear();
+                m = hoy.getMonth();
+            }
+            dd.setAttribute('data-aus-view', y + '-' + m);
+        }
+        const isoHoy = hoy.getFullYear() + '-' +
+            String(hoy.getMonth() + 1).padStart(2, '0') + '-' +
+            String(hoy.getDate()).padStart(2, '0');
+        const celdas = this._buildMonthGrid(y, m);
+        let dias = '';
+        celdas.forEach(c => {
+            const clases = ['aus-cal__day'];
+            if (!c.inMonth) clases.push('aus-cal__day--out');
+            if (c.iso === native.value) clases.push('aus-cal__day--sel');
+            if (c.iso === isoHoy) clases.push('aus-cal__day--today');
+            dias += '<button type="button" class="' + clases.join(' ') +
+                '" data-aus-accion="dia" data-iso="' + c.iso + '">' + c.day + '</button>';
+        });
+        menu.innerHTML =
+            '<div class="aus-cal__head">' +
+                '<button type="button" class="aus-cal__nav" data-aus-accion="mes" data-aus-delta="-1" aria-label="Mes anterior">&#8249;</button>' +
+                '<span class="aus-cal__label">' + MESES[m] + ' ' + y + '</span>' +
+                '<button type="button" class="aus-cal__nav" data-aus-accion="mes" data-aus-delta="1" aria-label="Mes siguiente">&#8250;</button>' +
+            '</div>' +
+            '<div class="aus-cal__week"><span>L</span><span>M</span><span>X</span><span>J</span><span>V</span><span>S</span><span>D</span></div>' +
+            '<div class="aus-cal__grid">' + dias + '</div>' +
+            '<div class="aus-cal__foot">' +
+                '<button type="button" class="aus-cal__btn" data-aus-accion="limpiar">Limpiar</button>' +
+                '<button type="button" class="aus-cal__btn" data-aus-accion="hoy">Hoy</button>' +
+            '</div>';
     }
 
     /**

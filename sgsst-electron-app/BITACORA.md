@@ -11217,3 +11217,50 @@ El fix normaliza `YYYYMMDD` y `YYYYMMDDHHMMSS` a `YYYY-MM-DD`.
 **La regla que queda.** Una revision independiente no se implementa a ciegas: se verifica contra el codigo y
 contra los datos reales, y se mide el impacto antes de afirmar que algo esta roto. Los seis fixes se
 comprobaron con pruebas en rojo primero (y el del estado, ademas, con las 33 cedulas reales de la base).
+
+## 📦 Los cinco campos del formulario con cara de desplegable propio (📦1101, 2026-11-26)
+
+**El pedido.** Los cinco campos del Formulario de Registro de ausentismo (genero, clase de incapacidad,
+tipo de incapacidad, fecha de inicio y fecha de fin) pasaron de selects e inputs nativos a desplegables
+con la cara del boton "Acciones" de Base de Personal: boton con borde y chevron, menu flotante con
+opciones, y para las dos fechas un calendario propio. El owner decidio: menu propio completo para los
+tres selects y calendario propio para las fechas (no el picker nativo).
+
+**La decision de diseno que sostiene todo: el nativo sigue vivo, solo se oculta.** El `<select>` e
+`<input type="date">` conservan su ID original y quedan con la clase `aus-dd__native` en
+`display:none`: son la fuente de verdad. `getFormData()`, `validateFormData()`, `limpiarFormulario()`,
+`disableForm()` y el listener de `change` que autocompleta LUTO a Z63.4 **no se tocaron**: siguen
+leyendo los mismos IDs. El menu se arma desde `native.options` (una sola fuente) y al elegir se escribe
+`native.value` y se despacha `change` con burbuja, por lo que el autocompletado se dispara solo. Un
+rediseño de cara no debe poder romper un contrato de datos.
+
+**El bug que estuvo a punto de llegar a produccion: el rotulo abria y cerraba el menu en el mismo clic.**
+El `label[for=...]` del campo es HERMANO de `.aus-dd`, no esta dentro: al hacer clic en el, el evento
+burbujea hasta el documento, el listener de "clic fuera" ve un destino fuera del desplegable y cierra
+el menu que el propio clic acaba de abrir. Se descubrio leyendo el orden de los listeners antes de correr
+el arnes (el de documento se registra primero, en `_initAusDropdowns`). El fix es `stopPropagation()` en
+el rotulo. **La regla:** cualquier elemento que ABRA el menu pero no este dentro de `.aus-dd` tiene que
+frenar la burbuja, o el listener de "clic fuera" lo cierra de inmediato.
+
+**La card recorta: el menu tiene que medir antes de abrirse.** `.aus-card` tiene `overflow: hidden`, asi
+que un menu que no cabe hacia abajo se corta a la mitad y nadie ve las ultimas opciones. `_abrirAus`
+mide el espacio disponible contra la interseccion de la card con la ventana y decide: cabe abajo, abre
+normal; no cabe abajo pero cabe arriba, agrega `aus-dd__menu--up`; y si se pasa del borde derecho lo
+ancla a la derecha del campo. Medido en Chromium real: el menu de fecha-fin (el mas abajo) abre hacia
+arriba y queda entero en lo visible. **La regla:** en este repo cualquier menu flotante dentro de una
+card con recorte debe medir su espacio y elegir direccion, no asumir que le cabe hacia abajo.
+
+**La medicion que minto fue la transicion, no el estilo.** El arnes midio el borde del boton con el tema
+oscuro puesto y dio el valor CLARO (`#d1d5db`), mientras el fondo ya estaba oscuro. La regla oscura
+existia y matcheaba: el borde tiene una transicion de 120 ms y la medicion corrio en el mismo instante
+del cambio de tema (el fondo, sin transicion, cambio de una). Separando el armado del tema de la
+medicion (250 ms despues) el borde salio `#2a3446`, el token oscuro correcto. Lo mismo paso con el
+chevron: midio sin girar a mitad de su transicion y despues dio `matrix(-1,0,0,-1,0,0)` (180°).
+**La regla:** al medir un estilo animado, esperar a que la transicion termine; si despues de esperar
+no cambia, ahi si sospechar de la regla.
+
+**Verificacion.** Test nuevo `main/test-ausentismo-form-dropdown.js` (49 checks, en rojo primero),
+bateria completa **162/162 en verde**, y arnes de Electron real con las 35 hojas de la app: los cinco
+menus abren, LUTO escribe Z63.4, el calendario entrega ISO, un solo menu a la vez, Escape y clic
+fuera cierran, Limpiar resetea todo, bloqueo del formulario, modo oscuro con los dos atributos y
+0 errores de consola.
