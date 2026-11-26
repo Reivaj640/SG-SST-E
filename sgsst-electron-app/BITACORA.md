@@ -11264,3 +11264,48 @@ bateria completa **162/162 en verde**, y arnes de Electron real con las 35 hojas
 menus abren, LUTO escribe Z63.4, el calendario entrega ISO, un solo menu a la vez, Escape y clic
 fuera cierran, Limpiar resetea todo, bloqueo del formulario, modo oscuro con los dos atributos y
 0 errores de consola.
+
+## 📦 El calendario que se cerraba al cambiar de mes (📦1101-fix, 2026-11-26)
+
+**El sintoma.** El owner reporto, con captura, que en los dos calendarios (fecha de inicio y fecha de
+finalizacion) **al pulsar la flecha de mes el calendario desaparecia**: habia que volver a hacer clic en
+el campo para verlo de nuevo.
+
+**Por que pasaba (leido en el codigo, no adivinado).** El calendario se dibuja con `innerHTML` y se
+repinta entero en cada cambio de mes. Al repintarse, **el boton pulsado queda desconectado del
+documento**: su camino hacia arriba (sus padres) queda cortado. El clic seguia subiendo hasta el
+detector de "clic fuera" (que vive en el `document`), y ese detector preguntaba si el destino estaba
+dentro de un desplegable con `ev.target.closest('.aus-dd')`. Como el boton ya no tenia padres, la
+respuesta era no y el menu se cerraba. **El menu no se cerraba por el repintado: se cerraba porque el
+detector de "clic fuera" dejo de reconocer el clic como interno.**
+
+**El arreglo, con dos defensas.** (1) El listener del calendario **detiene la propagacion**: un clic
+dentro del menu se queda ahi y nunca llega al detector. (2) El detector revisa `composedPath()` —la
+ruta que el evento tenia **cuando se disparo**— y no solo el destino actual, asi reconoce el clic
+interno aunque el nodo ya se haya desconectado. `closest()` queda como respaldo.
+
+**La regla.** **Un menu que se repinta con `innerHTML` rompe el supuesto del detector de "clic
+fuera".** Ese detector compara el destino actual contra un contenedor, y el repintado deja al destino
+sin contenedores. Dos formas de no volver a tropezar: (a) que lo que esta DENTRO del menu frene la
+propagacion (el clic nunca llega al detector) y (b) que el detector mire la ruta del evento
+(`composedPath()`), que no cambia aunque el arbol se repinte. **La regla general: si un menu puede
+repintarse, no puede confiar solo en `closest()` del destino.**
+
+**El detalle que se corrigio de paso.** Al elegir un dia, la vista del menu queda ahora en **el mes de
+ese dia**. Antes quedaba en el ultimo mes que se estaba mirando, asi que al reabrir el calendario
+aparecia un mes distinto del de la fecha guardada. Medido: se elige el 1 de abril desde la grilla de
+marzo y al reabrir abre en **Abril 2027** con ese dia marcado.
+
+**El detalle del test que casi no muerde.** El primer check de este fix buscaba `stopPropagation()` en
+todo el metodo y **no lo cazaba al mutar el fix**: la palabra tambien aparece en el listener del
+rotulo (que si la necesita). Un check que nunca se ve fallar no es un check. Se reescribio para
+mirar **solo el bloque del listener del calendario**, y se agrego una prueba de **comportamiento real**:
+el detector de "clic fuera" se **extrae del archivo vivo y se ejecuta** con dos eventos simulados
+(clic interno con el destino ya desconectado -> no cierra; clic de verdad afuera -> si cierra).
+Mutacion comprobada: sin `stopPropagation` el test cae a 56/57, y con el detector en su version vieja
+(sin `composedPath`) cae a 54/57.
+
+**Verificacion.** Arnés de Electron real con las 35 hojas de la app: **5 meses adelante y 5 atras
+seguidos sin que el menu se cierre** en los dos calendarios, elegir un dia del mes vecino
+(01/04/2027), reabrir en el mes de la fecha con el dia marcado, el clic dentro del menu **no** cierra
+y el clic de verdad afuera **si** cierra. 0 errores de consola.

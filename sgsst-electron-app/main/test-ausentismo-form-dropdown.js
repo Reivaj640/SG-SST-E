@@ -83,6 +83,38 @@ function comoFuncion(fuenteMetodo) {
   return new Function(cabeza + sinEspacios + '\nreturn ' + nombre + ';')();
 }
 
+/** Extrae una asignacion del tipo `this._algo = function (ev) { ... };`
+ *  devolviendo SOLO el cuerpo de la funcion (para poder ejecutarla). */
+function extraerAsignacion(fuente, propiedad) {
+  const idx = fuente.indexOf(propiedad + ' = function');
+  if (idx < 0) return null;
+  const desde = idx + propiedad.length + 3; // apunta a la palabra "function"
+  const llaveAbierta = fuente.indexOf('{', desde);
+  if (llaveAbierta < 0) return null;
+  let nivel = 0;
+  let enTexto = false;
+  let esc = false;
+  let enComentario = false;
+  for (let i = llaveAbierta; i < fuente.length; i++) {
+    const c = fuente[i];
+    if (enComentario) {
+      if (c === '\n') enComentario = false;
+      continue;
+    }
+    if (esc) { esc = false; continue; }
+    if (c === '\\') { esc = true; continue; }
+    if (c === '/' && fuente[i + 1] === '/') { enComentario = true; i++; continue; }
+    if (c === '"' || c === "'" || c === '`') { enTexto = !enTexto; continue; }
+    if (enTexto) continue;
+    if (c === '{') nivel++;
+    else if (c === '}') {
+      nivel--;
+      if (nivel === 0) return fuente.slice(desde, i + 1);
+    }
+  }
+  return null;
+}
+
 const CAMPOS = [
   'genero-select',
   'clase-incapacidad-select',
@@ -221,6 +253,80 @@ async function main() {
     /medicion-ausentismo\.js\?v=[A-Za-z0-9-]+/.test(htmlIndex));
   ok('7b) el ?v= cambio respecto de la version anterior',
     htmlIndex.indexOf('AUSENTISMO-20261125-busqueda-global-fix') < 0);
+  ok('7c) el ?v= es el del fix del calendario (navegar de mes no cierra)',
+    htmlIndex.indexOf('medicion-ausentismo.js?v=AUSENTISMO-20261126-dropdowns-calendario-fix') >= 0);
+
+  // ══════════════════════════════════════════════════════════════
+  // 8) El calendario NO se cierra al cambiar de mes (📦1101-fix)
+  //
+  // El fallo: al cambiar de mes el calendario se repinta con innerHTML, y
+  // eso DESCONECTA el botón que se pulsó. El clic seguía subiendo hasta el
+  // detector de "clic fuera", que ya no encontraba al .aus-dd en la ruta
+  // del botón desconectado → cerraba el menú. El usuario tenía que volver
+  // a hacer clic para verlo.
+  //
+  // Las dos defenses:
+  //   (1) el listener del menú detiene la propagación (el clic se queda
+  //       dentro del desplegable), y
+  //   (2) el detector de "clic fuera" revisa composedPath() (la ruta que
+  //       el evento tenía al dispararse), no solo el destino actual.
+  // ══════════════════════════════════════════════════════════════
+  const fnInitTxt = extraerMetodo(src, '_initAusDropdowns') || '';
+
+  // 8a) El listener del CALENDARIO (no el del rótulo) detiene la propagación.
+  //     Se busca dentro del bloque del menú para que el check no se satisfaga
+  //     con el stopPropagation del rótulo (que está en otro lado).
+  const iMenu = fnInitTxt.indexOf("menu.addEventListener('click', function (ev) {");
+  const iAcc = fnInitTxt.indexOf("closest('[data-aus-accion]')");
+  const bloqueCalendario = (iMenu >= 0 && iAcc > iMenu)
+    ? fnInitTxt.slice(iMenu, iAcc) : '';
+  ok('8a) el clic dentro del calendario detiene la propagacion',
+    bloqueCalendario.indexOf('ev.stopPropagation()') >= 0);
+
+  ok('8b) el detector de clic fuera revisa composedPath (destino desconectado)',
+    fnInitTxt.indexOf('composedPath') >= 0);
+  ok('8c) el detector de clic fuera sigue usando closest como respaldo',
+    fnInitTxt.indexOf("closest('.aus-dd')") >= 0);
+  ok('8d) al elegir un dia la vista queda en el mes de ese dia',
+    fnInitTxt.indexOf("p[0] + '-' + (parseInt(p[1], 10) - 1)") >= 0);
+
+  // 8e-f) COMPORTAMIENTO REAL: se extrae el detector de "clic fuera" del
+  // archivo real y se ejecuta con dos eventos simulados:
+  //   - clic DENTRO del desplegable cuyo destino ya quedó desconectado
+  //     (lo que pasa al repintar el mes): NO debe cerrar nada.
+  //   - clic FUERA del desplegable: SÍ debe cerrar los menús.
+  const detector = extraerAsignacion(src, 'this._ausDocClick');
+  ok('8e) se puede extraer el detector de clic fuera', !!detector);
+  if (detector) {
+    const selfMock = {
+      cerradas: 0,
+      _cerrarTodosAus: function () { this.cerradas++; }
+    };
+    const fnDoc = new Function('self',
+      'var _ausDocClick = ' + detector + ';\nreturn _ausDocClick;')(selfMock);
+
+    // Clic dentro del desplegable, destino desconectado (closest no lo ve)
+    const nodoDd = { classList: { contains: function (c) { return c === 'aus-dd'; } } };
+    const nodoFuera = { classList: { contains: function () { return false; } } };
+    const destinoDesconectado = {
+      closest: function () { return null; } // ya no está en el árbol
+    };
+    fnDoc({
+      target: destinoDesconectado,
+      composedPath: function () { return [destinoDesconectado, nodoDd]; }
+    });
+    ok('8f) un clic dentro del desplegable NO cierra los menus (destino desconectado)',
+      selfMock.cerradas === 0, 'cerradas=' + selfMock.cerradas);
+
+    // Clic de verdad afuera: sí debe cerrar
+    selfMock.cerradas = 0;
+    fnDoc({
+      target: { closest: function () { return null; } },
+      composedPath: function () { return [nodoFuera]; }
+    });
+    ok('8g) un clic afuera SI cierra los menus',
+      selfMock.cerradas === 1, 'cerradas=' + selfMock.cerradas);
+  }
 
   // ══════════════════════════════════════════════════════════════
   let failed = 0;

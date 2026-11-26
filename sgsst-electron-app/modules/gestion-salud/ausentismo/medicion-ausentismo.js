@@ -8302,9 +8302,15 @@ class MedicionAusentismoComponent {
             document.removeEventListener('keydown', this._ausDocKey);
         }
         this._ausDocClick = function (ev) {
-            if (!ev.target || !ev.target.closest || !ev.target.closest('.aus-dd')) {
-                self._cerrarTodosAus();
-            }
+            // Un clic DENTRO de un desplegable nunca lo cierra. Se revisa el
+            // camino completo del evento (composedPath) y no solo el destino:
+            // al cambiar de mes el calendario se repinta (innerHTML) y el
+            // botón pulsado queda DESCONECTADO del documento, así que con
+            // solo ev.target.closest el menú se cerraba solo.
+            const dentro = (ev.composedPath ? ev.composedPath() : []).some(function (n) {
+                return n && n.classList && n.classList.contains('aus-dd');
+            }) || (ev.target && ev.target.closest && !!ev.target.closest('.aus-dd'));
+            if (!dentro) self._cerrarTodosAus();
         };
         this._ausDocKey = function (ev) {
             if (ev.key === 'Escape') self._cerrarTodosAus();
@@ -8340,6 +8346,13 @@ class MedicionAusentismoComponent {
                 // Calendario: un solo listener delegado en el menú (sobrevive
                 // a los repintados de _pintarCalendario, que usa innerHTML)
                 menu.addEventListener('click', function (ev) {
+                    // Un clic dentro del calendario JAMÁS debe cerrar el
+                    // menú. Al cambiar de mes el calendario se repinta
+                    // (innerHTML) y el botón pulsado queda desconectado del
+                    // documento: si el clic siguiera subiendo, el detector de
+                    // "clic fuera" lo tomaría por un clic externo y cerraría
+                    // el calendario (que era justo lo que pasaba).
+                    ev.stopPropagation();
                     const acc = ev.target.closest ? ev.target.closest('[data-aus-accion]') : null;
                     if (!acc) return;
                     const tipo = acc.getAttribute('data-aus-accion');
@@ -8350,7 +8363,13 @@ class MedicionAusentismoComponent {
                         dd.setAttribute('data-aus-view', base.getFullYear() + '-' + base.getMonth());
                         self._pintarCalendario(dd);
                     } else if (tipo === 'dia') {
-                        native.value = acc.getAttribute('data-iso');
+                        const iso = acc.getAttribute('data-iso') || '';
+                        native.value = iso;
+                        // La vista queda en el mes del día elegido: al reabrir
+                        // el calendario se ve el mes donde está la fecha, no
+                        // el último mes que se estaba mirando.
+                        const p = iso.split('-');
+                        if (p.length === 3) dd.setAttribute('data-aus-view', p[0] + '-' + (parseInt(p[1], 10) - 1));
                         native.dispatchEvent(new Event('change', { bubbles: true }));
                         self._actualizarLabelDd(dd);
                         self._cerrarAus(dd);
