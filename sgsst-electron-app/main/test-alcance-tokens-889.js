@@ -431,11 +431,22 @@ for (const [nombre, txt] of [
 // Y los tres iframe del modulo con sello vigente: si el HTML se sirve del cache
 // viejo, el script nuevo nunca llega. El sello lleva prefijo de familia
 // (`PRESUP-`, `PRE-`), asi que la fecha va despues de un prefijo opcional.
-const prefijo = '\\?v=(?:[A-Z]+-)?20261014';
+// El sello NO se ata a una fecha literal: se pregunta por su FORMA
+// ([PREFIJO-]AAAAMMDD-desc) y por un PISO de fecha. Asi un bumpee futuro no
+// tumba este test, y el invariante que queda es el que de verdad importa:
+// el sello no retrocede. Mismo criterio que el test del 887.
+const prefijo = '\\?v=(?:[A-Z]+-)?\\d{8}-[A-Za-z0-9-]+';
+const PISO_SELLOS_889 = 20261014;
 const iframeSrcs = (pLogic.match(/presupuesto-[a-z]+\.html\?v=[^']+/g) || []);
 chk('1.1.3: los tres iframe se piden con cache-bust propio',
     iframeSrcs.length >= 4 && iframeSrcs.every((s) => new RegExp(prefijo).test(s)),
     iframeSrcs.length + ' src: ' + iframeSrcs.join(' | '));
+chk('1.1.3: ningun sello de iframe retrocede por debajo del piso',
+    iframeSrcs.every((s) => {
+      const f = /(\d{8})/.exec(s);
+      return !!f && Number(f[1]) >= PISO_SELLOS_889;
+    }),
+    iframeSrcs.join(' | '));
 
 // ── Mutaciones: el test tiene que morder ────────────────────────────────
 // Cada mutación rompe UNA cosa y el test tiene que ponerse rojo. Si alguna no
@@ -552,7 +563,12 @@ function correrCon(f) {
     && [f.pHome, f.pSel, f.pGes].every((t) => /kair-iframe-theme\.js\?v=[^"]+"/.test(t))
     && (() => {
       const srcs = f.pLogic.match(/presupuesto-[a-z]+\.html\?v=[^']+/g) || [];
-      return srcs.length >= 4 && srcs.every((s) => /\?v=(?:[A-Z]+-)?20261014/.test(s));
+      return srcs.length >= 4
+        && srcs.every((s) => /\?v=(?:[A-Z]+-)?\d{8}-[A-Za-z0-9-]+/.test(s))
+        && srcs.every((s) => {
+          const f2 = /(\d{8})/.exec(s);
+          return !!f2 && Number(f2[1]) >= 20261014;
+        });
     })();
 }
 
@@ -647,8 +663,17 @@ const MUTACIONES = [
      ...original,
      // El sello real lleva prefijo de familia (`?v=PRESUP-20261014-...`), asi que
      // el patron tiene que tolerarlo; con `?v=20261014` a secas no encuentra
-     // nada y la mutacion pasa sin romper nada.
-     pLogic: original.pLogic.replace(/\?v=(?:[A-Z]+-)?20261014/g, '?v=VIEJO')
+     // nada y la mutacion pasa sin romper nada. Ahora el sello se reemplaza
+     // COMPLETO: un `?v=` sin fecha rompe la forma y el piso.
+     pLogic: original.pLogic.replace(/\?v=(?:[A-Z]+-)?\d{8}-[A-Za-z0-9-]+/g, '?v=VIEJO')
+   })],
+  ['1.1.3: un sello de iframe retrocede a una fecha vieja (el cache del navegador)',
+   () => ({
+     ...original,
+     // El sello nuevo es mas viejo que el piso: la FORMA sigue valida, asi que
+     // solo el invariante del PISO lo caza. Sin el, el token podria volver a
+     // una fecha anterior y la vista se serviria del cache viejo.
+     pLogic: original.pLogic.replace(/\?v=(?:[A-Z]+-)?\d{8}-[A-Za-z0-9-]+/g, '?v=PRE-20260101-viejo')
    })]
 ];
 

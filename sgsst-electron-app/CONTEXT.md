@@ -2491,6 +2491,18 @@ muestra el histórico completo (753 / 1 501 / 1 289 filas) y el orden es del má
 — defecto preexistente) y el KPI del home (`get-ausentismo-stats`, Excel + `PRI.xlsx`).
 
 
+## 📈 Gestión de Presupuesto (Recursos 1.1.3) — las tres tarjetas de indicadores ya tienen el esqueleto de cuatro piezas de Recursos
+
+**El modelo.** La tarjeta de indicador de K+AIR tiene **cuatro** piezas, no dos: rótulo, valor, descripción y barra de avance. Lo define `renderMetricCard()` (`modules/recursos/recursos-home.js:692`) y el CSS que lo sostiene **ya estaba escrito** (`shared/kair-components.css:82-91`, documentado en `design_system.md:182` como "KPI con título + valor + progress bar"). Las tres tarjetas de "Gestión de Presupuesto" mostraban solo rótulo y valor: el trabajo no fue inventar un componente, fue **copiar el esqueleto que ya existía**.
+
+**Lo que cambió.** Cada tarjeta de presupuesto gana su descripción y su barra de "Avance"; `updateSummary()` calcula los porcentajes, **acota el ancho a 0-100** y aplica el semáforo de Recursos al ejecutado (≥70 normal, ≥40 ámbar, <40 rojo). El saldo va en **tono neutro** (`--kair-slate`), no en el semáforo: más saldo no es un estado bueno ni malo. El porcentaje real va siempre en la descripción, para que la barra no pueda mentir.
+
+**Lo que NO cambió.** El hero de la vista (`.kair-hero-card`, `pres-hero-score`), el CSS compartido, el grid del strip, la tabla y las demás vistas. El test nuevo incluye el check que se pone rojo si alguien le cuelga una barra o una descripción al hero.
+
+**El sello del iframe.** `presupuesto-logic.js:39` pide esta vista en un iframe con el sello `?v=PRE-20261014-889-theme`: si el sello no sube, Electron sirve el HTML viejo del caché y **el cambio no llega a la app**. El sello de esta vista subió a `PRE-20261126-presupuesto-barras`, y el test del 📦889 que tenía la fecha escrita a mano pasó a preguntar por la **forma** del sello (`[PREFIJO-]AAAAMMDD-desc`) y por un **piso** de fecha.
+
+**Tests.** `main/test-presupuesto-barras-avance.js` (14/14, estático y por contenido) · `main/test-alcance-tokens-889.js` (41/41 + 22 mutaciones).
+
 ## 🖋️ Servicio de firma electrónica (`firma-service`)
 Servicio **separado** del app de escritorio: lo opera Gesstiar S.A.S. y vive en `sgsst-electron-app/firma-service/` (Node, Express, SQLite). Se despliega aparte (tar en `/opt/kair-firma`), expone `https://firma.kair.fyi` por túnel de Cloudflare y tiene su propio manifiesto de evidencias legales (`legal-readiness.json`) y su propio gate de publicación (`scripts/auditar-readiness-legal.js`).
 **Lo que cambió el 27-oct-2026 (📦976), que es lo que hay que tener presente:**- **El remitente del enlace puede ser la Empresa.** Cada Empresa puede registrar una cuenta de envío propia (SMTP) en el servicio; la clave se guarda cifrada con la llave maestra y cada cambio deja rastro. El enlace de acceso y el aviso de la firma salen por esa cuenta. **El código de verificación (OTP) sale SIEMPRE desde la cuenta de K+AIR**, porque es el dato de creación de la firma y su custodia no puede depender de la Empresa (art. 2.2.2.47.4 núm. 1 del Decreto 1074 de 2015).

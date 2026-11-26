@@ -382,6 +382,10 @@ body { background: var(--kair-canvas, #fbfcfb); }
 }
 .kair-premium-strip .kair-metric-card { min-height: 0; justify-content: center; }
 .kair-premium-strip .kair-metric-value { margin-top: clamp(8px, 1vw, 14px); }
+/* Las 3 métricas de presupuesto usan el patrón de Recursos (rótulo → valor → descripción → barra).
+   El SALDO va en tono neutro a propósito: "más saldo" no es un estado bueno ni malo, y con el
+   semáforo (verde/ámbar/rojo) se leería como una alerta. El color sale de un token. */
+.kair-premium-strip .kair-metric-card--saldo .kair-progress i { background: var(--kair-slate); }
 .pres-hero-score { position: absolute; bottom: clamp(15px, 1.9vw, 24px); right: clamp(17px, 1.9vw, 25px); text-align: right; }
 .pres-hero-score .val { display: block; font: 800 clamp(22px, 2.4vw, 32px)/1 var(--kair-font-display, 'Segoe UI'); color: #fff; letter-spacing: -0.03em; }
 .pres-hero-score .lbl { display: block; font: 500 clamp(10px, 0.95vw, 12px) var(--kair-font-ui, 'Segoe UI'); color: #9eafc6; margin-top: 2px; }
@@ -520,14 +524,20 @@ tbody tr:hover { background: var(--surface-row-hover); }
   <div class="kair-metric-card">
     <div class="kair-metric-head">Presupuesto Total</div>
     <div class="kair-metric-value" id="totalPresupuesto">$0</div>
+    <p class="kair-metric-desc" id="descTotalPresupuesto">Asignación total del año</p>
+    <div class="kair-progress"><i id="barraTotalPresupuesto" style="width:0%"></i></div>
   </div>
-  <div class="kair-metric-card">
+  <div class="kair-metric-card" id="cardEjecutado">
     <div class="kair-metric-head">Ejecutado</div>
     <div class="kair-metric-value" id="totalEmpresa">$0</div>
+    <p class="kair-metric-desc" id="descEjecutado">0% de lo asignado</p>
+    <div class="kair-progress"><i id="barraEjecutado" style="width:0%"></i></div>
   </div>
-  <div class="kair-metric-card">
+  <div class="kair-metric-card kair-metric-card--saldo">
     <div class="kair-metric-head">Saldo Disponible</div>
     <div class="kair-metric-value" id="saldoDisponible">$0</div>
+    <p class="kair-metric-desc" id="descSaldo">0% sin ejecutar</p>
+    <div class="kair-progress"><i id="barraSaldo" style="width:0%"></i></div>
   </div>
 </div>
 
@@ -847,6 +857,28 @@ function parseFormattedNumber(value) {
             // 📦653 — formatPct omite ,00 cuando el % es entero
             document.getElementById('totalArl').textContent = formatPct(totalP > 0 ? (totalE / totalP) * 100 : 0);
             document.getElementById('saldoDisponible').textContent = '$' + formatNumber(totalP - totalE);
+
+            // --- Barras de avance ---------------------------------------------
+            // Mismo patrón que las tarjetas de Recursos (recursos-home.js →
+            // renderMetricCard): rótulo → valor → descripción → barra. La barra va
+            // ACOTADA a 0-100 (una sobre-ejecución no puede desbordarla) y el % real
+            // se muestra en la descripción. El semáforo es el de Recursos: ≥70 verde,
+            // ≥40 ámbar, <40 rojo.
+            const pctEjecucion = totalP > 0 ? (totalE / totalP) * 100 : 0;
+            const pctSaldo = totalP > 0 ? ((totalP - totalE) / totalP) * 100 : 0;
+            const acotarPct = (p) => Math.max(0, Math.min(100, p));
+
+            document.getElementById('barraTotalPresupuesto').style.width = (totalP > 0 ? 100 : 0) + '%';
+            document.getElementById('barraEjecutado').style.width = acotarPct(pctEjecucion) + '%';
+            document.getElementById('barraSaldo').style.width = acotarPct(pctSaldo) + '%';
+
+            document.getElementById('descEjecutado').textContent = formatPct(pctEjecucion) + ' de lo asignado';
+            document.getElementById('descSaldo').textContent = formatPct(pctSaldo) + ' sin ejecutar';
+
+            const cardEjec = document.getElementById('cardEjecutado');
+            cardEjec.classList.remove('kair-metric-card--warning', 'kair-metric-card--danger');
+            if (pctEjecucion < 40) cardEjec.classList.add('kair-metric-card--danger');
+            else if (pctEjecucion < 70) cardEjec.classList.add('kair-metric-card--warning');
         }
 
         function addNewRow() {
