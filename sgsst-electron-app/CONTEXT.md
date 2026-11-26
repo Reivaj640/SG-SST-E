@@ -2525,6 +2525,20 @@ muestra el histórico completo (753 / 1 501 / 1 289 filas) y el orden es del má
 
 **Tests.** `main/test-ausentismo-kpi-gestion.js` (51/51, con `loadGestionStats()` extraído del archivo vivo y ejecutado, y con la independencia de las dos fuentes como invariante) · `main/test-ausentismo-kpi-total.js` (24/24) · `tests/ausentismo/test-premium.js` (121/121, el invariante ahora exige los **5** IDs de KPI).
 
+## 🖋️ Generador de Actas del COPASST (Recursos) — la fecha y las dos horas se toman con calendario y rejilla propios, y el `<input>` nativo sigue siendo la fuente de verdad
+
+**El modelo.** El formulario de "Generador de Actas" del COPASST lo arma `showRealizarActasInterface()` (`modules/recursos/copasst/copasst-logic.js`): se inyecta **en el DOM del shell** (no es un iframe) con un `<style>` propio. Sus tres campos de fecha y hora eran `<input type="date" id="fecha">`, `<input type="time" id="inicia">` y `<input type="time" id="termina">`, y ese patrón de desplegable ya existía en el formulario de ausentismo (📦1101, `modules/gestion-salud/ausentismo/medicin-ausentismo.js`).
+
+**Lo que cambió.** Cada una de las tres casillas ganó un wrapper `.cop-dd` con `data-cop-dd="fecha|inicia|termina"`, un botón `.cop-dd__toggle` (icono de calendario o de reloj + chevron) y un menú `.cop-dd__menu`. La **fecha** usa un calendario propio (42 celdas, la semana en lunes, con "Limpiar" y "Hoy"); las **dos horas** usan una rejilla propia de **96 horarios en pasos de 15 minutos** (4 columnas × 24 filas), en formato **24 h** (es lo que va al Excel), que abre **centrada en la hora que ya tenía el campo**. El CSS va contenido en `.copasst-actas-container`, con su bloque oscuro.
+
+**Lo que NO cambió, y es lo que sostiene el diseño.** El `<input>` nativo **queda oculto pero intacto, con su ID**: es la fuente de verdad. `handleExportExcel()`, `prepareExcelChanges()` (que escriben las filas 7, 9 y 10 del Excel) y `handleAutoFill()` leen y escriben igual que antes. El desplegable es una vista encima del input, no un reemplazo. El autollenado, que cambia la fecha por fuera del desplegable, necesita `_syncCopasstPickers()`: sin eso el botón mostraría la fecha vieja y el Excel llevaría la nueva.
+
+**La regla de negocio añadida.** La **Hora Fin no puede ser anterior a la Hora Inicio**: esas casillas quedan deshabilitadas, y si se mueve el Inicio y el Fin había quedado antes, el Fin lo sigue. Es una adición a lo pedido.
+
+**El sello.** `index.html:518` pide `copasst-logic.js?v=COPASST-20261126-v4-actas-pickers`: sin subir el sello, Electron sirve el JS viejo del caché y el cambio no llega a la app.
+
+**Tests.** `main/test-copasst-actas-pickers.js` (75/75, con `_buildMonthGrid` y `_buildTimeSlots` **extraídos del archivo vivo y ejecutados**, y 8 mutaciones que muerden) · `main/test-copasst-tema-890.js` (47/47, su constante de sello se actualizó al nuevo).
+
 ## 🖋️ Servicio de firma electrónica (`firma-service`)
 Servicio **separado** del app de escritorio: lo opera Gesstiar S.A.S. y vive en `sgsst-electron-app/firma-service/` (Node, Express, SQLite). Se despliega aparte (tar en `/opt/kair-firma`), expone `https://firma.kair.fyi` por túnel de Cloudflare y tiene su propio manifiesto de evidencias legales (`legal-readiness.json`) y su propio gate de publicación (`scripts/auditar-readiness-legal.js`).
 **Lo que cambió el 27-oct-2026 (📦976), que es lo que hay que tener presente:**- **El remitente del enlace puede ser la Empresa.** Cada Empresa puede registrar una cuenta de envío propia (SMTP) en el servicio; la clave se guarda cifrada con la llave maestra y cada cambio deja rastro. El enlace de acceso y el aviso de la firma salen por esa cuenta. **El código de verificación (OTP) sale SIEMPRE desde la cuenta de K+AIR**, porque es el dato de creación de la firma y su custodia no puede depender de la Empresa (art. 2.2.2.47.4 núm. 1 del Decreto 1074 de 2015).

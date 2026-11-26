@@ -59,7 +59,9 @@ const REL = {
 
 // Sello vigente. El del JS subio a v3 porque el contraste de "+ Agregar tema"
 // lo piso el navegador, no una revision.
-const SELLO_JS = 'COPASST-20261014-v3-dark890';
+// El del JS subio a v4 en la ronda 📦1104 (los desplegables de fecha y hora del
+// generador de actas): el archivo cambio y el sello tiene que viajar con el.
+const SELLO_JS = 'COPASST-20261126-v4-actas-pickers';
 const SELLO_HTML = 'COPASST-20261014-v2-dark890';
 const SELLO_VIEJO = 'COPASST-20260915-v1-premium';
 
@@ -444,7 +446,7 @@ const MUTACIONES = [
   ['D2 copasst-home.css se normaliza a CRLF (EOL roto)',
    () => ({ ...original, homeCss: original.homeCss.replace(/(?<!\r)\n/g, '\r\n') })],
   ['E1 se cuela un caracter prohibido en el CSS',
-   () => ({ ...original, homeCss: original.homeCss.replace('.copasst-portal {', '.copasst-portal { /* 中文 */') })],
+   () => ({ ...original, homeCss: original.homeCss.replace('.copasst-portal {', '.copasst-portal { /* \u4e2d\u6587 */') })],
   ['F1 la vista del repositorio deja de cargar el modulo de tema',
    () => ({
      ...original,
