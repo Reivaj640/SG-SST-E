@@ -10542,3 +10542,24 @@ politica de la sesion dejo bloqueadas. **Sin push**: `origin/Dev` no se mueve ha
 **Batería.** 52/52 (nuevo) · 209/209 (bridge de Gestión Humana). Barrido amplio de los 73 tests: **69 verdes**; los 4 rojos son los **preexistentes** (3 checks del link de Google Fonts y `tools/lab/test-evaluacion-inicial-v2.js`). Barrido de caracteres no latinos y de fin de línea: **0 problemas**.
 
 **El estado.** Esta ronda se cierra **commiteada y pusheada** en `Dev-Port` como el **📦1110** (`cd8bd38e`), encima del `47cb95c4` (📦1109): 12 archivos, 2068 inserciones y 8 borradores. No se bumpeó la versión (§5.2) ni se hizo release. **Queda pendiente** la plantilla real del contrato (`contrato-base-2026.pdf`): con ella se ajusta el mapa de etiquetas del tipo `contrato` en `main/gh-plantilla-campos.js`, sin tocar código.
+
+**Actualización 2026-11-27 (tarde, antes de cerrar) — LO QUE HAY EN LAS PLANTILLAS REALES DE LA APP, Y QUÉ FALTA PARA EL LUNES**
+
+**El owner entrega la plantilla del contrato el lunes 30-nov-2026.** No bloquea nada: la ronda ya está commiteada y pusheada (📦1110 y 📦1111) y el mapa de etiquetas del tipo `contrato` está **provisional** a propósito.
+
+**Lo que se hizo mientras tanto: la herramienta que resuelve el mapa en un comando.** `%TEMP%\ka-probar-plantilla.js`: se le pasa la ruta del PDF y el tipo, y devuelve (1) las líneas del PDF que **parecen etiqueta de campo** (cortas y con ":"); (2) por cada campo del mapa, qué etiqueta encontró y en qué línea; (3) qué campos **no** tienen etiqueta (los que hay que agregar). Con el PDF del lunes, el ajuste es leer esa salida y pegar las etiquetas que falten en `main/gh-plantilla-campos.js`.
+
+**Lo que se encontró en la carpeta real de plantillas** (`%APPDATA%\sgsst-electron-app\gh-templates`): hay **6 PDF en disco, pero solo 1 está registrado en la base** (`gh_templates`): `autorizacion_datos`, que en realidad es una **cotización** ("COTIZACION TEMPOSUM TALENTO & SUMINISTRO EST S.A.S.pdf"). Los otros 5 son archivos huérfanos, y no todos son plantillas de la empresa:
+
+| PDF | Qué es realmente | ¿Sirve para el editor? |
+|---|---|---|
+| `Tempoactiva/tp-mt7t8dyo-w1mk.pdf` | Formulario de **actualización de datos** (NOMBRES, APELLIDOS, No. CEDULA, FECHA DE NACIMIENTO, NIVEL EDUCATIVO, CIUDAD/MUNICIPIO, EMPRESA CONTRATANTE, EMPRESA USUARIA, CARGO, FECHA DE INGRESO) | Sí: el mapa de `actualizacion_datos` acierta en 6 de 8 campos |
+| `Tempoactiva/tp-mtnlgppr-z700.pdf` | **Certificación apertura de cuenta de nómina** (Nombre de la empresa, Nombre del Empleado, Tipo y Número de Identificación, Fecha de Ingreso a la Empresa, Sueldo Básico, Tipo de contrato, Cargo) | Sí: el mapa de `contrato` acierta 5 de 9; **faltan "TIPO Y NUMERO DE IDENTIFICACION" (cédula) y "SUELDO BASICO" (salario)** |
+| `Aseplus/tp-mw24ipri-542d.pdf` | La cotización registrada (sin campos del trabajador) | No aplica |
+| `Temposum/tp-mtp1u0o0-zy4w.pdf` | PDF **escaneado**: 638 KB y **0 líneas de texto** | **No**: sin capa de texto no hay dónde ubicar las etiquetas (haría falta OCR, fuera de alcance) |
+| `Tempoactiva/tp-mtk4cw11-ueye.pdf` | PDF escaneado de 2 páginas | No |
+| `Tempoactiva/tp-mtkb2dh2-yk6g.pdf` | Una guía de 11 páginas sobre IA (no es de la empresa) | No |
+
+**Las tres etiquetas que el mapa de `contrato` necesita y ya están confirmadas** con un formulario real de la empresa: `TIPO Y NUMERO DE IDENTIFICACION` (cédula), `SUELDO BASICO` (salario) y `NOMBRE DEL EMPLEADO` / `NOMBRE COMPLETO EMPLEADO` (nombre). Quedan pendientes de agregar **hasta que llegue la plantilla del lunes**, porque el mapa es por tipo y esa plantilla puede traer otras.
+
+**El límite que conviene saber ya.** Esta técnica **superpone** el valor sobre la etiqueta: necesita que la plantilla tenga **capa de texto**. En un PDF escaneado (una foto del formulario) no hay dónde poner el valor: el motor no inventa nada y reporta que la etiqueta no aparece. No se rompió nada: es el comportamiento correcto de "lo que no se aplica, se dice".
