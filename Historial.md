@@ -10541,4 +10541,4 @@ politica de la sesion dejo bloqueadas. **Sin push**: `origin/Dev` no se mueve ha
 
 **Batería.** 52/52 (nuevo) · 209/209 (bridge de Gestión Humana). Barrido amplio de los 73 tests: **69 verdes**; los 4 rojos son los **preexistentes** (3 checks del link de Google Fonts y `tools/lab/test-evaluacion-inicial-v2.js`). Barrido de caracteres no latinos y de fin de línea: **0 problemas**.
 
-**El estado.** Los cambios de esta ronda quedan **sin commitear** en `Dev-Port`, encima del `47cb95c4` (📦1109), que ya está commiteado **y pusheado**. No se bumpeó la versión (§5.2) ni se hizo release. **Falta la palabra del owner para commitear y pushear.**
+**El estado.** Esta ronda se cierra **commiteada y pusheada** en `Dev-Port` como el **📦1110** (`cd8bd38e`), encima del `47cb95c4` (📦1109): 12 archivos, 2068 inserciones y 8 borradores. No se bumpeó la versión (§5.2) ni se hizo release. **Queda pendiente** la plantilla real del contrato (`contrato-base-2026.pdf`): con ella se ajusta el mapa de etiquetas del tipo `contrato` en `main/gh-plantilla-campos.js`, sin tocar código.
