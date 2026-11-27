@@ -32,6 +32,45 @@ const SIDEBAR_BUTTONS = [
   { name: "Salir",                            icon: "log_out",        subtitle: "Cerrar sesión",           }
 ];
 
+// 📦1109 — Sidebar de dos niveles. Al entrar el menú muestra SOLO las dos
+// secciones; al elegir una, desaparecen y quedan únicamente sus módulos
+// (tipo menú de ajustes del celular: un nivel a la vez, sin acordeón).
+// El título superior pasa a ser el nombre de la sección con una flecha que
+// vuelve a las dos.
+const SIDEBAR_SECCIONES = [
+  {
+    id: "sst",
+    label: "Seguridad y Salud en el Trabajo",
+    subtitle: "Recursos, Salud, Riesgos",
+    icon: "shield_check",
+    modulos: [
+      "Recursos",
+      "Gestión Integral",
+      "Gestión de la Salud",
+      "Gestión de Peligros y Riesgos",
+      "Gestión de Amenazas",
+      "Verificación",
+      "Mejoramiento"
+    ]
+  },
+  {
+    id: "gh",
+    label: "Gestión Humana",
+    subtitle: "Personal, Contratación",
+    icon: "user_plus",
+    modulos: ["Gestión Humana"]
+  }
+];
+
+// En qué nivel está el menú: null = raíz (las dos secciones). Vive acá y no
+// dentro de createSidebarButtons porque tiene que sobrevivir a los rearmados
+// (cambio de empresa, volver al home). Se limpia al entrar a la app, al
+// elegir empresa y al cerrar sesión.
+let _sidebarSeccion = null;
+// Último filtro de módulos activos con el que se armó el menú, para poder
+// rearmarlo (volver con la flecha) sin perder el filtro de la empresa.
+let _sidebarFiltro = null;
+
 // Submódulos para cada sección principal
 // Este objeto estructura el contenido que aparece en InternalPage
 const ALL_SUBMODULES = {
@@ -4122,7 +4161,9 @@ async function initializeAuthFlow() {
 function initializeApp(overrideCompanies = null) {
   console.log('Initializing app...');
   setAuthUIState(true);
-  // Crear los botones del menú lateral
+  // Crear los botones del menú lateral (al arrancar siempre en la raíz: las
+  // dos secciones, 📦1109)
+  _sidebarSeccion = null;
   createSidebarButtons();
   // Mostrar la página de inicio por defecto
   showHomePage(overrideCompanies);
@@ -4139,35 +4180,91 @@ function createSidebarButtons(activeModules = null) {
     window.activeSidebarButton = null;
   }
 
+  _sidebarFiltro = activeModules;
+
   // Limpiar el menú existente
   sidebarMenu.innerHTML = '';
-
-  // Header de sección "MÓDULOS DEL SISTEMA" (solo cuando hay módulos, no en home)
-  const headerLi = document.createElement('li');
-  headerLi.className = 'kair-nav-section-header-li';
-  headerLi.innerHTML = '<div class="kair-nav-section-header">Módulos del Sistema</div>';
-  sidebarMenu.appendChild(headerLi);
 
   // Separar "Salir" del resto — se renderiza como footer al final
   const modules = SIDEBAR_BUTTONS.filter(b => b.name !== 'Salir');
   const salir = SIDEBAR_BUTTONS.find(b => b.name === 'Salir');
+  const visible = (item) => !activeModules || activeModules.includes(item.name);
 
-  modules.forEach((item) => {
-    // FILTRADO DINÁMICO:
-    // Si activeModules está definido (no es null), filtramos.
+  // Nivel actual del menú: la sección pedida, o la raíz si no existe o si el
+  // filtro de la empresa dejó todos sus módulos afuera (una sección vacía no
+  // se muestra: mejor volver a las dos).
+  let seccion = SIDEBAR_SECCIONES.find(s => s.id === _sidebarSeccion) || null;
+  if (seccion && !seccion.modulos.some(nombre => {
+    const item = modules.find(m => m.name === nombre);
+    return item && visible(item);
+  })) {
+    seccion = null;
+  }
+  // El estado y la vista quedan sincronizados: si no hay nada que mostrar de
+  // esa sección, el menú se queda en la raíz y NO vuelve a ella solo cuando
+  // alguien rearme (si no, al ampliar el filtro reaparecería sin avisar).
+  if (!seccion) _sidebarSeccion = null;
+
+  // Header: en la raíz, el título general. Dentro de una sección, el nombre
+  // de esa sección con la flecha que vuelve a las dos secciones.
+  const headerLi = document.createElement('li');
+  headerLi.className = 'kair-nav-section-header-li';
+  if (seccion) {
+    const caja = document.createElement('div');
+    caja.className = 'kair-nav-section-header kair-nav-section-header--back';
+
+    const volver = document.createElement('button');
+    volver.className = 'kair-nav-back';
+    volver.setAttribute('type', 'button');
+    volver.setAttribute('aria-label', 'Volver a las secciones');
+    volver.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg>';
+    volver.addEventListener('click', () => {
+      _sidebarSeccion = null;
+      createSidebarButtons(_sidebarFiltro);
+    });
+
+    const texto = document.createElement('span');
+    texto.className = 'kair-nav-section-header__text';
+    texto.textContent = seccion.label;
+
+    caja.appendChild(volver);
+    caja.appendChild(texto);
+    headerLi.appendChild(caja);
+  } else {
+    headerLi.innerHTML = '<div class="kair-nav-section-header">Módulos del Sistema</div>';
+  }
+  sidebarMenu.appendChild(headerLi);
+
+  // Qué se pinta: en la raíz, las dos secciones; dentro de una sección, solo
+  // sus módulos. `esSeccion` decide qué atributo y qué clic lleva la tarjeta.
+  let aRenderizar;
+  if (seccion) {
+    aRenderizar = seccion.modulos
+      .map(nombre => modules.find(m => m.name === nombre))
+      .filter(item => item && visible(item));
+  } else {
+    // FILTRADO DINÁMICO: una sección sin ningún módulo visible no se muestra.
     // El botón "Salir" SIEMPRE se muestra.
-    if (activeModules && !activeModules.includes(item.name)) {
-      return; // No crear este botón
-    }
+    aRenderizar = SIDEBAR_SECCIONES.filter(sec => sec.modulos.some(nombre => {
+      const item = modules.find(m => m.name === nombre);
+      return item && visible(item);
+    }));
+  }
+
+  aRenderizar.forEach((item) => {
+    const esSeccion = !seccion;
+    const etiqueta = esSeccion ? item.label : item.name;
 
     const li = document.createElement('li');
     li.className = 'kair-nav-card-li';
 
     const card = document.createElement('button');
-    card.className = 'kair-nav-card';
+    // Las tarjetas de SECCIÓN llevan un nombre largo ("Seguridad y Salud en el
+    // Trabajo"): la hoja las deja en dos líneas en vez de cortarlas.
+    card.className = esSeccion ? 'kair-nav-card kair-nav-card--section' : 'kair-nav-card';
     card.setAttribute('type', 'button');
-    card.setAttribute('data-module', item.name);
-    card.setAttribute('aria-label', item.name);
+    card.setAttribute(esSeccion ? 'data-seccion' : 'data-module', esSeccion ? item.id : item.name);
+    card.setAttribute('aria-label', etiqueta);
 
     // 📦738 — Sidebar premium: caja de fondo suave + color del icono coherente
     // con el design system (kair-blue / kair-faint). El SVG hereda currentColor.
@@ -4181,7 +4278,7 @@ function createSidebarButtons(activeModules = null) {
 
     const titleEl = document.createElement('span');
     titleEl.className = 'kair-nav-card__title';
-    titleEl.textContent = item.name;
+    titleEl.textContent = etiqueta;
 
     const subtitleEl = document.createElement('span');
     subtitleEl.className = 'kair-nav-card__subtitle';
@@ -4194,6 +4291,12 @@ function createSidebarButtons(activeModules = null) {
     card.appendChild(textWrap);
 
     card.addEventListener('click', () => {
+      // 📦1109 · Tarjeta de sección: no navega, cambia de nivel en el menú.
+      if (esSeccion) {
+        _sidebarSeccion = item.id;
+        createSidebarButtons(_sidebarFiltro);
+        return;
+      }
       if (currentCompany) {
         // 📦843 · Antes: si había un submódulo activo, el clic en otro
         // módulo se descartaba en silencio (solo un console.log). El
@@ -4557,6 +4660,8 @@ if (mainContainerSel) mainContainerSel.classList.remove('vanta-fullscreen');
     console.log(`Módulos filtrados para la empresa ${companyName} (escenario: ${escenario}):`, RESOURCES_SUBMODULES);
 
     // --- ACTUALIZACIÓN DINÁMICA DEL SIDEBAR ---
+    // Nueva empresa, menú nuevo: se vuelve a la raíz (las dos secciones)
+    _sidebarSeccion = null;
     // Extraer los nombres de los módulos que tienen contenido (submódulos activos)
     const activeModuleNames = Object.keys(RESOURCES_SUBMODULES);
     // Reconstruir el sidebar mostrando solo los módulos activos
@@ -4706,7 +4811,9 @@ if (mainContainerLogout) mainContainerLogout.classList.add('vanta-fullscreen');
     window.applyBandejaIntegradaVisibility(false);
   }
 
-  // Restaurar el sidebar completo (mostrar todos los botones)
+  // Restaurar el sidebar completo (mostrar todos los botones). El menú vuelve
+  // a la raíz: tras cerrar sesión no debe quedar abierta una sección (📦1109)
+  _sidebarSeccion = null;
   createSidebarButtons(null);
 
   // Desactivar botón de sidebar

@@ -179,6 +179,60 @@
     margin-top: 16px;
 }
 
+/* ── 📦1109 — Navegación de dos niveles: título con flecha de vuelta ── */
+/* La tarjeta de sección lleva un nombre largo ("Seguridad y Salud en el
+   Trabajo"): no se recorta con puntos suspensivos, baja a dos líneas. Los
+   títulos de módulo siguen en una línea con elipsis, como siempre. */
+.kair-nav-card--section .kair-nav-card__title {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+    line-height: 1.3;
+}
+
+/* En la raíz el título es "Módulos del Sistema". Al entrar a una sección
+   el título pasa a ser el nombre de esa sección y aparece una flecha que
+   vuelve a las dos secciones iniciales. */
+.kair-nav-section-header--back {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.kair-nav-section-header__text {
+    flex: 1;
+    min-width: 0;
+}
+
+.kair-nav-back {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    flex-shrink: 0;
+    padding: 0;
+    background-color: transparent;
+    border: none;
+    border-radius: var(--kair-radius-control);
+    color: var(--kair-muted);
+    cursor: pointer;
+    transition: color var(--kair-transition),
+                background-color var(--kair-transition);
+}
+
+.kair-nav-back:hover {
+    color: var(--kair-blue);
+    background-color: var(--kair-soft);
+}
+
+.kair-nav-back svg {
+    width: 14px;
+    height: 14px;
+    stroke-width: 2;
+    display: block;
+}
+
 /* ============================================================
  * 📦884 — Tema oscuro del menú (Sistema y Oscuro)
  * ============================================================

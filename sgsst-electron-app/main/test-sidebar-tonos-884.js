@@ -368,7 +368,10 @@ const MUT = [
   ['se apaca el subtítulo activo por debajo de AA',
     f => { f.sidebar = f.sidebar.replace('[data-theme^="dark"] .kair-nav-card--active .kair-nav-card__title {', '[data-theme^="dark"] .kair-nav-card--active .kair-nav-card__subtitle { opacity: 0.75; }\n[data-theme^="dark"] .kair-nav-card--active .kair-nav-card__title {'); }],
   ['se pierde el cache-bust del sidebar',
-    f => { f.idx = f.idx.replace('?v=SIDEBAR-20261014-dark-tokens884', '?v=SIDEBAR-20260913-v4-footer-soft'); }],
+    // Regex y no literal: el token se bumpea en CADA paquete que toca el CSS,
+    // y con un literal anclado al valor viejo la mutación quedaba vacía en el
+    // primer bump posterior (📦1109 lo descubrió: "FAIL MUTANTE VACIO").
+    f => { f.idx = f.idx.replace(/shared\/kair-sidebar\.css\?v=[^"]+/, 'shared/kair-sidebar.css?v=SIDEBAR-20260913-v4-footer-soft'); }],
   ['se pierde el cache-bust de styles.css',
     f => { f.idx = f.idx.replace(/styles\.css\?v=[^"]+/, 'styles.css?v=20261013-consent882'); }],
   ['el tema claro pierde el azul de marca',

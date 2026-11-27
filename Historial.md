@@ -10486,3 +10486,33 @@ politica de la sesion dejo bloqueadas. **Sin push**: `origin/Dev` no se mueve ha
 **Batería.** 170/170 (nuevo) · 87/87 (premium-v2) · 70/70 (modal-1093). Barrido amplio de los 72 tests: **68 verdes**; los 4 rojos son los **preexistentes** de las rondas anteriores (3 checks del link de Google Fonts y `tools/lab/test-evaluacion-inicial-v2.js`). Barrido de caracteres no latinos y de fin de línea: **0 problemas**.
 
 **El estado.** Los cambios de esta ronda quedan **sin commitear** en `Dev-Port`, encima del `40ff8cb8` (📦1107), que ya está commiteado **y pusheado** (la rama quedó sincronizada con `origin/Dev-Port`). No se bumpeó la versión (§5.2) ni se hizo release.
+
+**Actualización 2026-11-27 (mañana) — EL SIDEBAR DE DOS NIVELES: PRIMERO LAS DOS SECCIONES, DESPUÉS SUS MÓDULOS**
+
+**Lo que se pidió.** El menú lateral mostraba una lista larga y plana: los siete apartados de seguridad, luego Gestión Humana, todo seguido y sin orden por tema. El owner pidió un menú de dos pisos: al abrir la app (o al elegir empresa) se ven solo dos puertas —"Seguridad y Salud en el Trabajo" y "Gestión Humana"— y al tocar una se abren **solo** sus módulos, con una flecha para volver a las dos.
+
+**Dónde vive (leído en el código, no supuesto).** Todo el menú se arma en una función: `createSidebarButtons()`, en `sgsst-electron-app/renderer.js`. Las secciones viven en una constante **nueva**, al lado de `SIDEBAR_BUTTONS`: `SIDEBAR_SECCIONES`, con dos entradas (`sst`, con sus siete módulos, y `gh`, con el suyo). El estado del menú son **dos variables del módulo**: `_sidebarSeccion` (en qué sección estás; `null` = raíz) y `_sidebarFiltro` (los módulos que la empresa abierta tiene permitidos).
+
+**Las dos vistas.** En la **raíz**: el título "MÓDULOS DEL SISTEMA" y las dos tarjetas de sección. Dentro de una **sección**: el nombre de la sección con una flecha ← y los módulos de esa sección. "Salir" está **siempre** al final, con su separador. Nunca se ven las dos secciones a la vez.
+
+**El detalle que hace que funcione: el filtro de la empresa se acuerda.** `_sidebarFiltro` guarda la lista de módulos que la empresa abierta tiene permitidos y se vuelve a usar en **cada** reconstrucción del menú. Por eso la flecha y el clic de la tarjeta de sección no pierden el filtro: el menú se rearma con `createSidebarButtons(_sidebarFiltro)`, no con `createSidebarButtons()` a secas. Si se rearmara sin filtro, al volver de una sección aparecerían módulos que la empresa no tiene.
+
+**Los seis caminos que rearman el menú, verificados uno por uno.** `initializeApp()` (al abrir la app: raíz), el clic de la tarjeta de sección (entra), la flecha (vuelve a la raíz), el cambio de empresa (raíz, con el filtro nuevo), el respaldo por error del cambio de empresa (raíz) y el cierre de sesión (raíz). `showHomePage()` **no** rearma el menú: por eso **Home no reinicia el sidebar** y seguís viendo los módulos de la sección en la que estabas.
+
+**La regla: una sección sin módulos no puede quedar muda.** Si el filtro de la empresa dejó a una sección sin **ningún** módulo visible, esa sección **no se pinta** y el menú vuelve a la raíz, en vez de mostrar un encabezado con flecha y nada debajo. Y como el estado y la vista quedan sincronizados, no reaparece sola más tarde.
+
+**La hoja.** `shared/kair-sidebar.css` (LF puro) gana tres reglas: la tarjeta de sección deja el título **en dos líneas** sin puntos suspensivos (el nombre "Seguridad y Salud en el Trabajo" es largo), el encabezado con flecha y el botón de vuelta. **Sin colores nuevos**: solo tokens que ya existen (`--kair-radius-control`, `--kair-muted`, `--kair-blue`, `--kair-soft`, `--kair-transition`).
+
+**El detalle chico: los iconos NO están en `renderer.js`.** `SIDEBAR_ICONS` vive en `shared/sidebar-icons.js` (que se expone en `window` para los homes); el SVG de la flecha sí va inline en `renderer.js`. Quien arme una maqueta tiene que leer los iconos de su archivo, no del renderer.
+
+**La trampa que se encontró de paso, en el test de otro paquete.** `test-sidebar-tonos-884.js` tenía una mutación anclada al **token viejo literal** (`?v=SIDEBAR-20261014-dark-tokens884`): al bumpear el sello del CSS, la mutación **dejó de morder** (buscaba un texto que ya no estaba) y el test daba verde sin comprobar nada. Se arregló con una **regex** (`?v=[^"]+`), que sigue mordiendo en cada bumpeo. Queda como trampa **nº 213**.
+
+**La prueba.** `main/test-sidebar-secciones.js`: **33/33**. No mira el texto: **recorta la función real** (`SIDEBAR_BUTTONS`, `SIDEBAR_SECCIONES`, `SIDEBAR_ICONS` y `createSidebarButtons`) del archivo vivo y **la ejecuta en un `vm` con un DOM mínimo**, y juzga lo que el menú de verdad pinta. Cubre: la raíz con exactamente dos secciones y sus títulos, que la raíz no liste ningún módulo, que "Salir" sea el último renglón, entrar a SST y ver sus siete módulos en su orden sin mezclas, que GH no se cuele dentro de SST, la flecha y su regreso, el clic de módulo que sigue navegando igual (contrato 📦843), el filtro por empresa, la sección vacía que vuelve a la raíz, y el EOL y los sellos. Los otros dos del sidebar siguen verdes: **14/14** (843) y **82/82** (884).
+
+**La verificación visual.** Maqueta con el **marcado que produce la función real** (se ejecuta en un `vm` con un DOM que serializa a HTML) y las **hojas reales** de la app (`styles.css`, los tokens, los componentes y `kair-sidebar.css`). Cinco paneles: raíz, SST y GH en claro, y raíz y SST en oscuro. Medido: en la raíz el título largo **baja a dos líneas** sin cortarse; dentro de la sección el título es el de la sección con la **flecha ←** a la izquierda; los siete módulos salen en su orden y "Salir" queda al final con su separador; en oscuro todo se ve igual de bien.
+
+**Lo que NO se pudo verificar, y conviene que el owner mire.** La revisión **dentro de la app real** no se hizo: manejar la app de Electron pide `electron-playwright-cli`, que **no está en el PATH** de esta máquina (ni `npx`), así que hacerlo pediría instalar paquetes. La maqueta usa el marcado y el CSS reales, pero no es la app corriendo.
+
+**Batería.** 33/33 (nuevo) · 14/14 (843) · 82/82 (884). Barrido amplio de los 72 tests: **68 verdes**; los 4 rojos son los **preexistentes** de las rondas anteriores (3 checks del link de Google Fonts y `tools/lab/test-evaluacion-inicial-v2.js`). Barrido de caracteres no latinos y de fin de línea: **0 problemas**.
+
+**El estado.** Esta ronda se cierra commiteada y pusheada en `Dev-Port` como el **📦1109**, encima del `f6603ff1` (📦1108). No se bumpeó la versión (§5.2) ni se hizo release.
