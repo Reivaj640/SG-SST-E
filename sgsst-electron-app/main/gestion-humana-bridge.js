@@ -2740,6 +2740,15 @@ function _handlerCreateDocumento(token, companyName, data) {
             fs2.copyFileSync(srcPath, destPath);
             rutaArchivo = destPath;
             nombreArchivo = tplRow.nombre_archivo;
+            // 📦GPE · Copia PRISTINA de la plantilla. El motor que aplica
+            // los datos editados parte SIEMPRE de ella: si partiera del archivo
+            // ya renderizado, cada guardado volveria a poner los valores encima.
+            try {
+              var rutaPlantillaGPE = path2.join(docDir, id + '-plantilla' + ext);
+              fs2.copyFileSync(srcPath, rutaPlantillaGPE);
+            } catch (eGPE0) {
+              console.warn('[' + MOD + '][create-documento][plantilla-pristina]', eGPE0.message);
+            }
             console.log('[' + MOD + '] Template ' + data.templateId + ' copiado a ' + destPath);
           } else {
             console.warn('[' + MOD + '] Template ' + data.templateId + ' no encontrado o sin archivo');
@@ -2771,13 +2780,85 @@ function _handlerCreateDocumento(token, companyName, data) {
 }
 
 /**
+ * 📦GPE · Aplica los datos editados al archivo del documento.
+ *
+ * El motor (gh-render-plantilla) ubica la etiqueta en la capa de texto del PDF
+ * y escribe el valor al lado, y DESPUES vuelve a leer el PDF resultante para
+ * comprobar que el valor quedo dentro. Lo que no se pudo aplicar se reporta:
+ * un dato que no llego al documento es un dato que hay que saber.
+ *
+ * Si algo falla, la EDICION ya quedo guardada igual: el error se devuelve en
+ * `render` y el guardado no se pierde.
+ */
+async function _aplicarDatosAlDocumento(localDb, documentoId, contenido) {
+  var render = require('./gh-render-plantilla');
+  var fs3 = registerGestionHumanaHandlers._fs;
+  var path3 = registerGestionHumanaHandlers._path;
+  var vacio = { ok: false, aplicados: [], faltantes: [], sinVerificar: [], mensaje: '' };
+  if (!fs3 || !path3) { vacio.mensaje = 'fs/path no disponibles'; return vacio; }
+
+  var row = localDb.prepare(
+    'SELECT id, empresa_id, tipo, ruta_archivo, nombre_archivo FROM gh_documentos WHERE id = ?'
+  ).get(documentoId);
+  if (!row) { vacio.mensaje = 'Documento no encontrado'; return vacio; }
+  if (!row.ruta_archivo || !fs3.existsSync(row.ruta_archivo)) {
+    vacio.mensaje = 'El documento no tiene archivo generado';
+    return vacio;
+  }
+
+  var datos;
+  try { datos = JSON.parse(contenido); } catch (e) {
+    vacio.mensaje = 'El contenido del documento no es JSON valido';
+    return vacio;
+  }
+  var de = datos.datosEditados;
+  if (!de || (!de.valores && !de.reemplazos)) {
+    return { ok: true, aplicados: [], faltantes: [], sinVerificar: [], mensaje: 'No hay datos editados que aplicar.' };
+  }
+
+  // La base es la plantilla ORIGINAL: la copia pristine del documento, o, si
+  // el documento es anterior a esta version, la plantilla de la que salio.
+  var dir3 = path3.dirname(row.ruta_archivo);
+  var ext3 = path3.extname(row.ruta_archivo) || '.pdf';
+  var base3 = path3.join(dir3, row.id + '-plantilla' + ext3);
+  if (!fs3.existsSync(base3)) {
+    var tpls = localDb.prepare(
+      'SELECT ruta_archivo, nombre_archivo FROM gh_templates WHERE empresa_id = ? AND tipo_documento = ? AND activo = 1'
+    ).all(row.empresa_id, row.tipo);
+    var baseNombre = path3.basename(row.ruta_archivo);
+    for (var ti = 0; ti < tpls.length; ti++) {
+      var nombreTpl = tpls[ti].nombre_archivo || path3.basename(tpls[ti].ruta_archivo || '');
+      if (nombreTpl && (nombreTpl === baseNombre || tpls[ti].ruta_archivo === base3)) {
+        if (tpls[ti].ruta_archivo && fs3.existsSync(tpls[ti].ruta_archivo)) {
+          base3 = tpls[ti].ruta_archivo;
+          break;
+        }
+      }
+    }
+  }
+  if (!fs3.existsSync(base3)) {
+    vacio.mensaje = 'No se encontro la plantilla original del documento';
+    return vacio;
+  }
+
+  var res = await render.aplicarDatos({
+    bytesPlantilla: fs3.readFileSync(base3),
+    tipoDocumento: row.tipo,
+    datosEditados: de
+  });
+  if (!res.ok) return res;
+  fs3.writeFileSync(row.ruta_archivo, res.bytes);
+  return res;
+}
+
+/**
  * gh:update-documento
  * Whitelist: titulo, contenido, estado, fechaFirma, version.
  * NO permite cambiar tipo ni trabajador_id.
  * (firmaId eliminado en LEGACY-SIGN-REMOVE — el estado 'firmado' lo setea
  *  firma-service vía I-105 al recibir SIGN_COMMITTED.)
  */
-function _handlerUpdateDocumento(token, documentoId, updates) {
+async function _handlerUpdateDocumento(token, documentoId, updates) {
   var auth = _checkAuth(token);
   if (!auth.ok) return _err(auth.error.code, auth.error.message);
 
@@ -2833,7 +2914,19 @@ function _handlerUpdateDocumento(token, documentoId, updates) {
 
     var stmtU = localDb.prepare('UPDATE gh_documentos SET ' + sqlParts.join(', ') + ' WHERE id = ?');
     stmtU.run.apply(stmtU, values);
-    return _ok({ documentoId: documentoId });
+
+    // 📦GPE · Aplicar los datos editados al archivo del documento. La
+    // edicion YA quedo guardada: si el render falla, se reporta y no se pierde.
+    var renderGPE = null;
+    if (updates.contenido && typeof updates.contenido === 'string') {
+      try {
+        renderGPE = await _aplicarDatosAlDocumento(localDb, documentoId, updates.contenido);
+      } catch (eGPE) {
+        console.error('[' + MOD + '][update-documento][render]', eGPE.message);
+        renderGPE = { ok: false, aplicados: [], faltantes: [], sinVerificar: [], mensaje: 'No se pudieron aplicar los datos al archivo: ' + eGPE.message };
+      }
+    }
+    return _ok({ documentoId: documentoId, render: renderGPE });
   } catch (e) {
     console.error('[' + MOD + '][update-documento]', e.message);
     return _err('INTERNAL', e.message);
@@ -4813,10 +4906,10 @@ function registerGestionHumanaHandlers(app, deps) {
       return _err('INTERNAL', e.message);
     }
   });
-  ipcMainHandle('gh:update-documento', function (event, payload) {
+  ipcMainHandle('gh:update-documento', async function (event, payload) {
     try {
       var p = payload || {};
-      return _handlerUpdateDocumento(p.token || '', p.documentoId, p.updates);
+      return await _handlerUpdateDocumento(p.token || '', p.documentoId, p.updates);
     } catch (e) {
       console.error('[' + MOD + '][update-documento]', e.message);
       return _err('INTERNAL', e.message);

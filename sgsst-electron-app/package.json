@@ -60,6 +60,7 @@
     "asar": true,
     "asarUnpack": [
       "**/node_modules/better-sqlite3/**",
+      "**/node_modules/pdfjs-dist/**",
       "**/node_modules/@napi-rs/canvas*/**",
       "**/node_modules/bcryptjs/**",
       "**/utils/**",

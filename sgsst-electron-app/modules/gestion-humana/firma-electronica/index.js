@@ -654,6 +654,9 @@
           self._openGenerarModal();
         } else if (action === 'firmar-electronico') {
           self._firmarElectronico(docId);
+        } else if (action === 'editar-datos') {
+          // 📦GPE · Editor de datos del documento (puntos clave, reemplazos, exportar, firma)
+          self._abrirEditorDatos(docId);
         } else if (action === 'descargar-documento') {
           self._descargarDocumento(docId);
         } else if (action === 'anular-documento') {
@@ -696,6 +699,9 @@
     // Escape para cerrar modales
     self._escKeyHandler = function (ev) {
       if (ev.key === 'Escape') {
+        // 📦GPE · Si el editor de datos (gpe-) está abierto, él maneja su propio
+        // Escape (es la capa superior sobre el expediente): no cerrar ambos.
+        if (document.querySelector('.gpe-modal')) return;
         // Close sub-modals first, then main modal
         var subModals = ['fe-firma-success-modal', 'fe-firma-modal', 'fe-gen-modal', 'fe-tpl-upload-modal', 'fe-tpl-admin-modal'];
         for (var i = 0; i < subModals.length; i++) {
@@ -1460,6 +1466,11 @@
         actions.push('<button class="fe-doc-action" data-action="descargar-constancia-doc" data-sr-id="' + _esc(d.idSolicitudFirma) + '" type="button"><i class="fas fa-file-signature"></i> Constancia</button>');
       } else if (d.rutaArchivo) {
         actions.push('<button class="fe-doc-action" data-action="descargar-documento" data-doc-id="' + _esc(d.id) + '" type="button"><i class="fas fa-download"></i> Descargar</button>');
+      }
+      // 📦GPE · Editar datos antes de firmar: el eslabón entre generar y
+      // enviar a firma. Abre el editor de puntos clave (plantillas-editar).
+      if (d.estado === 'pendiente' && d.rutaArchivo) {
+        actions.push('<button class="fe-doc-action" data-action="editar-datos" data-doc-id="' + _esc(d.id) + '" type="button"><i class="fas fa-pen-ruler"></i> Editar datos</button>');
       }
       if (d.estado === 'pendiente' && d.rutaArchivo) {
         actions.push('<button class="fe-doc-action fe-doc-action--primary" data-action="firmar-electronico" data-doc-id="' + _esc(d.id) + '" type="button"><i class="fas fa-file-signature"></i> Firmar electrónicamente</button>');
@@ -2471,6 +2482,19 @@
         self._toast.success('Documento generado. Pendiente de firma electrónica.');
         await self._reloadData();
         self._renderTabla();
+        // 📦GPE · Tras generar, abrir el editor de datos: revisión y ajuste de
+        // los puntos clave antes de exportar o enviar a firma.
+        var nuevoDocGPE = (r && r.data && r.data.documento && r.data.documento.id) || null;
+        if (!nuevoDocGPE) {
+          // Fallback: el pendiente más nuevo de ese tipo para el trabajador.
+          var candGPE = (self._documentos || []).filter(function (d) {
+            return d.trabajadorId === trabajadorId && d.tipo === tipo && d.estado === 'pendiente';
+          }).sort(function (a, b) {
+            return new Date(b.createdAt || b.fechaCreacion || 0) - new Date(a.createdAt || a.fechaCreacion || 0);
+          });
+          if (candGPE.length) nuevoDocGPE = candGPE[0].id;
+        }
+        if (nuevoDocGPE) { self._abrirEditorDatos(nuevoDocGPE); }
         // Refrescar el modal del expediente con el proceso FRESCO (post-reload).
         // FIX: antes se pasaba _lastExpedienteProceso (objeto viejo, sin el doc
         // nuevo) — por eso el documento recién generado no aparecía hasta
@@ -2489,6 +2513,124 @@
       self._toast.error('Error generando documento', e.message);
     } finally {
       if (confirmBtn) { confirmBtn.disabled = false; confirmBtn.innerHTML = '<i class="fas fa-plus"></i> Generar'; }
+    }
+  };
+
+  // ═══════════════════════════════════════════════════════════
+  // 📦GPE · EDITAR DATOS DEL DOCUMENTO (antes de exportar o firmar)
+  // ═══════════════════════════════════════════════════════════
+
+  // Lazy-load del módulo plantillas-editar (CSS + JS) una sola vez.
+  FirmaElectronicaComponent.prototype._ensureEditorAssets = function () {
+    return new Promise(function (resolve) {
+      if (window.GPEditor) { resolve(window.GPEditor); return; }
+      if (!document.getElementById('gpe-css')) {
+        var link = document.createElement('link');
+        link.id = 'gpe-css';
+        link.rel = 'stylesheet';
+        link.href = 'modules/gestion-humana/plantillas-editar/index.css';
+        document.head.appendChild(link);
+      }
+      var prev = document.getElementById('gpe-js');
+      if (prev) {
+        // Carga en curso de una apertura anterior: esperar su load.
+        prev.addEventListener('load', function () { resolve(window.GPEditor || null); });
+        prev.addEventListener('error', function () { resolve(null); });
+        if (window.GPEditor) resolve(window.GPEditor);
+        return;
+      }
+      var script = document.createElement('script');
+      script.id = 'gpe-js';
+      script.src = 'modules/gestion-humana/plantillas-editar/index.js';
+      script.onload = function () { resolve(window.GPEditor || null); };
+      script.onerror = function () { resolve(null); };
+      document.head.appendChild(script);
+    });
+  };
+
+  // Abrir el editor de datos para un documento pendiente.
+  FirmaElectronicaComponent.prototype._abrirEditorDatos = async function (docId) {
+    var self = this;
+    if (!docId || !window.electronAPI) return;
+    try {
+      var r = await window.electronAPI.ghGetDocumento({ documentoId: docId });
+      if (!r || !r.success || !r.data || !r.data.documento) {
+        self._toast.error('No se pudo obtener el documento');
+        return;
+      }
+      var doc = r.data.documento;
+      if (doc.estado && doc.estado !== 'pendiente') {
+        self._toast.warning('Solo se editan documentos pendientes', 'El documento está en estado "' + doc.estado + '".');
+        return;
+      }
+
+      // Trabajador: del expediente abierto o del listado de procesos.
+      var trab = null;
+      if (self._lastExpedienteProceso && self._lastExpedienteProceso.trabajador &&
+          String(self._lastExpedienteProceso.trabajador.id) === String(doc.trabajadorId)) {
+        trab = self._lastExpedienteProceso.trabajador;
+      } else if (self._procesosPorTrabajador) {
+        var pGPE = self._procesosPorTrabajador.find(function (x) {
+          return String(x.trabajadorId) === String(doc.trabajadorId);
+        });
+        if (pGPE && pGPE.trabajador) trab = pGPE.trabajador;
+      }
+
+      // Contratación activa: cargo/salario/ingreso/sede frescos del pipeline.
+      var ct = null;
+      try {
+        var rc = await window.electronAPI.ghListContrataciones({ companyName: self.companyName });
+        if (rc && rc.success && rc.data && rc.data.contrataciones) {
+          ct = rc.data.contrataciones.find(function (x) {
+            if (x.estado !== 'en_proceso') return false;
+            if (doc.trabajadorId && x.trabajadorId && String(x.trabajadorId) === String(doc.trabajadorId)) return true;
+            return !!(trab && x.cedula && trab.cedula && String(x.cedula) === String(trab.cedula));
+          }) || null;
+        }
+      } catch (e) { /* sin contratación activa: se usan los datos del trabajador */ }
+
+      var nombreCompletoGPE = trab ? ((trab.nombres || '') + ' ' + (trab.apellidos || '')).trim() : '';
+      var salGPE = (ct && ct.salario != null) ? ct.salario : (trab && trab.salario != null ? trab.salario : null);
+      var salTxtGPE = (salGPE == null || isNaN(Number(salGPE))) ? '' : '$' + Number(salGPE).toLocaleString('es-CO');
+      var fIngGPE = (ct && ct.fechaIngreso) ? ct.fechaIngreso : (trab && trab.fechaIngreso ? trab.fechaIngreso : null);
+      var fIngTxtGPE = '';
+      if (fIngGPE) { try { fIngTxtGPE = new Date(fIngGPE).toLocaleDateString('es-CO'); } catch (e2) { fIngTxtGPE = ''; } }
+      var tipoObjGPE = TIPOS.find(function (t) { return t.value === doc.tipo; });
+
+      var editorGPE = await self._ensureEditorAssets();
+      if (!editorGPE) {
+        self._toast.error('No se pudo cargar el editor', 'verifica modules/gestion-humana/plantillas-editar/index.js');
+        return;
+      }
+      editorGPE.open({
+        doc: doc,
+        electronAPI: window.electronAPI,
+        valoresAuto: {
+          TRABAJADOR_NOMBRE: nombreCompletoGPE,
+          TRABAJADOR_CEDULA: trab && trab.cedula ? String(trab.cedula) : '',
+          TRABAJADOR_CARGO: (ct && ct.cargo) || (trab && trab.cargo) || '',
+          TRABAJADOR_SALARIO: salTxtGPE,
+          TRABAJADOR_FECHA_INGRESO: fIngTxtGPE,
+          TRABAJADOR_SEDE: (ct && ct.sedeId) || '',
+          TRABAJADOR_EMPRESA_USUARIA: (ct && ct.empresaUsuaria) || '',
+          DOC_TIPO: tipoObjGPE ? tipoObjGPE.label : (doc.tipo || ''),
+          EMPRESA_NOMBRE: self.companyName || ''
+        },
+        onSaved: async function () {
+          await self._reloadData();
+          self._renderTabla();
+          // Refrescar el expediente abierto con el documento editado.
+          if (self._modal && !self._modal.hidden && self._lastExpedienteProceso) {
+            var freshGPE = self._procesosPorTrabajador.find(function (p) {
+              return String(p.trabajadorId) === String(self._lastExpedienteProceso.trabajadorId);
+            });
+            if (freshGPE) await self._refetchExpediente(freshGPE);
+          }
+        },
+        onEnviarFirma: function (idDocGPE) { self._firmarElectronico(idDocGPE); }
+      });
+    } catch (e) {
+      self._toast.error('Error abriendo el editor de datos', e.message);
     }
   };
 

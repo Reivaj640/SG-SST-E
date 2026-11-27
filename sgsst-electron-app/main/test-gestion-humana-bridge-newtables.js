@@ -484,7 +484,7 @@ async function run() {
   console.log('');
   console.log('[41] update-documento — caso OK');
   // doId2 todavía está pendiente
-  var d7 = registeredHandlers['gh:update-documento']({}, {
+  var d7 = await registeredHandlers['gh:update-documento']({}, {
     token: 'valid-token', documentoId: doId2, updates: { titulo: 'Inducción actualizada', version: 2 }
   });
   _assert(d7.success === true, 'update OK');
@@ -510,7 +510,7 @@ async function run() {
   // ========== TEST 44: DOCUMENTOS — update de anulado falla ==========
   console.log('');
   console.log('[44] update-documento — sobre anulado');
-  var d10 = registeredHandlers['gh:update-documento']({}, {
+  var d10 = await registeredHandlers['gh:update-documento']({}, {
     token: 'valid-token', documentoId: doId2, updates: { titulo: 'X' }
   });
   _assertEq(d10.error.code, 'ALREADY_DELETED', 'error.code = ALREADY_DELETED');
@@ -856,7 +856,7 @@ async function run() {
     data: { trabajadorId: bpId1, tipo: 'induccion', titulo: 'Indu', contenido: '{}' }
   });
   var dNewId = dNew.data.documentoId;
-  var dBad = registeredHandlers['gh:update-documento']({}, {
+  var dBad = await registeredHandlers['gh:update-documento']({}, {
     token: 'valid-token', documentoId: dNewId, updates: { estado: 'malo' }
   });
   _assertEq(dBad.error.code, 'INVALID_INPUT', 'error.code = INVALID_INPUT');
@@ -1090,7 +1090,7 @@ async function run() {
   // ========== TEST 111: DOCUMENTOS — update id inexistente ==========
   console.log('');
   console.log('[111] update-documento — id inexistente');
-  var dNoId2 = registeredHandlers['gh:update-documento']({}, {
+  var dNoId2 = await registeredHandlers['gh:update-documento']({}, {
     token: 'valid-token', documentoId: 'do-noexiste', updates: { titulo: 'x' }
   });
   _assertEq(dNoId2.error.code, 'NOT_FOUND', 'error.code = NOT_FOUND');
