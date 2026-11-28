@@ -28,6 +28,7 @@ const html = fs.readFileSync(F_HTML, 'utf8');
 const js = fs.readFileSync(F_JS, 'utf8');
 const comp = fs.readFileSync(F_COMP, 'utf8');
 const indexHtml = fs.readFileSync(F_INDEX, 'utf8');
+const fuentes = fs.readFileSync(path.join(ROOT, 'assets', 'css', 'google-fonts.css'), 'utf8');
 
 const checks = [];
 function check(name, ok, extra) { checks.push({ name: name, ok: !!ok, extra: extra }); }
@@ -135,8 +136,20 @@ check('Cache-bust: el script del viewer lleva ?v=PCP-20260918-premium',
   html.includes('perfiles-cargo-profesiograma-viewer.js?v=PCP-20260918-premium'));
 check('Cache-bust: index.html carga el componente con ?v=PCP-20260918-premium',
   /perfiles-cargo-profesiograma-component\.js\?v=PCP-20260918-premium/.test(indexHtml));
-check('Fuentes: Manrope en el link de Google Fonts',
-  html.includes('family=Manrope:wght@600;700;800'));
+check('Fuentes: Manrope se carga LOCAL (sin CDN: la app trabaja sin internet)',
+  html.includes('assets/css/google-fonts.css') &&
+  !html.includes('fonts.googleapis.com') &&
+  /font-family: 'Manrope'[^}]*font-weight: 600/.test(fuentes) &&
+  /font-family: 'Manrope'[^}]*font-weight: 700/.test(fuentes) &&
+  /font-family: 'Manrope'[^}]*font-weight: 800/.test(fuentes));
+check('Fuentes: los archivos woff2 que usa la hoja local estan en disco',
+  (function () {
+    const nombres = (fuentes.match(/url\('\.\.\/fonts\/google\/([^']+)'\)/g) || [])
+      .map(function (u) { return u.replace(/url\('\.\.\/fonts\/google\//, '').replace(/'\)/, ''); });
+    return nombres.length > 0 && nombres.every(function (n) {
+      return fs.existsSync(path.join(ROOT, 'assets', 'fonts', 'google', n));
+    });
+  })());
 check('HTML: llaves del CSS balanceadas',
   (css.match(/\{/g) || []).length === (css.match(/\}/g) || []).length);
 check('HTML: <style> y </style> presentes (el CSS vive en el HTML, iframe aislado)',

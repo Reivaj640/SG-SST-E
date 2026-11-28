@@ -30,6 +30,7 @@ const html = fs.readFileSync(F_HTML, 'utf8');
 const js = fs.readFileSync(F_JS, 'utf8');
 const logic = fs.readFileSync(F_LOGIC, 'utf8');
 const indexHtml = fs.readFileSync(F_INDEX, 'utf8');
+const fuentes = fs.readFileSync(path.join(ROOT, 'assets', 'css', 'google-fonts.css'), 'utf8');
 
 // CSS sin saltos de línea para regex de bloques
 const flat = css.replace(/\s+/g, ' ');
@@ -159,8 +160,19 @@ check('Cache-bust: el <script> del viewer lleva ?v=FURAT-20260918-premium-fix2',
   html.includes('reportes-accidentes-viewer.js?v=FURAT-20260918-premium-fix2'));
 check('Cache-bust: index.html carga logic.js con ?v=FURAT-20260930-toast-realm-fix',
   indexHtml.includes('reportes-accidentes-logic.js?v=FURAT-20260930-toast-realm-fix'));
-check('Fuentes: Manrope + DM Sans en el link de Google Fonts',
-  html.includes('family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@500;600;700;800'));
+check('Fuentes: Manrope + DM Sans se cargan LOCALES (sin CDN: la app trabaja sin internet)',
+  html.includes('assets/css/google-fonts.css') &&
+  !html.includes('fonts.googleapis.com') &&
+  /font-family: 'DM Sans'[^}]*font-weight: 400/.test(fuentes) &&
+  /font-family: 'Manrope'[^}]*font-weight: 800/.test(fuentes));
+check('Fuentes: los archivos woff2 que usa la hoja local estan en disco',
+  (function () {
+    const nombres = (fuentes.match(/url\('\.\.\/fonts\/google\/([^']+)'\)/g) || [])
+      .map(function (u) { return u.replace(/url\('\.\.\/fonts\/google\//, '').replace(/'\)/, ''); });
+    return nombres.length > 0 && nombres.every(function (n) {
+      return fs.existsSync(path.join(ROOT, 'assets', 'fonts', 'google', n));
+    });
+  })());
 check('CDN: se quitó Bootstrap Icons (no se usaba)',
   !html.includes('bootstrap-icons'));
 check('HTML: llaves del CSS balanceadas',

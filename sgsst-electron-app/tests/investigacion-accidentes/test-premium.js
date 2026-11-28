@@ -34,6 +34,7 @@ const listCss = fs.readFileSync(F_LIST_CSS, 'utf8');
 const logic = fs.readFileSync(F_LOGIC, 'utf8');
 const mainJs = fs.readFileSync(F_MAIN, 'utf8');
 const indexHtml = fs.readFileSync(F_INDEX, 'utf8');
+const fuentes = fs.readFileSync(path.join(ROOT, 'assets', 'css', 'google-fonts.css'), 'utf8');
 
 function sinComentarios(t) {
   return t.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^[ \t]*\/\/[^\n]*$/gm, '');
@@ -102,8 +103,19 @@ check('Realizar CSS: Header v2 definido (.inv-header-v2 + .inv-btn)',
 check('Realizar: la hoja y el script llevan cache-bust',
   view.includes('investigacion-accidentes-view.css?v=INV-') &&
   view.includes('investigacion-accidentes-main.js?v=INV-'));
-check('Realizar: tipografía premium en el link de Google Fonts',
-  /family=DM\+Sans[^"]*family=Manrope/.test(view));
+check('Realizar: tipografía premium se carga LOCAL (sin CDN: la app trabaja sin internet)',
+  view.includes('assets/css/google-fonts.css') &&
+  !view.includes('fonts.googleapis.com') &&
+  /font-family: 'DM Sans'[^}]*font-weight: 400/.test(fuentes) &&
+  /font-family: 'Manrope'[^}]*font-weight: 800/.test(fuentes));
+check('Fuentes: los archivos woff2 que usa la hoja local estan en disco',
+  (function () {
+    const nombres = (fuentes.match(/url\('\.\.\/fonts\/google\/([^']+)'\)/g) || [])
+      .map(function (u) { return u.replace(/url\('\.\.\/fonts\/google\//, '').replace(/'\)/, ''); });
+    return nombres.length > 0 && nombres.every(function (n) {
+      return fs.existsSync(path.join(ROOT, 'assets', 'fonts', 'google', n));
+    });
+  })());
 
 /* ══════════════ D. VISTA "VER INVESTIGACIONES" ══════════════ */
 check('Ver: Header System v2',

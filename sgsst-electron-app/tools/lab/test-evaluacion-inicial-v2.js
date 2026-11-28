@@ -21,7 +21,7 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 
-const root = path.join(__dirname, '..');
+const root = path.join(__dirname, '..', '..');
 const dir = path.join(root, 'modules', 'gestion-integral', 'evaluacion-inicial-sg-sst');
 const envoltorio = fs.readFileSync(path.join(dir, 'index.html'), 'utf8');
 const css = fs.readFileSync(path.join(dir, 'evaluacion-inicial-view.css'), 'utf8');
