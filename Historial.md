@@ -10563,3 +10563,92 @@ politica de la sesion dejo bloqueadas. **Sin push**: `origin/Dev` no se mueve ha
 **Las tres etiquetas que el mapa de `contrato` necesita y ya están confirmadas** con un formulario real de la empresa: `TIPO Y NUMERO DE IDENTIFICACION` (cédula), `SUELDO BASICO` (salario) y `NOMBRE DEL EMPLEADO` / `NOMBRE COMPLETO EMPLEADO` (nombre). Quedan pendientes de agregar **hasta que llegue la plantilla del lunes**, porque el mapa es por tipo y esa plantilla puede traer otras.
 
 **El límite que conviene saber ya.** Esta técnica **superpone** el valor sobre la etiqueta: necesita que la plantilla tenga **capa de texto**. En un PDF escaneado (una foto del formulario) no hay dónde poner el valor: el motor no inventa nada y reporta que la etiqueta no aparece. No se rompió nada: es el comportamiento correcto de "lo que no se aplica, se dice".
+
+**Actualización 2026-11-27 (noche) — PILOTO DE MEJORA VISUAL DE LAS CARDS (MÓDULO RECURSOS): EL HERO NO SE TOCA**
+
+**Lo que se pidió.** Una mejora visual general para las cards, con un diseño de referencia (tarjetas con rótulo, número grande, un badge de color, una curva de tendencia y un pie con flecha), probada primero en **Recursos**, y **solo en las cards: el hero no se toca**.
+
+**Dónde viven las cards de Recursos (leído en el código).** `modules/recursos/recursos-home.js`: el strip es `renderMainArea()` → un `<section class="kair-health">` con el hero (`.kair-hero-card`) y **3 metric cards** que salen de `renderMetricCard()`. La clase `.kair-metric-card` vive en `shared/kair-components.css` y la usan **7 módulos** (Verificación, Mejoramiento, Salud, Peligros, Integral, Amenazas y Recursos).
+
+**La decisión que define la ronda: el piloto va con SCOPE, no tocando la clase compartida.** Si se hubiera editado `.kair-metric-card` en el archivo compartido, se habrían movido las cards de los otros seis módulos y se habrían roto tres cosas que están blindadas: el **esqueleto** (que se alinea con las medidas reales de la card por variables `--ks-kpi-*`), el **patrón de la card** de 4 piezas (`main/test-presupuesto-barras-avance.js`) y el **contrato de medidas** (`main/test-skeleton-encaje.js`). Así que el piloto se metió con una clase nueva de scope, `.kair-recursos-home`, que se le pone al contenedor del home de Recursos: **las cards de los demás módulos no se mueven**, y si el owner aprueba el diseño, el siguiente paso es llevar el mismo bloque al scope de cada módulo.
+
+**La anatomía nueva de la card.** Rótulo (igual) · **valor grande + badge de color** · bajada (igual) · **curva de los últimos 12 meses** · **pie con la flecha al submódulo**. La **barra de progreso sale**: su dato (el % de cumplimiento) lo carga ahora el badge, y la curva le da la dimensión que la barra no tenía.
+
+**El badge dice lo que FALTA, no lo que ya se ve.** "108 / 108" ya dice que el 100 % está listo, así que el badge pone **"Al día"**; "2 / 19" pone **"17 pendientes"**; "93.0 %" pone **"7.0 % sin ejecutar"**. El color sale del mismo semáforo de siempre (verde ≥ 70, ámbar ≥ 40, rojo por debajo) y el tono lo toma el estado real de la card.
+
+**La curva es dato de verdad, no adorno.** Sale de las series mensuales que ya traía el módulo: `inducciones.mensual` (inducciones completadas por mes), `capacitaciones.mensual.realizadas` (capacitaciones ejecutadas por mes) y `presupuestoData.ejecutado` (ejecución del mes). Es **SVG nativo** (design_system §5.8, sin Chart.js), con área degradada, curva suave y punto final. **Sin dato no hay curva**: se dibuja una línea de puntos, nunca un invento.
+
+**El pie lleva al submódulo, y respeta el rol.** "Ver detalle →" llama a `handleSubmoduleClick()`, pero **solo sale si el submódulo está en la lista**, que ya viene filtrada por rol y por empresa: si el usuario no tiene acceso a "1.1.3 Asignación de Recursos", su card de Presupuesto no muestra pie en vez de llevar a un sitio donde no puede entrar.
+
+**Las tres reglas del repo que hubo que respetar (y una que casi se rompe).** (1) **Nada de `preserveAspectRatio="none"`**: estira el dibujo y el punto final se volvía un óvalo. La curva escala **uniforme** (`viewBox` 200×34 + `width:100%` + `height:auto`), así que no deforma nada. (2) **Los colores del piloto salen de tokens** (`--kair-mint`, `--kair-green-soft`, `--kair-line-soft`…), así que **el modo oscuro sale solo** y no queda ningún color fijo que auditar. (3) **El esqueleto se alinea con el alto real** de la card nueva (`--ks-kpi-minh`), si no, todo salta de lugar cuando llegan los datos.
+
+**La prueba.** `main/test-recursos-cards-v2.js`: **28/28**. No mira texto: **recorta la clase real del módulo y la ejecuta en un `vm`** con un DOM mínimo, y juzga el HTML que produce de verdad. Cubre que el hero quedó intacto (eyebrow, mensaje y score, sin badge ni curva ni pie), la anatomía nueva, que la curva sale de los 12 puntos de la serie y que **sin dato no inventa curva**, que el pie respeta el rol, que las reglas nuevas van con scope, que **no hay ni un color fijo** en el piloto, que el esqueleto y la card miden lo mismo, y el cache-bust. Tres checks son de **mordida**: se rompe el piloto a propósito (se le quita el scope, se le fija un color, se le devuelve la curva inventada) y se exige que los checks se caigan.
+
+**La verificación visual.** Maqueta **autocontenida** con el **JS y el CSS reales** (tokens, componentes y el módulo tal cual están en el repo), renderizada con **el home real de Recursos** (hero incluido) y datos de ejemplo, capturada con el propio Electron: **en claro y en oscuro**. Se ve que el hero quedó idéntico, que la curva es suave y el punto final redondo, que los tres badges tienen su color y que el pie cierra la card.
+
+**Lo que NO se verificó.** La revisión **dentro de la app real**: la maqueta usa los archivos reales, pero no es la app corriendo (el owner mira esta parte). Y los **otros seis módulos no se tocaron**: el piloto es de Recursos, a propósito, hasta que el owner apruebe el diseño.
+
+**Batería.** 28/28 (nuevo) · 29/29 (encaje del esqueleto) · 14/14 (patrón de la card) · 109/109 (tokens y tema, con sus 22 mutaciones) · 20/20 (gráficos que no se deforman). Barrido amplio de los 74 tests: **70 verdes**; los 4 rojos son los **preexistentes** (3 checks del link de Google Fonts y `tools/lab/test-evaluacion-inicial-v2.js`). Barrido de caracteres no latinos y de fin de línea: **0 problemas**.
+
+**El estado.** Los cambios de esta ronda quedan **sin commitear** en `Dev-Port`, encima del `09ed4c88` (📦1111), que ya está commiteado **y pusheado**. No se bumpeó la versión (§5.2) ni se hizo release.
+**Actualización 2026-11-27 (noche, 2) — LA CARD DENTRO DE CARD: el owner aclaró que la referencia es una tarjeta dentro de otra**
+
+**Lo que se aclaró.** En la imagen de referencia no es una sola tarjeta: es **una tarjeta externa con un tono distinto que contiene una tarjeta interna blanca**, y el **"Ver detalle" va en la parte inferior de la externa**. La primera maqueta del piloto había metido todo en una sola tarjeta blanca: el diseño estaba, pero la estructura no.
+
+**Lo que se midió, no lo que se suponer.** La imagen se midió píxel a píxel (436 × 297): el fondo de la externa da **#f2f2f2**, la interna **#ffffff**, el texto del pie gris **#6f6f6f** y la flecha **#838383**. La lectura del owner quedó confirmada por los números, no por el ojo.
+
+**El cambio en el código (solo `modules/recursos/recursos-home.js`).** La **externa** toma el tono suave (`--kair-soft`) y envuelve a la **interna**, que es la blanca (`--kair-card`) y lleva el diseño (rótulo, valor + badge, bajada y curva), con su propio borde (`--kair-line`) y su propio radio (`--kair-radius-card` menos 6 px). El **pie** vive en la externa: su borde superior cruza a todo el ancho de la externa y el texto queda alineado con el rótulo de la interna. La curva **bajó al fondo** de la interna (`margin-top: auto`) para que las tres cards alineen su curva abajo, y se le agregó la **guía vertical punteada** del último punto, que es el detalle de la referencia.
+
+**Por qué los tonos salen de tokens y no de los medidos.** El #f2f2f2 medido es casi el `--kair-soft` del sistema (#f3f6f6), así que se usa el token: el **modo oscuro se invierte solo** y la jerarquía se mantiene (en oscuro la externa queda #2f3a4d y la interna #384151, es decir, la de arriba más clara). Poner el #f2f2f2 fijo habría sido un color quemado que no se invierte.
+
+**La prueba creció.** `main/test-recursos-cards-v2.js` pasó de **28 a 35 checks**: los nuevos miran que el diseño vive dentro de la interna, que el pie queda fuera (después de que la interna se cierre), que la externa usa el tono suave y la interna el color de card, que la interna tiene borde y radio propios, que el pie se apoya en la externa, que la curva trae la guía punteada, y **una mordida nueva**: si la interna desaparece del markup, el check tiene que caerse.
+
+**Batería.** 35/35 (nuevo) · 29/29 (encaje del esqueleto) · 20/20 (gráficos que no se deforman) · 14/14 (patrón de la card) · 109/109 (tokens y tema). Barrido de caracteres no latinos y de fin de línea: **0 problemas**.
+
+**Lo que sigue igual.** El **hero no se tocó**, la barra de progreso sigue fuera, el badge sigue diciendo lo que falta, la curva sigue saliendo del dato real (sin dato no hay curva) y el pie sigue respetando el rol. Los cambios de esta ronda siguen **sin commitear**, encima del `09ed4c88` (📦1111).
+**Actualización 2026-11-27 (noche, 3) — LAS 4 ROJAS DEL BARRIDO: una apuntaba a una ruta movida y las tres seguían pidiendo el CDN de Google Fonts**
+
+**Lo que eran.** Las 4 rojas del barrido amplio (70 verdes / 4 rojas) no eran fallos de la app: eran **checks viejos que el proyecto ya había dejado atrás**. Se verificaron una por una antes de tocar nada.
+
+**La ENOENT: el test apuntaba a una carpeta que no existe.** `tools/lab/test-evaluacion-inicial-v2.js` calculaba la raíz con `path.join(__dirname, '..')`, o sea `sgsst-electron-app/tools`, y de ahí buscaba `tools/modules/gestion-integral/evaluacion-inicial-sg-sst/`. **El módulo sí existe**, pero vive en `sgsst-electron-app/modules/gestion-integral/evaluacion-inicial-sg-sst/` (con su `index.html`, su `evaluacion-inicial-view.css` y su `evaluacion-inicial-view.js`): lo que estaba mal era **un nivel de la ruta** en el test. La corrección es una línea (`'..', '..'`, como hacen los otros tests) y el módulo da **64/64**.
+
+**Las 3 de Google Fonts: el check pedía algo que la app ya no hace.** Los tres módulos (Reportes de accidentes, Perfiles de cargo y Profesiograma, e Investigación de accidentes) cargan las fuentes **locales**: `<link rel="stylesheet" href="../../../assets/css/google-fonts.css">`, con los `.woff2` dentro del repo (`assets/fonts/google/`). Los checks seguían exigiendo el `<link>` de `fonts.googleapis.com`, o sea, el estado anterior a la mudanza a fuentes locales. **La solución no es devolver el CDN**: la app tiene que trabajar sin internet (el cliente no siempre tiene red), y el proyecto ya trae DM Sans (400/500/600/700) y Manrope (500/600/700/800) en local, exactamente los pesos que los checks pedían.
+
+**Qué se reescribió (solo tests, la app no se toca).** Cada check de fuentes ahora exige el contrato que hoy vale: (1) que el módulo cargue la hoja local, (2) que **no** haya link al CDN, (3) que la hoja local declare las familias con los pesos que el módulo usa, y (4) —el check nuevo— que **los `.woff2` que la hoja referencia existan en disco**: con el CDN, un archivo que faltaba no se notaba; con fuente local, la app se queda sin tipografía y nadie se entera.
+
+**Resultado.** 64/64 (evaluación inicial) · 48/48 (reportes de accidentes) · 40/40 (profesiograma) · 43/43 (investigación de accidentes). Barrido amplio: **74 verdes, 0 rojos**. Barrido de caracteres no latinos y de fin de línea: **0 problemas**.
+**Actualización 2026-11-27 (noche, 4) — PRUEBA EN VIVO DE LAS FUENTES: las tipografías NO estaban rotas**
+
+**La pregunta que quedaba abierta.** Quedaba probar, con la app corriendo y no solo leyendo el código, que las fuentes de los tres módulos (Reportes de accidentes, Perfiles de cargo y Profesio-grama, e Investigación de accidentes) **se cargan y de verdad se usan**, y que la app **no pide nada a internet**. Se hizo con el propio Electron, abriendo las tres vistas y midiendo dentro del navegador.
+
+**El resultado.** En los tres módulos: **Manrope 600 y 700 cargadas**, **DM Sans 400 y 700 cargadas**, **una** hoja local (`assets/css/google-fonts.css`) por vista y **cero peticiones a internet**. Y la prueba de que no es la tipografía de máquina: el mismo texto midió **577 px con Manrope** y **562 px con DM Sans**, contra **616 px** con `monospace`; si fuera el fallback daría el mismo ancho.
+
+**El tropiezo que hizo que la primera medición mintiera.** La primera vez dio "Manrope no cargada" y el mismo ancho que el fallback. No era un problema de la app: `canvas.measureText()` **no espera** a que la fuente termine de cargar, así que midió la tipografía de máquina. La medición honesta primero **carga** las familias (`document.fonts.load(...)`) y **espera**, y recién ahí mide. Una prueba que mide sin esperar está midiendo el camino rápido, no la app.
+
+**Dos detalles de operación que se comieron un rato.** (1) Los procesos de Electron de una corrida anterior **se quedaron vivos** y el arranque siguiente no imprimía nada: hay que cerrarlos antes de relanzar. (2) Con un `userData` propio, dos corridas no se pelean por el bloqueo del perfil.
+
+**Lo que queda instalado.** Los tres tests de fuentes exigen el contrato vigente (hoja local + sin CDN + familias con los pesos que usa el módulo) y que **los `.woff2` referenciados existan en disco**. La prueba en vivo de esta actualización confirmó que ese contrato se cumple en la app real.
+**Actualización 2026-11-27 (noche, 5) — LAS CARDS DE INDUCCIÓN Y REINDUCCIÓN: el mismo diseño de card dentro de card**
+
+**Lo que se pidió.** Llevar a las **4 cards de indicadores del dashboard de Inducción y Reinducción** el mismo diseño que quedó en Recursos: la **card dentro de card**, **sin tocar el hero**.
+
+**Lo que se encontró (leído, no supuesto).** El módulo `modules/recursos/inducciones/` tiene un **dialecto propio**: su CSS (`inducciones-view.css`) está **scopeado bajo `.inducciones-container`** y define sus **propios tokens** (`--kair-surface`, `--kair-track`, `--kair-border`, `--kair-green`, `--kair-red`, `--kair-amber`, `--kair-blue`, `--kair-radius-lg`…). O sea: **tocar su `.kair-kpi` no toca los demás módulos**, aunque `.kair-kpi` sea una clase que usan 45 archivos (cada módulo tiene la suya). Las 4 cards usaban rótulo + chip arriba, valor grande, bajada y **barra de progreso** (2 de las 4).
+
+**El hero no se tocó.** Ni una línea de su markup ni de su CSS: el test lo verifica (que el bloque del hero no gane la card nueva, y que el CSS del piloto no mentione el hero).
+
+**Qué cambió.**
+1. La **externa** toma el tono suave (`--kair-track`) y envuelve a la **interna** (blanca, `--kair-surface`), que es la que lleva el diseño: rótulo, **valor + chip** (el chip baja a la fila del número, como en la referencia), bajada y **curva**.
+2. La **barra de progreso sale**: su dato (el %) ya estaba en el chip, y la curva le da la dimensión del tiempo.
+3. **Curvas con dato real** de los 12 meses del filtro: Total = inducciones del mes, Aprobadas = aprobadas del mes, Reprobadas = reprobadas del mes, Promedio = **promedio de puntaje del mes** (este último se calculó: `prom` en `computeMetrics()`; sin él la curva sería inventada).
+4. El **pie "Ver detalle →"** vive en la externa: lleva al **Registro** y, en las cards de Aprobadas y Reprobasas, deja el filtro puesto (igual que hace el botón del hero). El desplegable de estado se **resincroniza** (`_syncIndPickers()`), que es la trampa 210.
+5. La **escala del promedio** es la real (0 a 22 puntos), no la relativa: así se ve que el promedio está alto, y no solo que "se movió".
+
+**Un detalle que se vio en la captura.** El **halo del punto final** se salía de la card blanca (el margen lateral del dibujo era menor que el halo): el `PADX` de la curva pasó de 4 a 8. Se vio mirando la captura, no leyendo el código.
+
+**La prueba.** `main/test-inducciones-cards-v2.js`: **38/38**. No mira texto: **recorta la lógica real del módulo y la ejecuta en un `vm`** con un DOM mínimo, y juzga el SVG que produce. Lo que mira: que el hero quede intacto, que las 4 cards tengan la estructura nueva, que **la curva de cada card sea la serie que le toca** (compara punto por punto las 12 contra la geometría esperada), que **sin dato no haya curva**, que la barra se fue, que el pie lleve al registro con su filtro, que los colores salgan de tokens, que el CSS siga scopeado, los sellos, y **5 mordidas**.
+
+**Los sellos.** El módulo tiene su sello en **tres sitios**: `INDUC_TOKEN` (la lógica), el `<link>` del CSS dentro de `inducciones-view.html` y el `<script>` en `index.html`. Subió a `INDUCCIONES-20261127-v24-cards` en los tres, y los tests que anclaban el sello viejo (`test-inducciones-premium-v2.js`, `test-inducciones-modal-1093.js`, `test-inducciones-pickers.js`) se actualizaron en la misma ronda.
+
+**Lo que NO se cambió.** El hero. Las gráficas. La tabla. Y el **modo oscuro**: este módulo **no tiene bloque de tema propio** (sus tokens son suyos y son claros), así que las cards quedan claras como todo el módulo — eso es de antes, no de esta ronda.
+
+**Batería.** 38/38 (nuevo) · 87/87 (premium v2 del módulo) · 170/170 (desplegables) · 70/70 (modal) · 62/62 (tema) · 20/20 (gráficos) · 29/29 (esqueleto) · 35/35 (cards de Recursos) · 109/109 (tokens).
