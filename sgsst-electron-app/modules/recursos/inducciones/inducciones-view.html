@@ -1,4 +1,4 @@
-<link rel="stylesheet" href="./modules/recursos/inducciones/inducciones-view.css?v=INDUCCIONES-20261126-v23-pickers">
+<link rel="stylesheet" href="./modules/recursos/inducciones/inducciones-view.css?v=INDUCCIONES-20261127-v24-cards">
   <link rel="stylesheet" href="../../../assets/css/google-fonts.css">
 
 <main class="kair-page">
@@ -126,40 +126,77 @@
       </div>
     </div>
 
-    <!-- KPIs (celdas del strip) — label + chip de estado + valor + sub (📦746) -->
+    <!-- KPIs (celdas del strip) · CARD DENTRO DE CARD (📦1114)
+         La EXTERNA lleva el tono suave, la INTERNA lleva el diseño
+         (rotulo, valor + chip, bajada y curva) y el pie "Ver detalle"
+         vive en la externa, abajo. El hero NO se toca. -->
       <div class="kair-kpi">
-        <div class="kair-kpi__top">
-          <span class="kair-kpi__label">Total inducciones</span>
-          <span class="kair-chip kair-chip--soft-slate" id="kpi-total-chip">—</span>
+        <div class="kair-kpi__inner">
+          <div class="kair-kpi__top">
+            <span class="kair-kpi__label">Total inducciones</span>
+          </div>
+          <div class="kair-kpi__value-row">
+            <span class="kair-kpi__value" id="kpi-total">—</span>
+            <span class="kair-chip kair-chip--soft-slate" id="kpi-total-chip">—</span>
+          </div>
+          <div class="kair-kpi__sub">Inducciones y reinducciones registradas</div>
+          <div class="kair-kpi__spark" id="kpi-total-spark"></div>
         </div>
-        <div class="kair-kpi__value" id="kpi-total">—</div>
-        <div class="kair-kpi__sub">Inducciones y reinducciones registradas</div>
+        <button type="button" class="kair-kpi__foot" id="kpi-detalle-total">
+          <span>Ver detalle</span>
+          <span class="kair-kpi__foot__arrow" aria-hidden="true">&rarr;</span>
+        </button>
       </div>
       <div class="kair-kpi">
-        <div class="kair-kpi__top">
-          <span class="kair-kpi__label">Aprobadas</span>
-          <span class="kair-chip kair-chip--soft-green" id="kpi-apr-chip">—</span>
+        <div class="kair-kpi__inner">
+          <div class="kair-kpi__top">
+            <span class="kair-kpi__label">Aprobadas</span>
+          </div>
+          <div class="kair-kpi__value-row">
+            <span class="kair-kpi__value" id="kpi-apr">—</span>
+            <span class="kair-chip kair-chip--soft-green" id="kpi-apr-chip">—</span>
+          </div>
+          <div class="kair-kpi__sub">Puntaje ≥ 20 / 22</div>
+          <div class="kair-kpi__spark" id="kpi-apr-spark"></div>
         </div>
-        <div class="kair-kpi__value" id="kpi-apr">—</div>
-        <div class="kair-kpi__sub">Puntaje ≥ 20 / 22</div>
-        <div class="kair-kpi__bar"><span class="kair-kpi__fill kair-kpi__fill--green" id="kpi-apr-bar"></span></div>
+        <button type="button" class="kair-kpi__foot" id="kpi-detalle-apr">
+          <span>Ver detalle</span>
+          <span class="kair-kpi__foot__arrow" aria-hidden="true">&rarr;</span>
+        </button>
       </div>
       <div class="kair-kpi">
-        <div class="kair-kpi__top">
-          <span class="kair-kpi__label">Reprobadas</span>
-          <span class="kair-chip kair-chip--soft-red" id="kpi-rep-chip">—</span>
+        <div class="kair-kpi__inner">
+          <div class="kair-kpi__top">
+            <span class="kair-kpi__label">Reprobadas</span>
+          </div>
+          <div class="kair-kpi__value-row">
+            <span class="kair-kpi__value" id="kpi-rep">—</span>
+            <span class="kair-chip kair-chip--soft-red" id="kpi-rep-chip">—</span>
+          </div>
+          <div class="kair-kpi__sub">Requieren reinducción</div>
+          <div class="kair-kpi__spark" id="kpi-rep-spark"></div>
         </div>
-        <div class="kair-kpi__value" id="kpi-rep">—</div>
-        <div class="kair-kpi__sub">Requieren reinducción</div>
-        <div class="kair-kpi__bar"><span class="kair-kpi__fill kair-kpi__fill--red" id="kpi-rep-bar"></span></div>
+        <button type="button" class="kair-kpi__foot" id="kpi-detalle-rep">
+          <span>Ver detalle</span>
+          <span class="kair-kpi__foot__arrow" aria-hidden="true">&rarr;</span>
+        </button>
       </div>
       <div class="kair-kpi">
-        <div class="kair-kpi__top">
-          <span class="kair-kpi__label">Promedio de puntaje</span>
-          <span class="kair-chip kair-chip--soft-green" id="kpi-prom-chip">—</span>
+        <div class="kair-kpi__inner">
+          <div class="kair-kpi__top">
+            <span class="kair-kpi__label">Promedio de puntaje</span>
+          </div>
+          <div class="kair-kpi__value-row">
+            <span class="kair-kpi__value" id="kpi-prom">—</span>
+            <span class="kair-chip kair-chip--soft-green" id="kpi-prom-chip">—</span>
+          </div>
+          <div class="kair-kpi__sub" id="kpi-prom-sub">Rango de resultados —</div>
+          <div class="kair-kpi__spark" id="kpi-prom-spark"></div>
         </div>
-        <div class="kair-kpi__value" id="kpi-prom">—</div>
-        <div class="kair-kpi__sub" id="kpi-prom-sub">Rango de resultados —</div>
+        <button type="button" class="kair-kpi__foot" id="kpi-detalle-prom">
+          <span>Ver detalle</span>
+          <span class="kair-kpi__foot__arrow" aria-hidden="true">&rarr;</span>
+        </button>
       </div>
     </div>
 

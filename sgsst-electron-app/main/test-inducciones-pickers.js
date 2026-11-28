@@ -356,19 +356,19 @@ function correrCon(src, html, css, htmlIndex) {
   an('10a) index.html carga inducciones-logic.js con ?v=',
     /inducciones-logic\.js\?v=[A-Za-z0-9-]+/.test(htmlIndex));
   an('10b) el ?v= es el de esta ronda',
-    htmlIndex.indexOf('inducciones-logic.js?v=INDUCCIONES-20261126-v23-pickers') >= 0);
+    htmlIndex.indexOf('inducciones-logic.js?v=INDUCCIONES-20261127-v24-cards') >= 0);
   an('10c) el ?v= anterior ya no esta',
-    htmlIndex.indexOf('inducciones-logic.js?v=INDUCCIONES-20261120-v22-modal-fix') < 0);
+    htmlIndex.indexOf('inducciones-logic.js?v=INDUCCIONES-20261126-v23-pickers') < 0);
   an('10d) el HTML de la vista se pide con el sello (INDUC_TOKEN)',
     src.indexOf("inducciones-view.html?v=' + INDUC_TOKEN") >= 0);
   an('10e) el sello viejo ya no esta en el modulo',
-    src.indexOf('INDUCCIONES-20261120-v22-modal-fix') < 0);
+    src.indexOf('INDUCCIONES-20261126-v23-pickers') < 0);
   an('10f) el CSS de la vista tambien lleva sello nuevo (lo pide el propio HTML)',
-    /inducciones-view\.css\?v=INDUCCIONES-20261126-v23-pickers/.test(html));
+    /inducciones-view\.css\?v=INDUCCIONES-20261127-v24-cards/.test(html));
   an('10g) el sello viejo del CSS ya no esta',
-    /inducciones-view\.css\?v=INDUCCIONES-20261120-v22-modal-fix/.test(html) === false);
+    /inducciones-view\.css\?v=INDUCCIONES-20261126-v23-pickers/.test(html) === false);
   an('10h) el token del modulo (INDUC_TOKEN) es el de esta ronda',
-    /var INDUC_TOKEN = 'INDUCCIONES-20261126-v23-pickers';/.test(src));
+    /var INDUC_TOKEN = 'INDUCCIONES-20261127-v24-cards';/.test(src));
 
   // ── 11 · el modulo no pierde lo que ya tenia ─────────────────────
   an('11a) el dashboard sigue con su filtro de ano y su filtro de genero',
@@ -499,17 +499,17 @@ const MUTACIONES = [
     html, css, htmlIndex],
   ['el cache-bust de index.html no sube',
     src, html, css,
-    htmlIndex.replace('inducciones-logic.js?v=INDUCCIONES-20261126-v23-pickers',
-      'inducciones-logic.js?v=INDUCCIONES-20261120-v22-modal-fix')],
+    htmlIndex.replace('inducciones-logic.js?v=INDUCCIONES-20261127-v24-cards',
+      'inducciones-logic.js?v=INDUCCIONES-20261126-v23-pickers')],
   ['el HTML de la vista se pide con el sello viejo',
     src.replace("inducciones-view.html?v=' + INDUC_TOKEN",
-      "inducciones-view.html?v=INDUCCIONES-20261120-v22-modal-fix"), html, css, htmlIndex],
+      "inducciones-view.html?v=INDUCCIONES-20261126-v23-pickers"), html, css, htmlIndex],
   ['el CSS de la vista se pide con el sello viejo',
-    src, html.replace('inducciones-view.css?v=INDUCCIONES-20261126-v23-pickers',
-      'inducciones-view.css?v=INDUCCIONES-20261120-v22-modal-fix'), css, htmlIndex],
+    src, html.replace('inducciones-view.css?v=INDUCCIONES-20261127-v24-cards',
+      'inducciones-view.css?v=INDUCCIONES-20261126-v23-pickers'), css, htmlIndex],
   ['el token del modulo se queda viejo',
-    src.replace("var INDUC_TOKEN = 'INDUCCIONES-20261126-v23-pickers';",
-      "var INDUC_TOKEN = 'INDUCCIONES-20261120-v22-modal-fix';"), html, css, htmlIndex],
+    src.replace("var INDUC_TOKEN = 'INDUCCIONES-20261127-v24-cards';",
+      "var INDUC_TOKEN = 'INDUCCIONES-20261126-v23-pickers';"), html, css, htmlIndex],
   ['el borde del desplegable usa un token que no existe',
     src, html, css.replace('background:var(--kair-surface);border:1px solid var(--kair-border);border-radius:var(--kair-radius-sm);',
       'background:var(--kair-surface);border:1px solid var(--border-color);border-radius:var(--kair-radius-sm);'), htmlIndex],

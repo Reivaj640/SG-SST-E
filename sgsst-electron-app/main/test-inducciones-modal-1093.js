@@ -17,7 +17,7 @@ const js = fs.readFileSync(path.join(induccionesRoot, 'inducciones-logic.js'), '
 const revisionCss = fs.readFileSync(revisionCssPath, 'utf8');
 const indexHtml = fs.readFileSync(path.join(appRoot, 'index.html'), 'utf8');
 
-const TOKEN = 'INDUCCIONES-20261126-v23-pickers';
+const TOKEN = 'INDUCCIONES-20261127-v24-cards';
 const VIEWER_TOKEN = 'INDUCCIONES-20260915-v21-chart-scope-fix';
 const RAD_TOKEN = '20261120-modal-scope-1093';
 

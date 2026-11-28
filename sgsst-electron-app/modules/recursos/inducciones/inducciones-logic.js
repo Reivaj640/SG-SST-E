@@ -8,7 +8,7 @@
    Regla de oro: estado derivado (puntaje>=20 aprueba); refreshAll() único.
    ═══════════════════════════════════════════════════════════════════ */
 
-var INDUC_TOKEN = 'INDUCCIONES-20261126-v23-pickers';
+var INDUC_TOKEN = 'INDUCCIONES-20261127-v24-cards';
 console.log('%c[Inducciones] Versión cargada: ' + INDUC_TOKEN, 'color:#2057b8;font-weight:bold');
 
 /* ---------- 0. Logging + helpers puros (sin DOM) ---------- */
@@ -673,7 +673,11 @@ class InduccionesComponent {
       var k = (i < 9 ? '0' : '') + String(i + 1);
       var rm = rs.filter(function (r) { return r.fecha.slice(5, 7) === k; });
       var ra = rm.filter(function (r) { return r.puntaje >= IND_UMBRAL_APR; }).length;
-      return { i: i, real: rm.length, apr: ra, tasa: rm.length ? ra / rm.length * 100 : null };
+      // 📦1114 · El promedio del mes: es la serie REAL de la curva del KPI
+      // "Promedio de puntaje" (sin esto habria que inventar la curva).
+      var suma = rm.reduce(function (s, r) { return s + r.puntaje; }, 0);
+      return { i: i, real: rm.length, apr: ra, tasa: rm.length ? ra / rm.length * 100 : null,
+        prom: rm.length ? suma / rm.length : null };
     });
     var cargoMap = {};
     rs.forEach(function (r) {
@@ -742,20 +746,82 @@ class InduccionesComponent {
     var pct = m.total ? Math.round(m.rate) : 0;
     var a = q('#kpi-apr'); if (a) a.textContent = m.apr;
     var achip = q('#kpi-apr-chip'); if (achip) achip.textContent = m.total ? pct + '%' : '—%';
-    var ab = q('#kpi-apr-bar'); if (ab) ab.style.width = pct + '%';
     var pctR = m.total ? Math.round(m.rep / m.total * 100) : 0;
     var rp = q('#kpi-rep'); if (rp) rp.textContent = m.rep;
     var rchip = q('#kpi-rep-chip'); if (rchip) rchip.textContent = m.total ? pctR + '%' : '—%';
-    var rb = q('#kpi-rep-bar'); if (rb) rb.style.width = pctR + '%';
     var pr = q('#kpi-prom'); if (pr) pr.textContent = m.total ? m.avg.toFixed(1) : '—';
+    var sobre = m.total && m.avg >= IND_UMBRAL_APR;
     var pchip = q('#kpi-prom-chip');
     if (pchip) {
-      var sobre = m.total && m.avg >= IND_UMBRAL_APR;
       pchip.textContent = m.total ? (sobre ? 'Sobre la meta' : 'Bajo la meta') : '—';
       pchip.className = 'kair-chip ' + (sobre ? 'kair-chip--soft-green' : 'kair-chip--soft-amber');
     }
     var ps = q('#kpi-prom-sub');
     if (ps) ps.textContent = m.total ? 'Rango de resultados ' + m.min + '–' + m.max : 'Rango de resultados —';
+    // 📦1114 · La curva de cada card sale de los 12 meses REALES del filtro.
+    // La barra de progreso se fue: su dato (el %) ya estaba en el chip.
+    var meses = m.meses || [];
+    this._pintarSpark('#kpi-total-spark', meses.map(function (x) { return x.real; }), '', 0, 'total');
+    this._pintarSpark('#kpi-apr-spark', meses.map(function (x) { return x.apr; }), 'kair-kpi__spark--green', 0, 'apr');
+    this._pintarSpark('#kpi-rep-spark', meses.map(function (x) { return x.real - x.apr; }), 'kair-kpi__spark--red', 0, 'rep');
+    this._pintarSpark('#kpi-prom-spark', meses.map(function (x) { return x.prom; }),
+      sobre ? 'kair-kpi__spark--green' : 'kair-kpi__spark--amber', IND_PUNTAJE_MAX, 'prom');
+  }
+
+  /* 📦1114 · Curva de 12 meses de un KPI (SVG nativo, design_system §5.8).
+     Escala UNIFORME: nada de preserveAspectRatio="none" (estirar el dibujo
+     deformaba el punto final). Sin dato NO hay curva: se dibuja una linea de
+     puntos, nunca un invento. */
+  _pintarSpark(sel, serie, tono, tope, id) {
+    var el = this.q(sel);
+    if (!el) return;
+    el.className = 'kair-kpi__spark' + (tono ? ' ' + tono : '');
+    el.innerHTML = this._buildSpark(serie, tope, id);
+  }
+
+  _buildSpark(serie, tope, id) {
+    var W = 200, H = 34, PADX = 8, PADY = 5;
+    var baseY = H - PADY;
+    var vals = [];
+    for (var i = 0; i < 12; i++) {
+      var v = Number(serie && serie[i]);
+      vals.push(isFinite(v) && v > 0 ? v : 0);
+    }
+    var max = tope > 0 ? tope : Math.max.apply(null, vals);
+    var uid = 'kpi-spk-' + id;
+    if (!(max > 0)) {
+      return '<div class="kair-kpi__spark-empty" aria-hidden="true">'
+        + '<svg viewBox="0 0 ' + W + ' ' + H + '" class="kair-spark__svg">'
+        + '<line x1="0" y1="' + baseY + '" x2="' + W + '" y2="' + baseY + '" '
+        + 'stroke="var(--kair-border)" stroke-width="1.5" stroke-dasharray="3 4" /></svg></div>';
+    }
+    var pts = vals.map(function (v, i) {
+      return { x: PADX + (i * (W - PADX * 2)) / 11, y: baseY - (v / max) * (baseY - PADY) };
+    });
+    var d = 'M ' + pts[0].x.toFixed(1) + ' ' + pts[0].y.toFixed(1);
+    for (var j = 1; j < pts.length - 1; j++) {
+      var mx = ((pts[j].x + pts[j + 1].x) / 2).toFixed(1);
+      var my = ((pts[j].y + pts[j + 1].y) / 2).toFixed(1);
+      d += ' Q ' + pts[j].x.toFixed(1) + ' ' + pts[j].y.toFixed(1) + ' ' + mx + ' ' + my;
+    }
+    var pen = pts[pts.length - 2];
+    var last = pts[pts.length - 1];
+    d += ' Q ' + pen.x.toFixed(1) + ' ' + pen.y.toFixed(1) + ' ' + last.x.toFixed(1) + ' ' + last.y.toFixed(1);
+    var area = d + ' L ' + last.x.toFixed(1) + ' ' + baseY + ' L ' + pts[0].x.toFixed(1) + ' ' + baseY + ' Z';
+    return '<div class="kair-kpi__spark-box" aria-hidden="true">'
+      + '<svg viewBox="0 0 ' + W + ' ' + H + '" class="kair-spark__svg">'
+      + '<defs><linearGradient id="' + uid + '" x1="0" y1="0" x2="0" y2="1">'
+      + '<stop offset="0%" stop-color="currentColor" stop-opacity="0.22" />'
+      + '<stop offset="100%" stop-color="currentColor" stop-opacity="0" />'
+      + '</linearGradient></defs>'
+      + '<path class="kair-spark__area" d="' + area + '" fill="url(#' + uid + ')" />'
+      + '<path class="kair-spark__line" d="' + d + '" fill="none" stroke="currentColor" stroke-width="2" '
+      + 'stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke" />'
+      + '<line class="kair-spark__guide" x1="' + last.x.toFixed(1) + '" y1="0" x2="' + last.x.toFixed(1) + '" y2="' + last.y.toFixed(1) + '" '
+      + 'stroke="currentColor" stroke-width="1" stroke-dasharray="2 3" opacity="0.35" />'
+      + '<circle class="kair-spark__halo" cx="' + last.x.toFixed(1) + '" cy="' + last.y.toFixed(1) + '" r="6" fill="currentColor" opacity="0.16" />'
+      + '<circle class="kair-spark__dot" cx="' + last.x.toFixed(1) + '" cy="' + last.y.toFixed(1) + '" r="3.2" fill="currentColor" />'
+      + '</svg></div>';
   }
   _radarItem(iconCls, icon, name, sub, chipCls, chipText) {
     return '<div class="kair-radar__item">' +
@@ -1333,6 +1399,23 @@ class InduccionesComponent {
       indLog('DASHBOARD', 'VER_REPROBADOS', 'OK');
     });
     on('#btn-radar-registro', 'click', function () { self.setView('registro'); });
+    // 📦1114 · El pie de cada card lleva al registro; las de aprobadas y
+    // reprobadas dejan el filtro puesto (como hace el boton del hero).
+    var detalle = function (estado) {
+      self._st.filters.estado = estado;
+      self._st.filters.q = '';
+      self._st.page = 1;
+      var fe = self.q('#f-estado'); if (fe) fe.value = estado;
+      var fb = self.q('#f-buscar'); if (fb) fb.value = '';
+      self._syncIndPickers();
+      self.setView('registro');
+      self.renderTable();
+      indLog('DASHBOARD', 'KPI_DETALLE', 'OK', estado);
+    };
+    on('#kpi-detalle-total', 'click', function () { detalle('all'); });
+    on('#kpi-detalle-apr', 'click', function () { detalle('APROBADO'); });
+    on('#kpi-detalle-rep', 'click', function () { detalle('REPROBADO'); });
+    on('#kpi-detalle-prom', 'click', function () { detalle('all'); });
     on('#btn-volver', 'click', function () {
       if (self.backToModuleCallback) self.backToModuleCallback();
       else self.toast('info', 'Navegación', 'Vista disponible al integrar con el módulo Talento Humano.');
