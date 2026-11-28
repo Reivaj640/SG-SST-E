@@ -10679,3 +10679,27 @@ politica de la sesion dejo bloqueadas. **Sin push**: `origin/Dev` no se mueve ha
 **Lo que NO se cambió.** El hero. La tabla. El resto de vistas. La clase compartida `.kair-metric-card` de `shared/kair-components.css`.
 
 **Batería.** 42/42 (nuevo) · 16/16 (dispatch de la vista) · 41/41 + 22 mutaciones (alcance de tokens) · 109/109 (tokens y tema) · 29/29 (esqueleto) · 20/20 (gráficos) · 35/35 (cards de Recursos) · 38/38 (cards de Inducciones). Barrido amplio: **76 verdes, 0 rojos**. Barrido de caracteres no latinos y de fin de línea: **0 problemas**.
+**Actualización 2026-11-28 (madrugada, 2) — LAS CARDS DEL PANEL DE CONTROL: la "card dentro de card" en el home del shell**
+
+**Lo que se pidió.** Llevar a las **4 tarjetas de indicadores del Panel de Control** el mismo diseño que quedó en Recursos (📦1113), Inducciones (📦1114) y Presupuesto (📦1117): la **card dentro de card**, **sin tocar el hero**.
+
+**Lo que se encontró (leído, no supuesto).** El Panel **no es un módulo con iframe**: se arma en el **shell** (`renderer.js`), en un contenedor con clase `kair-dashboard kair-premium`, y su CSS es `shared/kair-premium.css` (dialecto propio, con su **bloque oscuro aditivo** dentro del bloque del 📦885). Las 4 tarjetas (`renderDashKpis`) traían rótulo + valor + chip + bajada y una **barra de progreso** (`kair-kpi__bar` / `kair-kpi__fill`) que pintaba con `requestAnimationFrame`. El hero (`renderDashHero`, `.kair-hero`, `kair-hero__pct`, `kair-hero__meter`) vive al lado y **no se tocó**.
+
+**Qué cambió.**
+1. La **externa** (`.kair-kpi--v2`) toma el tono suave y envuelve a la **interna** (`.kair-kpi__inner`, blanca): la interna lleva rótulo + icono, **valor + chip**, bajada y **curva**; el **pie "Ver detalle →"** vive en la externa, **fuera** de la interna.
+2. La **barra sale** y entra la **curva SVG nativa** (`dashSparkline`): `viewBox` fijo, `width:100%` + `height:auto` (escala uniforme, nunca `preserveAspectRatio="none"`), con área + línea + halo + punto final + guía.
+3. **Series mensuales reales** en `dashboard_data.kpis`: `accidents_monthly` (accidentes del mes, con la fecha del Excel 3.2.3 convertida — serial de Excel, `Date` o texto), `overdue_docs_monthly` (documentos vencidos por mes **de vencimiento**) y `plan_monthly` (avance acumulado del Plan de Trabajo, que **termina en el mismo % que el KPI**).
+4. La **ventana de la curva va de enero al mes en curso** (`Math.min(12, mes + 1)` + `slice(0, ventana)`), no "recortar ceros": en el Panel **un 0 es un dato real** (un mes sin accidentes).
+5. El pie navega con la función del shell (`navigateToModule(mod, código)`): accidentes → investigación 3.2.3 · PRIC → ausentismo 3.3.6 · documentos → capacitaciones 1.2.1 · plan → plan de trabajo 2.4.1.
+
+**Sin dato no hay curva.** El KPI de PRIC (`pric_active`) se **declara** en `main.js` pero **nunca se asigna**: su serie llega vacía y la curva se dibuja como **línea de puntos** ("sin dato"), nunca como un invento. Eso ya venía de antes (preexistente), pero la curva lo dejó a la vista.
+
+**El sello.** El Panel se carga en el shell (sin iframe), pero su CSS sí tiene sello: `index.html:79` pide `shared/kair-premium.css?v=…`. Como el CSS cambió, el sello subió a `20261128-panel-cards`, y el test que lo anclaba (`test-empresa-893.js`, que exige el literal) se actualizó **en la misma ronda**: si sube uno y no el otro, Electron sirve el CSS viejo y el cambio no llega a la app.
+
+**La prueba.** `main/test-panel-cards-v2.js`: **48/48** + **9 mordidas**. No mira texto: recorta `renderDashKpis` y `dashSparkline` del renderer vivo y los **ejecuta en un `vm`** con un DOM mínimo, y juzga el SVG que producen. Lo que mira: la estructura de card dentro de card con el pie **fuera** de la interna, que las barras se fueron, que el **hero quedó intacto**, que la curva escala uniforme y no se estira, que **sin dato no hay curva**, que la ventana va de enero al mes en curso, que **las series del renderer son las mismas que las del backend**, que el pie navega con la función del shell (y **no** con `postMessage`), que el CSS sigue scopeado bajo `.kair-premium` con su contraparte oscura y **tokens** (no colores fijos), y que el render real produce 4 tarjetas con su pie y su curva.
+
+**El test del 885 se actualizó, no se debilitó.** Los tonos de la curva (`kair-kpi__spark--red/green/amber`) se agregaron a la lista de **exentas** de `test-panel-tema-885.js`: son **semánticos** y salen de tokens (`--kair-red`, `--kair-green`, `--kair-amber`) que ya cambian de tema, igual que `kair-kpi__fill`. **62/62**.
+
+**Lo que NO se cambió.** El hero. La clase compartida `.kair-metric-card` de `shared/kair-components.css` (la usan 7 módulos). Las gráficas. El resto del shell.
+
+**Batería.** 48/48 + 9/9 (nuevo) · 62/62 (tema del 885) · 73/73 (empresa 893) · 35/35 (fila del hero) · 109/109 (tokens y tema). Barrido amplio: **77 verdes, 0 rojos**. Barrido de caracteres no latinos y de fin de línea: **0 problemas**.

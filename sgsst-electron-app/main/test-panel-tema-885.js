@@ -160,7 +160,10 @@ function evaluar(F) {
   const PINTA = /(^|[;{\s])(color|background|background-color|border|border-color|border-top|border-bottom|box-shadow)\s*:/;
   // El hero, los rellenos semanticos y las franjas de las tareas ya son vivos:
   // funcionan sobre fondo oscuro y no necesitan contraparte.
-  const EXENTAS = ['kair-hero', 'kair-kpi__fill', 'kair-task--critical', 'kair-task--warn', 'kair-task--info'];
+  // 📦1118 · Los tonos de la CURVA son semanticos y salen de tokens (--kair-red,
+// --kair-green, --kair-amber): el token ya cambia de tema, asi que la curva no
+// necesita contraparte oscura. Es el mismo caso que los rellenos de las barras.
+const EXENTAS = ['kair-hero', 'kair-kpi__fill', 'kair-kpi__spark--', 'kair-task--critical', 'kair-task--warn', 'kair-task--info'];
 
   const clasesOscuras = new Set();
   for (const r of reglas(oscuro).filter(esOscura)) clasesDe(r.sel).forEach(x => clasesOscuras.add(x));

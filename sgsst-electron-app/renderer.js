@@ -5139,6 +5139,52 @@ function renderDashHero(data) {
     meterEl.style.width = tasks.length ? Math.round(crit / tasks.length * 100) + '%' : '0%';
   }
 }
+// 📦1118 · Curva de 12 meses de un KPI del panel (SVG nativo, design_system §5.8).
+// Escala UNIFORME: nada de preserveAspectRatio="none" (estirar el dibujo deformaba
+// el punto final). Sin dato NO hay curva: se dibuja una línea de puntos, nunca un invento.
+function dashSparkline(serie, id) {
+  var W = 200, H = 34, PADX = 8, PADY = 5;
+  var baseY = H - PADY;
+  var vals = [];
+  // 📦1118 · El largo real de la serie: la ventana la recorta el render (de enero
+  // al mes en curso). Con 12 fijos los meses que faltan salian en 0 y la curva
+  // se caia al piso.
+  var total = Math.min(12, (serie && serie.length) || 0);
+  for (var i = 0; i < total; i++) {
+    var v = Number(serie && serie[i]);
+    vals.push(isFinite(v) && v > 0 ? v : 0);
+  }
+  var max = Math.max.apply(null, vals);
+  var uid = 'dash-spk-' + id;
+  if (!(max > 0)) {
+    return '<svg viewBox="0 0 ' + W + ' ' + H + '" class="kair-kpi__spark__svg">' +
+      '<line x1="0" y1="' + baseY + '" x2="' + W + '" y2="' + baseY + '" stroke="var(--kair-line)" stroke-width="1.5" stroke-dasharray="3 4" /></svg>';
+  }
+  var pts = vals.map(function (v, i) {
+    return { x: PADX + (i * (W - PADX * 2)) / Math.max(1, vals.length - 1), y: baseY - (v / max) * (baseY - PADY) };
+  });
+  var d = 'M ' + pts[0].x.toFixed(1) + ' ' + pts[0].y.toFixed(1);
+  for (var j = 1; j < pts.length - 1; j++) {
+    var mx = ((pts[j].x + pts[j + 1].x) / 2).toFixed(1);
+    var my = ((pts[j].y + pts[j + 1].y) / 2).toFixed(1);
+    d += ' Q ' + pts[j].x.toFixed(1) + ' ' + pts[j].y.toFixed(1) + ' ' + mx + ' ' + my;
+  }
+  var pen = pts[pts.length - 2];
+  var last = pts[pts.length - 1];
+  d += ' Q ' + pen.x.toFixed(1) + ' ' + pen.y.toFixed(1) + ' ' + last.x.toFixed(1) + ' ' + last.y.toFixed(1);
+  var area = d + ' L ' + last.x.toFixed(1) + ' ' + baseY + ' L ' + pts[0].x.toFixed(1) + ' ' + baseY + ' Z';
+  return '<svg viewBox="0 0 ' + W + ' ' + H + '" class="kair-kpi__spark__svg">' +
+    '<defs><linearGradient id="' + uid + '" x1="0" y1="0" x2="0" y2="1">' +
+    '<stop offset="0%" stop-color="currentColor" stop-opacity="0.22" />' +
+    '<stop offset="100%" stop-color="currentColor" stop-opacity="0" />' +
+    '</linearGradient></defs>' +
+    '<path class="kair-kpi__spark__area" d="' + area + '" fill="url(#' + uid + ')" />' +
+    '<path class="kair-kpi__spark__line" d="' + d + '" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke" />' +
+    '<line class="kair-kpi__spark__guide" x1="' + last.x.toFixed(1) + '" y1="0" x2="' + last.x.toFixed(1) + '" y2="' + last.y.toFixed(1) + '" stroke="currentColor" stroke-width="1" stroke-dasharray="2 3" opacity="0.35" />' +
+    '<circle class="kair-kpi__spark__halo" cx="' + last.x.toFixed(1) + '" cy="' + last.y.toFixed(1) + '" r="6" fill="currentColor" opacity="0.16" />' +
+    '<circle class="kair-kpi__spark__dot" cx="' + last.x.toFixed(1) + '" cy="' + last.y.toFixed(1) + '" r="3.2" fill="currentColor" />' +
+    '</svg>';
+}
 function renderDashKpis(data) {
   var slot = document.getElementById('kpi-slot');
   if (!slot) return;
@@ -5146,24 +5192,52 @@ function renderDashKpis(data) {
   var pric = Number(k.pric_active || 0);
   var docs = Number(k.overdue_docs || 0);
   var plan = Number(k.compliance || 0);
+  var accMes = Number(k.accidents_month || 0);
+  // 📦1118 · La ventana de la curva: de enero al mes en curso. Los meses que
+  // todavia no llegan NO son un dato: dibujarlos en 0 hacia que la curva se
+  // cayera al piso y se leyera como un colapso del mes.
+  var ventana = Math.min(12, new Date().getMonth() + 1);
   var items = [
-    { label: 'Accidentes (año)', value: (k.accidents_year || 0), suf: '', icon: DASH_GLYPH.activity, tone: '', sub: 'Eventos reportados en el año en curso.' },
-    { label: 'Casos PRIC activos', value: (k.pric_active || 0), suf: '', icon: DASH_GLYPH.users, tone: '--green', chip: { cls: 'kair-chip--soft-green', text: pric === 0 ? 'Bajo control' : 'En seguimiento' }, sub: pric === 0 ? 'Sin casos en seguimiento actualmente.' : 'Casos activos en seguimiento.' },
-    { label: 'Documentos vencidos', value: (k.overdue_docs || 0), suf: '', icon: DASH_GLYPH.filex, tone: '--red', chip: { cls: 'kair-chip--soft-red', text: 'Requieren gestión' }, sub: 'Documentos con vigencia vencida.', valueRed: docs > 0 },
-    { label: 'Plan de trabajo', value: (k.compliance || 0), suf: '%', icon: DASH_GLYPH.trend, tone: '', sub: 'Ejecución del plan vigente.', bar: { mod: '--amber', pct: plan } }
+    { id: 'accidentes', label: 'Accidentes (año)', value: (k.accidents_year || 0), suf: '', icon: DASH_GLYPH.activity, tone: '',
+      chip: { cls: accMes > 0 ? 'kair-chip--soft-red' : 'kair-chip--soft-slate', text: accMes + ' este mes' },
+      sub: 'Eventos reportados en el año en curso.', serie: k.accidents_monthly, spark: '--red',
+      mod: 'investigacion', sub2: '3.2.3 Registro y analisis estadistico' },
+    { id: 'pric', label: 'Casos PRIC activos', value: (k.pric_active || 0), suf: '', icon: DASH_GLYPH.users, tone: '--green',
+      chip: { cls: pric === 0 ? 'kair-chip--soft-green' : 'kair-chip--soft-amber', text: pric === 0 ? 'Bajo control' : 'En seguimiento' },
+      sub: pric === 0 ? 'Sin casos en seguimiento actualmente.' : 'Casos activos en seguimiento.', serie: k.pric_monthly, spark: '--green',
+      mod: 'ausentismo', sub2: '3.3.6 Medición del ausentismo por causa médica' },
+    { id: 'documentos', label: 'Documentos vencidos', value: (k.overdue_docs || 0), suf: '', icon: DASH_GLYPH.filex, tone: '--red',
+      chip: { cls: docs > 0 ? 'kair-chip--soft-red' : 'kair-chip--soft-green', text: docs > 0 ? 'Requieren gestión' : 'Al día' },
+      sub: 'Documentos con vigencia vencida.', valueRed: docs > 0, serie: k.overdue_docs_monthly, spark: '--red',
+      mod: 'capacitaciones', sub2: '1.2.1 Programa de capacitación Anual' },
+    { id: 'plan', label: 'Plan de trabajo', value: (k.compliance || 0), suf: '%', icon: DASH_GLYPH.trend, tone: '',
+      chip: { cls: 'kair-chip--soft-slate', text: 'En ejecución' },
+      sub: 'Ejecución del plan vigente.', serie: k.plan_monthly, spark: '--amber',
+      mod: 'plan-trabajo', sub2: '2.4.1 Plan de Trabajo Anual' }
   ];
   slot.innerHTML = items.map(function (it) {
     var chip = it.chip ? '<span class="kair-chip kair-chip--sm ' + it.chip.cls + '">' + dashEsc(it.chip.text) + '</span>' : '';
-    var bar = it.bar ? '<span class="kair-kpi__bar"><span class="kair-kpi__fill kair-kpi__fill' + it.bar.mod + '" data-pct="' + it.bar.pct + '"></span></span>' : '';
-    return '<article class="kair-kpi">' +
-      '<div class="kair-kpi__top"><span class="kair-kpi__label">' + dashEsc(it.label) + '</span>' +
-      '<span class="kair-kpi__icon kair-kpi__icon' + (it.tone || '') + '">' + it.icon + '</span></div>' +
-      '<div class="kair-kpi__value' + (it.valueRed ? ' kair-kpi__value--red' : '') + '">' + dashEsc(it.value) + '<small>' + dashEsc(it.suf || '') + '</small></div>' +
-      chip + bar + '<p class="kair-kpi__sub">' + dashEsc(it.sub) + '</p></article>';
+    var serie = it.serie ? (it.serie || []).slice(0, ventana) : null;
+    var spark = '<div class="kair-kpi__spark kair-kpi__spark' + (it.spark || '') + '">' + dashSparkline(serie, it.id) + '</div>';
+    return '<article class="kair-kpi kair-kpi--v2">' +
+      '<div class="kair-kpi__inner">' +
+        '<div class="kair-kpi__top"><span class="kair-kpi__label">' + dashEsc(it.label) + '</span>' +
+        '<span class="kair-kpi__icon kair-kpi__icon' + (it.tone || '') + '">' + it.icon + '</span></div>' +
+        '<div class="kair-kpi__valuerow">' +
+        '<div class="kair-kpi__value' + (it.valueRed ? ' kair-kpi__value--red' : '') + '">' + dashEsc(it.value) + '<small>' + dashEsc(it.suf || '') + '</small></div>' +
+        chip + '</div>' +
+        '<p class="kair-kpi__sub">' + dashEsc(it.sub) + '</p>' +
+        spark +
+      '</div>' +
+      '<button type="button" class="kair-kpi__foot" data-dash-kpi-mod="' + dashEsc(it.mod || '') + '" data-dash-kpi-sub="' + dashEsc(it.sub2 || '') + '">' +
+        '<span>Ver detalle</span><span class="kair-kpi__foot__arrow" aria-hidden="true">&rarr;</span>' +
+      '</button>' +
+    '</article>';
   }).join('');
-  requestAnimationFrame(function () {
-    slot.querySelectorAll('.kair-kpi__fill').forEach(function (f) {
-      f.style.width = (f.getAttribute('data-pct') || 0) + '%';
+  // 📦1118 · El pie lleva al módulo donde vive el dato (navegación del shell).
+  slot.querySelectorAll('.kair-kpi__foot').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      navigateToModule(btn.getAttribute('data-dash-kpi-mod'), btn.getAttribute('data-dash-kpi-sub'));
     });
   });
 }

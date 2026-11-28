@@ -369,10 +369,12 @@ function evaluar(F) {
     'ninguno de los archivos escritos trae U+FFFD');
   chk(!/[\u4e00-\u9fff\u3040-\u30ff\u0400-\u04ff\uac00-\ud7af]/.test(F.premium + F.dev + F.rend + F.idx),
     'ninguno de los archivos escritos trae CJK, cirilico o hangul');
-  chk(/shared\/kair-premium\.css\?v=20261015-empresa893/.test(F.idx),
+  chk(/shared\/kair-premium\.css\?v=20261128-panel-cards/.test(F.idx),
     'index.html lleva el sello nuevo del premium (sin el, Electron sirve el CSS viejo del cache)');
-  chk(/shared\/kair-premium\.css\?v=20261014-panel885/.test(F.idx) === false,
+  chk(/shared\/kair-premium\.css\?v=20261015-empresa893/.test(F.idx) === false,
     'el sello anterior se retiro');
+  chk(/shared\/kair-premium\.css\?v=20261014-panel885/.test(F.idx) === false,
+    'tampoco quedo el sello previo a ese');
 
   return c;
 }
@@ -441,7 +443,7 @@ const MUT = [
   ['se pierde el mensaje de salida del admin (el del 862)',
     f => { f.rend = f.rend.replace('No hay empresas registradas', 'Nada todavia'); }],
   ['se pierde el sello del premium en index.html',
-    f => { f.idx = f.idx.replace('?v=20261015-empresa893', '?v=20261014-panel885'); }]
+    f => { f.idx = f.idx.replace('?v=20261128-panel-cards', '?v=20261015-empresa893'); }]
 ];;;
 
 let mutDetectadas = 0, mutVacias = 0;

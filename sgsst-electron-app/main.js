@@ -3433,12 +3433,23 @@ async function getDashboardAlertas(rootPath, companyName) {
     
     // Actualizar KPIs
     dashboard_data.kpis.overdue_docs = vencidas.length;
+    // 📦1118 · Las vencidas por mes de vencimiento: es la serie que dibuja la
+    // curva de la card "Documentos vencidos".
+    const vencidasPorMes = new Array(12).fill(0);
+    vencidas.forEach(c => {
+        if (!c.fecha) return;
+        const m = c.fecha.getMonth();
+        if (m >= 0 && m < 12) vencidasPorMes[m]++;
+    });
+    dashboard_data.kpis.overdue_docs_monthly = vencidasPorMes;
     
     // ========================================================================
     // 1b. PLAN DE TRABAJO - Calcular cumplimiento
     // ========================================================================
     const planTrabajoStats = await calculatePlanTrabajoStats(rootPath, currentYear);
     dashboard_data.kpis.compliance = planTrabajoStats.porcentajeAvance;
+    // 📦1118 · La serie mensual del plan para la curva de la card.
+    dashboard_data.kpis.plan_monthly = planTrabajoStats.avancePorMes;
     sendLog(`[DASHBOARD] 📊 Plan de Trabajo: ${planTrabajoStats.porcentajeAvance}% (${planTrabajoStats.actividadesEjecutadas}/${planTrabajoStats.totalActividades})`, 'INFO');
 
     // REGLA DE ORO ACTUALIZADA: Alertas de recursos = Vencidas + Pendientes de gestión
@@ -3637,6 +3648,8 @@ async function getDashboardAlertas(rootPath, companyName) {
 
             sendLog(`[DASHBOARD] 📋 Accidentes headers: Año=${iAnio}, Fecha=${iFecha}, Evento=${iEvento} (archivo: ${excelFile})`, 'INFO');
 
+            // 📦1118 · La serie mensual: la curva de la card "Accidentes" la dibuja.
+            const monthlyCount = new Array(12).fill(0);
             let count = 0;
             for (let r = headerRowIdx + 1; r < rawData.length; r++) {
               const row = rawData[r];
@@ -3654,10 +3667,31 @@ async function getDashboardAlertas(rootPath, companyName) {
                 if (evento !== 'at') continue;
               }
 
+              // 📦1118 · El mes del accidente (misma conversion de fecha que el
+              // modulo de frecuencia: numero serial de Excel, Date o texto).
+              let mesIdx = -1;
+              const fechaVal = row[iFecha];
+              if (fechaVal) {
+                  let fecha = null;
+                  if (typeof fechaVal === 'number' && fechaVal >= 1) {
+                      const utc = new Date((fechaVal - 25569) * 86400 * 1000);
+                      fecha = new Date(utc.getUTCFullYear(), utc.getUTCMonth(), utc.getUTCDate());
+                  } else if (fechaVal instanceof Date) {
+                      fecha = fechaVal;
+                  } else {
+                      const parsed = new Date(fechaVal);
+                      if (!isNaN(parsed.getTime())) fecha = parsed;
+                  }
+                  if (fecha && !isNaN(fecha.getTime())) mesIdx = fecha.getMonth();
+              }
+              if (mesIdx >= 0 && mesIdx < 12) monthlyCount[mesIdx]++;
               count++;
             }
 
             dashboard_data.kpis.accidents_year = count;
+            dashboard_data.kpis.accidents_monthly = monthlyCount;
+            // El KPI de "accidentes del mes" nunca se llenaba: sale de la serie.
+            dashboard_data.kpis.accidents_month = monthlyCount[currentMonth] || 0;
             sendLog(`[DASHBOARD] 📊 Accidentes año ${today.getFullYear()}: ${count} (fuente: ${excelFile})`, 'INFO');
           }
         }
@@ -18020,7 +18054,11 @@ async function calculatePlanTrabajoStats(basePath, currentYear) {
     celdasVencidas: 0,           // celdas 'P' en mes anterior al vigente
     celdasProgramadas: 0,        // total celdas con marca (C o P)
     porcentajeAvanceCeldas: 0,   // % = celdasEjecutadas / celdasProgramadas
-    currentMonthIdx: new Date().getMonth()
+    currentMonthIdx: new Date().getMonth(),
+  // 📦1118 · La serie mensual del plan (avance acumulado). La curva de la card
+  // "Plan de trabajo" sale de aqui y termina en el mismo % que el KPI.
+  avancePorMes: new Array(12).fill(0),
+  actividadesPorMes: new Array(12).fill(0),
   };
 
   const mesesNombres = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
@@ -18258,6 +18296,8 @@ async function calculatePlanTrabajoStats(basePath, currentYear) {
 
         // 9. Verificar si está ejecutada (tiene "C" en algún mes)
         let tieneCompletado = false;
+        // 📦1118 · El PRIMER mes con "C" de la actividad: es cuando se cumplio.
+        let primerMesC = -1;
         const mesesCols = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
                           'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
 
@@ -18267,6 +18307,7 @@ async function calculatePlanTrabajoStats(basePath, currentYear) {
                 const mesValor = String(row[mesCol]).trim().toLowerCase();
                 if (mesValor === 'c') {
                     tieneCompletado = true;
+                    if (primerMesC === -1) primerMesC = mIndex;
                     // 📦698 · FIX: contar CELDAS (no actividades)
                     stats.celdasEjecutadas++;
                     stats.celdasProgramadas++;
@@ -18288,6 +18329,7 @@ async function calculatePlanTrabajoStats(basePath, currentYear) {
 
         if (tieneCompletado) {
             stats.actividadesEjecutadas++;
+        stats.actividadesPorMes[primerMesC]++;
         }
     }
 
@@ -18297,6 +18339,15 @@ async function calculatePlanTrabajoStats(basePath, currentYear) {
     if (stats.actividadesProgramadas > 0 && stats.totalActividades > 0) {
         stats.porcentajeAvance = Math.round((stats.actividadesEjecutadas / stats.totalActividades) * 100);
     }
+
+// 📦1118 · El avance acumulado mes a mes. Termina en el mismo % que el KPI,
+// asi que la curva no puede mentir sobre el numero grande.
+let acum = 0;
+for (let m = 0; m < 12; m++) {
+    acum += stats.actividadesPorMes[m];
+    stats.avancePorMes[m] = stats.totalActividades > 0
+        ? Math.round((acum / stats.totalActividades) * 100) : 0;
+}
 
     // 📦698 · FIX: calcular también el % por CELDAS (consistente con el dashboard)
     if (stats.celdasProgramadas > 0) {

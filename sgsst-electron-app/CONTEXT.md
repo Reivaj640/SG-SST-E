@@ -2503,6 +2503,20 @@ muestra el histórico completo (753 / 1 501 / 1 289 filas) y el orden es del má
 
 **Tests.** `main/test-presupuesto-cards-v2.js` (42/42 + 9 mordidas: recorta el script en línea de la vista y lo ejecuta en un `vm`) · `main/test-alcance-tokens-889.js` (41/41 + 22 mutaciones) · `main/test-presupuesto-824-dispatch.js` (16/16).
 
+## 📈 Panel de Control (shell) — las cuatro tarjetas de indicadores ya tienen la card dentro de card
+
+**El modelo.** Las cuatro tarjetas del **Panel de Control** las arma `renderDashKpis()` en el **shell** (`renderer.js`) —no es un módulo con iframe: se inyectan en un contenedor con clase `kair-dashboard kair-premium`— y su CSS es `shared/kair-premium.css` (dialecto propio, con su bloque oscuro aditivo del 📦885). El patrón viejo era rótulo + valor + chip + bajada + **barra de progreso** (`kair-kpi__bar` / `kair-kpi__fill`, pintada con `requestAnimationFrame`). Desde el 28-nov-2026 las cuatro llevan el diseño de **card dentro de card** (el mismo de Recursos 📦1113, Inducciones 📦1114 y Presupuesto 📦1117): la **externa** con el tono suave y el pie "Ver detalle →", la **interna** (blanca) con rótulo + icono, **valor + chip**, bajada y **curva**.
+
+**El dato de las curvas.** Las series son **mensuales y reales**, y las arma el backend en `dashboard_data.kpis`: `accidents_monthly` (accidentes del mes, con la fecha del Excel 3.2.3 convertida — serial de Excel, `Date` o texto), `overdue_docs_monthly` (documentos vencidos por **mes de vencimiento**) y `plan_monthly` (avance acumulado del Plan de Trabajo, que **termina en el mismo % que el KPI**). La **ventana va de enero al mes en curso**: en el Panel un 0 es un dato real (un mes sin accidentes), a diferencia del Presupuesto, donde los meses futuros eran ausencia de dato.
+
+**Sin dato no hay curva.** La serie vacía se dibuja como **línea de puntos**, nunca como una curva inventada. Hoy eso pasa con el KPI de PRIC (`pric_active`): se **declara** en `main.js` pero **ningún handler lo asigna**, así que llega en 0 con su serie vacía. Es un dato **preexistente**, no de esta ronda, pero la curva lo dejó a la vista.
+
+**Lo que NO cambió.** El hero (`renderDashHero`, `.kair-hero`, `kair-hero__pct`, `kair-hero__meter`) —ni una línea— y la clase compartida `.kair-metric-card` de `shared/kair-components.css` (la usan 7 módulos). El pie "Ver detalle" es navegación **del shell**: llama `navigateToModule(mod, código)` y **no hace `postMessage`**. Ojo: el submódulo se resuelve **por código** (3.2.3, 3.3.6, 1.2.1, 2.4.1), y la clave interna que se le pasa tiene que existir **en los dos mapas**: el de navegación del shell y el de tareas (`MODULE_TASK_MAP`).
+
+**El sello.** El Panel se carga en el shell, pero su CSS tiene sello igual: `index.html:79` pide `shared/kair-premium.css?v=20261128-panel-cards`. Como el CSS cambió, el sello **subió** y el test que lo anclaba (`main/test-empresa-893.js`, que exige el literal) se actualizó en la misma ronda: **si sube uno y no el otro, Electron sirve el CSS viejo y el cambio no llega a la app**.
+
+**Tests.** `main/test-panel-cards-v2.js` (48/48 + 9 mordidas: recorta `renderDashKpis` y `dashSparkline` del renderer vivo y los ejecuta en un `vm`) · `main/test-panel-tema-885.js` (62/62, con los tonos de la curva declarados exentos porque salen de tokens) · `main/test-empresa-893.js` (73/73) · `main/test-hero-fila-840.js` (35/35).
+
 ## 📊 Medición del Ausentismo (3.3.6) — el home ya tiene cuatro tarjetas de indicador y la cuarta salió sin tocar el backend
 
 **El modelo.** Las tarjetas del home de "Medición del Ausentismo" se alimentan del handler `get-ausentismo-stats` (`main.js:20011`), que cruza **GI-FO-076** (el Excel oficial "AUSENTISMO POR ARL Y EPS") con **PRI.xlsx** (el registro de seguimiento) y clasifica cada caso: con cierre → Cerrado, con seguimiento sin cierre → Activo, sin registro en PRI → Pendiente. El handler devuelve `pendientes`, `activos`, `cerrados`, **`total`**, `year` y `mes`: **el total, el año y el mes ya viajaban y no se mostraban**.

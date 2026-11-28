@@ -125,6 +125,27 @@
 .kair-premium .kair-kpi__fill--red{background:#DA5563}
 .kair-premium .kair-kpi .kair-chip{align-self:flex-start}
 
+/* 📦1118 · CARDS KPI v2 — "card dentro de card" (Panel de Control). La EXTERNA
+   lleva el tono suave y el pie "Ver detalle"; la INTERNA (blanca) lleva el rótulo,
+   el valor + chip, la bajada y la curva de 12 meses. EL HERO NO SE TOCA.
+   Los tonos de la curva salen de tokens (--kair-red, --kair-amber...): el token
+   ya cambia de tema, así que la curva no necesita contraparte oscura. */
+.kair-premium .kair-kpi--v2{--kkp-gap:8px;--kkp-pad-x:15px;padding:var(--kkp-gap) var(--kkp-gap) 0;min-height:clamp(200px,17vw,224px);background:#F1F4F8;border-color:#E8EBEE;gap:0;box-shadow:none}
+.kair-premium .kair-kpi--v2 .kair-kpi__inner{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;background:#FFFFFF;border:1px solid #E8EBEE;border-radius:14px;padding:14px var(--kkp-pad-x) 12px}
+.kair-premium .kair-kpi--v2 .kair-kpi__valuerow{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+.kair-premium .kair-kpi--v2 .kair-kpi__valuerow .kair-chip{align-self:auto}
+.kair-premium .kair-kpi--v2 .kair-kpi__value{margin-top:4px}
+.kair-premium .kair-kpi--v2 .kair-kpi__sub{margin-top:6px}
+.kair-premium .kair-kpi--v2 .kair-kpi__spark{margin-top:auto;padding-top:10px}
+.kair-premium .kair-kpi__spark__svg{display:block;width:100%;height:auto;overflow:visible}
+.kair-premium .kair-kpi__spark--red{color:var(--kair-red)}
+.kair-premium .kair-kpi__spark--green{color:var(--kair-green)}
+.kair-premium .kair-kpi__spark--amber{color:var(--kair-amber)}
+.kair-premium .kair-kpi--v2 .kair-kpi__foot{margin:0 calc(var(--kkp-gap) * -1);padding:9px calc(var(--kkp-gap) + var(--kkp-pad-x)) 11px;width:100%;box-sizing:border-box;display:flex;align-items:center;justify-content:space-between;gap:8px;background:none;border:0;border-top:1px solid #E8EBEE;color:#748096;font:600 12px var(--kair-font-ui,system-ui,sans-serif);text-align:left;cursor:pointer;transition:color var(--kair-transition)}
+.kair-premium .kair-kpi--v2 .kair-kpi__foot:hover{color:#2057B8}
+.kair-premium .kair-kpi--v2 .kair-kpi__foot__arrow{transition:transform var(--kair-transition)}
+.kair-premium .kair-kpi--v2 .kair-kpi__foot:hover .kair-kpi__foot__arrow{transform:translateX(3px)}
+
 /* Cards y secciones */
 .kair-premium .kair-card{background:#FFFFFF;border:1px solid #E8EBEE;border-radius:20px;padding:22px 24px;box-shadow:0 1px 2px rgba(20,33,61,.03)}
 .kair-premium .kair-card__head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:18px;flex-wrap:wrap}
@@ -356,6 +377,13 @@
 /* El valor en rojo del KPI (#B23A48) es un tono oscuro pensado para fondo claro:
    sobre tarjeta oscura no se lee. Se sube al mismo rosa del chip de rojo. */
 [data-theme^="dark"] .kair-premium .kair-kpi__value--red{color:#f0a0a8}
+
+/* 📦1118 · La card dentro de card en oscuro: la externa se separa del fondo con
+   un velo más tenue y la interna lleva el velo de superficie de las tarjetas. */
+[data-theme^="dark"] .kair-premium .kair-kpi--v2{background:rgba(255,255,255,.03);border-color:rgba(255,255,255,.11)}
+[data-theme^="dark"] .kair-premium .kair-kpi--v2 .kair-kpi__inner{background:rgba(255,255,255,.05);border-color:rgba(255,255,255,.11)}
+[data-theme^="dark"] .kair-premium .kair-kpi--v2 .kair-kpi__foot{border-top-color:rgba(255,255,255,.11);color:#9AA4B8}
+[data-theme^="dark"] .kair-premium .kair-kpi--v2 .kair-kpi__foot:hover{color:#8cc6ff}
 
 /* El borde lateral de las tareas (#5B6B8C) es un gris medio: sobre fondo oscuro
    se pierde. Se sube para que la franja siga marcando el estado. */
