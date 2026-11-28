@@ -50,7 +50,10 @@ class RecursosHome {
 
         // Contenedor Principal
         const contentContainer = document.createElement('div');
-        contentContainer.className = 'gestion-integral-home';
+        // 📦1113 · Scope del piloto de cards: todas las reglas nuevas van
+        // debajo de esta clase, así las cards de los otros módulos (que usan
+        // la misma clase compartida .kair-metric-card) no se mueven.
+        contentContainer.className = 'gestion-integral-home kair-recursos-home';
         contentContainer.id = 'app-container';
 
         // Área Principal
@@ -529,6 +532,110 @@ margin-bottom: 0.5rem;
                 .canvas-container { height: 220px; }
                 .widget-value { font-size: 1.5rem; }
             }
+
+            /* =========================================
+               📦1113 · CARDS KPI v2 (PILOTO · SOLO RECURSOS)
+               El hero no se toca. Lo que cambian las 3 cards:
+                 · la barra de progreso sale y su dato queda en un badge
+                 · entra la curva de los ultimos 12 meses (dato real)
+                 · entra un pie con la flecha al submódulo
+               Todos los colores salen de los tokens del shell
+               (shared/kair-design-tokens.css): no hay ningun color fijo,
+               asi que el modo oscuro se invierte solo.
+               ========================================= */
+            /* La EXTERNA lleva el tono suave y envuelve a la INTERNA (blanca),
+               que es la que lleva el diseño. El pie "Ver detalle" vive en la
+               externa, abajo, sobre el tono suave. */
+            .kair-recursos-home .kair-metric-card--v2 {
+                --krc-gap: clamp(8px, 0.85vw, 11px);
+                --krc-pad-x: clamp(15px, 1.6vw, 18px);
+                padding: var(--krc-gap) var(--krc-gap) 0;
+                min-height: clamp(200px, 17vw, 224px);
+                background: var(--kair-soft);
+                border-color: var(--kair-line);
+                gap: 0;
+            }
+            .kair-recursos-home .kair-metric-card--v2 .kair-metric-inner {
+                flex: 1 1 auto;
+                min-height: 0;
+                display: flex;
+                flex-direction: column;
+                background: var(--kair-card);
+                border: 1px solid var(--kair-line);
+                border-radius: calc(var(--kair-radius-card) - 6px);
+                padding: clamp(14px, 1.5vw, 18px) var(--krc-pad-x) clamp(12px, 1.3vw, 15px);
+            }
+            .kair-recursos-home .kair-metric-card--v2 .kair-metric-value {
+                display: flex;
+                align-items: baseline;
+                gap: 8px;
+                flex-wrap: wrap;
+                margin-top: clamp(9px, 1.2vw, 14px);
+            }
+            .kair-recursos-home .kair-metric-card--v2 .kair-metric-desc { margin: 4px 0 0; }
+            .kair-recursos-home .kair-metric-badge {
+                font: 700 11px/1 var(--kair-font-ui);
+                letter-spacing: 0.2px;
+                padding: 4px 8px;
+                border-radius: var(--kair-radius-pill);
+                background: var(--kair-green-soft);
+                color: var(--kair-green-text);
+                white-space: nowrap;
+            }
+            .kair-recursos-home .kair-metric-badge--warning {
+                background: var(--kair-amber-soft);
+                color: var(--kair-amber-text);
+            }
+            .kair-recursos-home .kair-metric-badge--danger {
+                background: var(--kair-red-soft);
+                color: var(--kair-red-text);
+            }
+            /* La curva se pega al fondo de la card interna (margin-top:auto),
+               como en la referencia: las 3 cards alinean su curva abajo. */
+            .kair-recursos-home .kair-spark {
+                margin-top: auto;
+                padding-top: 12px;
+                color: var(--kair-mint);
+            }
+            .kair-recursos-home .kair-metric-card--warning .kair-spark { color: var(--kair-amber); }
+            .kair-recursos-home .kair-metric-card--danger .kair-spark { color: var(--kair-red); }
+            .kair-recursos-home .kair-spark__svg {
+                display: block;
+                width: 100%;
+                height: auto;
+                overflow: visible;
+            }
+            .kair-recursos-home .kair-metric-foot {
+                margin: 0 calc(var(--krc-gap) * -1);
+                padding: 11px calc(var(--krc-gap) + var(--krc-pad-x)) 13px;
+                width: 100%;
+                box-sizing: border-box;
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 8px;
+                background: none;
+                border: 0;
+                border-top: 1px solid var(--kair-line-soft);
+                color: var(--kair-muted);
+                font: 600 12px var(--kair-font-ui);
+                text-align: left;
+                cursor: pointer;
+                transition: var(--kair-transition);
+            }
+            .kair-recursos-home .kair-metric-foot:hover { color: var(--kair-blue); }
+            .kair-recursos-home .kair-metric-foot__arrow { transition: transform var(--kair-transition); }
+            .kair-recursos-home .kair-metric-foot:hover .kair-metric-foot__arrow { transform: translateX(3px); }
+            .kair-recursos-home .kair-metric-foot:focus-visible {
+                outline: 2px solid var(--kair-blue);
+                outline-offset: -2px;
+            }
+            /* El esqueleto se alinea con la card v2 (mismo mecanismo que usa
+               Mantenimiento): si no, al llegar los datos todo salta de alto. */
+            .kair-recursos-home .ks-kpi-strip {
+                --ks-kpi-minh: clamp(200px, 17vw, 224px);
+                --ks-kpi-pad: clamp(14px, 1.5vw, 18px) clamp(15px, 1.6vw, 18px);
+            }
         `;
         document.head.appendChild(style);
     }
@@ -611,26 +718,38 @@ margin-bottom: 0.5rem;
 
         const induccionesPct = inducciones.porcentajeCompletado || 0;
         const capacitacionesPct = capacitaciones.porcentajeCumplimiento || 0;
+        // 📦1113 · Cada card: badge con lo que falta + curva de 12 meses + pie.
+        var pendInducciones = Math.max(0, (inducciones.totalTrabajadores || 0) - (inducciones.completadas || 0));
         health.appendChild(this.renderMetricCard({
             label: 'Inducciones',
             valueHTML: (inducciones.completadas || 0) + ' <small style="font:500 15px DM Sans;color:var(--kair-text-3)">/ ' + (inducciones.totalTrabajadores || 0) + '</small>',
             desc: 'Personal con inducción al día',
-            progressPct: induccionesPct,
-            variant: induccionesPct >= 70 ? 'ok' : induccionesPct >= 40 ? 'warning' : 'danger'
+            badgeText: pendInducciones > 0 ? pendInducciones + ' pendientes' : 'Al día',
+            variant: induccionesPct >= 70 ? 'ok' : induccionesPct >= 40 ? 'warning' : 'danger',
+            series: inducciones.mensual || [],
+            sparkId: 'inducciones',
+            linkKey: 'inducci'
         }));
+        var pendCapacitaciones = Math.max(0, (capacitaciones.programadas || 0) - (capacitaciones.realizadas || 0));
         health.appendChild(this.renderMetricCard({
             label: 'Plan de capacitación',
             valueHTML: (capacitaciones.realizadas || 0) + ' <small style="font:500 15px DM Sans;color:var(--kair-text-3)">/ ' + (capacitaciones.programadas || 0) + '</small>',
             desc: 'Actividades ejecutadas',
-            progressPct: capacitacionesPct,
-            variant: capacitacionesPct >= 70 ? 'ok' : capacitacionesPct >= 40 ? 'warning' : 'danger'
+            badgeText: pendCapacitaciones > 0 ? pendCapacitaciones + ' pendientes' : 'Al día',
+            variant: capacitacionesPct >= 70 ? 'ok' : capacitacionesPct >= 40 ? 'warning' : 'danger',
+            series: (capacitaciones.mensual && capacitaciones.mensual.realizadas) || [],
+            sparkId: 'capacitaciones',
+            linkKey: 'programa de capacitacion'
         }));
         health.appendChild(this.renderMetricCard({
             label: 'Presupuesto',
             valueHTML: cumplimientoPresupuesto.toFixed(1) + '<span style="font:600 16px DM Sans">%</span>',
             desc: 'Ejecución presupuestal acumulada',
-            progressPct: cumplimientoPresupuesto,
-            variant: cumplimientoPresupuesto >= 70 ? 'ok' : cumplimientoPresupuesto >= 40 ? 'warning' : 'danger'
+            badgeText: (100 - cumplimientoPresupuesto).toFixed(1) + '% sin ejecutar',
+            variant: cumplimientoPresupuesto >= 70 ? 'ok' : cumplimientoPresupuesto >= 40 ? 'warning' : 'danger',
+            series: presupuestoData.ejecutado || [],
+            sparkId: 'presupuesto',
+            linkKey: 'asignacion de recursos'
         }));
         container.appendChild(health);
 
@@ -689,20 +808,129 @@ margin-bottom: 0.5rem;
         this.renderSubmodulesGrid();
     }
 
+    // 📦1113 · Card KPI v2 (piloto visual del módulo Recursos).
+    // Anatomia: rótulo · valor grande + badge · bajada · curva de 12 meses ·
+    // pie con la flecha al submódulo. La barra de progreso se fue: su dato
+    // (el % de cumplimiento) lo carga ahora el badge de color.
     renderMetricCard(opts) {
         var label = opts.label;
         var valueHTML = opts.valueHTML;
         var desc = opts.desc;
-        var progressPct = opts.progressPct;
-        var variant = opts.variant;
+        var variant = opts.variant || 'ok';
         var card = document.createElement('article');
-        card.className = 'kair-metric-card' + (variant && variant !== 'ok' ? ' kair-metric-card--' + variant : '');
+        card.className = 'kair-metric-card kair-metric-card--v2' + (variant !== 'ok' ? ' kair-metric-card--' + variant : '');
+
+        var badge = opts.badgeText
+            ? '<span class="kair-metric-badge kair-metric-badge--' + variant + '">' + opts.badgeText + '</span>'
+            : '';
+
         card.innerHTML = ''
-            + '<span class="kair-metric-head">' + label + '</span>'
-            + '<div class="kair-metric-value">' + valueHTML + '</div>'
-            + '<p class="kair-metric-desc">' + desc + '</p>'
-            + '<div class="kair-progress"><i style="width:' + Math.min(100, progressPct) + '%"></i></div>';
+            + '<div class="kair-metric-inner">'
+            + '  <span class="kair-metric-head">' + label + '</span>'
+            + '  <div class="kair-metric-value">' + valueHTML + badge + '</div>'
+            + '  <p class="kair-metric-desc">' + desc + '</p>'
+            + this.buildSparkline(opts.series, variant, opts.sparkId)
+            + '</div>'
+            + this.buildMetricFooter(opts);
+
+        var pie = card.querySelector('[data-kair-metric-link]');
+        if (pie) {
+            var self = this;
+            pie.onclick = function () {
+                var destino = self.resolveSubmodule(opts.linkKey);
+                if (destino) self.handleSubmoduleClick(destino);
+            };
+        }
         return card;
+    }
+
+    // 📦1113 · Curva de los últimos 12 meses. SVG nativo (design_system §5.8).
+    // Sin dato no hay curva: se dibuja una línea de puntos, no un invento.
+    buildSparkline(series, variant, id) {
+        // 📦1113 · Escala UNIFORME (nada de preserveAspectRatio="none": estirar el
+        // dibujo deformaba el punto final). El viewBox es 200x34 y el CSS pone
+        // width:100% + height:auto: la curva llena el ancho y el alto sale de la
+        // proporción, sin deformar nada.
+        var W = 200, H = 34, PADX = 4, PADY = 5;
+        var baseY = H - PADY;
+        var vals = [];
+        for (var i = 0; i < 12; i++) {
+            var v = Number(series && series[i]);
+            vals.push(isFinite(v) && v > 0 ? v : 0);
+        }
+        var max = Math.max.apply(null, vals);
+        var uid = 'spk-' + String(id || 'k').toLowerCase().replace(/[^a-z0-9]+/g, '-');
+
+        if (max <= 0) {
+            return '<div class="kair-spark kair-spark--empty" aria-hidden="true">'
+                + '<svg viewBox="0 0 ' + W + ' ' + H + '" class="kair-spark__svg">'
+                + '<line x1="0" y1="' + baseY + '" x2="' + W + '" y2="' + baseY + '" '
+                + 'stroke="var(--kair-line)" stroke-width="1.5" stroke-dasharray="3 4" />'
+                + '</svg></div>';
+        }
+
+        var pts = vals.map(function (v, i) {
+            return {
+                x: PADX + (i * (W - PADX * 2)) / 11,
+                y: baseY - (v / max) * (baseY - PADY)
+            };
+        });
+
+        // curva suave: control en cada punto y paso por el punto medio
+        var d = 'M ' + pts[0].x.toFixed(1) + ' ' + pts[0].y.toFixed(1);
+        for (var j = 1; j < pts.length - 1; j++) {
+            var mx = ((pts[j].x + pts[j + 1].x) / 2).toFixed(1);
+            var my = ((pts[j].y + pts[j + 1].y) / 2).toFixed(1);
+            d += ' Q ' + pts[j].x.toFixed(1) + ' ' + pts[j].y.toFixed(1) + ' ' + mx + ' ' + my;
+        }
+        var pen = pts[pts.length - 2];
+        var last = pts[pts.length - 1];
+        d += ' Q ' + pen.x.toFixed(1) + ' ' + pen.y.toFixed(1) + ' ' + last.x.toFixed(1) + ' ' + last.y.toFixed(1);
+
+        var area = d + ' L ' + last.x.toFixed(1) + ' ' + baseY + ' L ' + pts[0].x.toFixed(1) + ' ' + baseY + ' Z';
+
+        return '<div class="kair-spark" aria-hidden="true">'
+            + '<svg viewBox="0 0 ' + W + ' ' + H + '" class="kair-spark__svg">'
+            + '<defs><linearGradient id="' + uid + '" x1="0" y1="0" x2="0" y2="1">'
+            + '<stop offset="0%" stop-color="currentColor" stop-opacity="0.22" />'
+            + '<stop offset="100%" stop-color="currentColor" stop-opacity="0" />'
+            + '</linearGradient></defs>'
+            + '<path class="kair-spark__area" d="' + area + '" fill="url(#' + uid + ')" />'
+            + '<path class="kair-spark__line" d="' + d + '" fill="none" stroke="currentColor" stroke-width="2" '
+            + 'stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke" />'
+            + '<line class="kair-spark__guide" x1="' + last.x.toFixed(1) + '" y1="0" x2="' + last.x.toFixed(1) + '" y2="' + last.y.toFixed(1) + '" '
+            + 'stroke="currentColor" stroke-width="1" stroke-dasharray="2 3" opacity="0.35" />'
+            + '<circle class="kair-spark__halo" cx="' + last.x.toFixed(1) + '" cy="' + last.y.toFixed(1) + '" r="6" '
+            + 'fill="currentColor" opacity="0.16" />'
+            + '<circle class="kair-spark__dot" cx="' + last.x.toFixed(1) + '" cy="' + last.y.toFixed(1) + '" r="3.2" '
+            + 'fill="currentColor" />'
+            + '</svg></div>';
+    }
+
+    // 📦1113 · Pie de la card. Solo sale si el submódulo existe para esta
+    // empresa: la lista this.submodules ya viene filtrada por rol.
+    buildMetricFooter(opts) {
+        var destino = this.resolveSubmodule(opts.linkKey);
+        if (!destino) return '';
+        return '<button type="button" class="kair-metric-foot" data-kair-metric-link="' + (opts.linkKey || '') + '">'
+            + '<span>Ver detalle</span>'
+            + '<span class="kair-metric-foot__arrow" aria-hidden="true">&rarr;</span>'
+            + '</button>';
+    }
+
+    // 📦1113 · Busca el submódulo por una pista de texto ("inducci",
+    // "programa de capacitacion") dentro de la lista ya filtrada.
+    resolveSubmodule(pista) {
+        if (!pista) return null;
+        var norm = function (s) {
+            return String(s == null ? '' : s).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+        };
+        var k = norm(pista);
+        var lista = this.submodules || [];
+        for (var i = 0; i < lista.length; i++) {
+            if (norm(lista[i]).indexOf(k) >= 0) return lista[i];
+        }
+        return null;
     }
 
     buildRadarTasks() {
