@@ -380,12 +380,113 @@ body { background: var(--kair-canvas, #fbfcfb); }
   display: grid; grid-template-columns: 1.25fr repeat(3, 1fr);
   gap: clamp(10px, 1.2vw, 16px); margin-bottom: 1.25rem; flex-shrink: 0;
 }
-.kair-premium-strip .kair-metric-card { min-height: 0; justify-content: center; }
-.kair-premium-strip .kair-metric-value { margin-top: clamp(8px, 1vw, 14px); }
-/* Las 3 métricas de presupuesto usan el patrón de Recursos (rótulo → valor → descripción → barra).
-   El SALDO va en tono neutro a propósito: "más saldo" no es un estado bueno ni malo, y con el
-   semáforo (verde/ámbar/rojo) se leería como una alerta. El color sale de un token. */
-.kair-premium-strip .kair-metric-card--saldo .kair-progress i { background: var(--kair-slate); }
+/* 📦1117 · CARDS KPI v2 — "card dentro de card". La EXTERNA lleva el tono suave y el
+   pie "Ver detalle"; la INTERNA (blanca) lleva rótulo, valor + chip, bajada y la curva
+   de los 12 meses. EL HERO NO SE TOCA. Todos los colores salen de tokens: el modo
+   oscuro sale solo. El ámbito es propio (.kair-presupuesto-strip) porque la clase
+   compartida .kair-metric-card la usan 7 módulos y aquí no se toca. */
+.kair-presupuesto-strip .kair-metric-card--v2 {
+    --krc-gap: clamp(8px, 0.85vw, 11px);
+    --krc-pad-x: clamp(15px, 1.6vw, 18px);
+    padding: var(--krc-gap) var(--krc-gap) 0;
+    min-height: clamp(200px, 17vw, 224px);
+    background: var(--kair-soft);
+    border-color: var(--kair-line);
+    gap: 0;
+    justify-content: flex-start;
+}
+.kair-presupuesto-strip .kair-metric-card--v2 .kair-metric-inner {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    background: var(--kair-card);
+    border: 1px solid var(--kair-line);
+    border-radius: calc(var(--kair-radius-card) - 6px);
+    padding: clamp(14px, 1.5vw, 18px) var(--krc-pad-x) clamp(12px, 1.3vw, 15px);
+}
+.kair-presupuesto-strip .kair-metric-card--v2 .kair-metric-value {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-top: clamp(9px, 1.2vw, 14px);
+}
+.kair-presupuesto-strip .kair-metric-card--v2 .kair-metric-desc { margin: 4px 0 0; }
+.kair-presupuesto-strip .kair-metric-badge {
+    font: 700 11px/1 var(--kair-font-ui);
+    letter-spacing: 0.2px;
+    padding: 4px 8px;
+    border-radius: var(--kair-radius-pill);
+    background: var(--kair-green-soft);
+    color: var(--kair-green-text);
+    white-space: nowrap;
+}
+.kair-presupuesto-strip .kair-metric-badge--slate {
+    background: var(--kair-slate-soft);
+    color: var(--kair-slate);
+}
+/* El semáforo: verde >=70, ámbar >=40, rojo <40. Las reglas del ámbar y del rojo van
+   DESPUÉS de la verde para ganar por orden (tienen la misma especificidad). */
+.kair-presupuesto-strip .kair-metric-card--warning .kair-metric-badge {
+    background: var(--kair-amber-soft);
+    color: var(--kair-amber-text);
+}
+.kair-presupuesto-strip .kair-metric-card--danger .kair-metric-badge {
+    background: var(--kair-red-soft);
+    color: var(--kair-red-text);
+}
+/* La curva se pega al fondo de la card interna (margin-top:auto): las 3 cards alinean
+   su curva abajo, como en la referencia. */
+.kair-presupuesto-strip .kair-spark {
+    margin-top: auto;
+    padding-top: 12px;
+    color: var(--kair-blue);
+}
+.kair-presupuesto-strip .kair-metric-card--ejecutado .kair-spark { color: var(--kair-green); }
+.kair-presupuesto-strip .kair-metric-card--warning .kair-spark { color: var(--kair-amber); }
+.kair-presupuesto-strip .kair-metric-card--danger .kair-spark { color: var(--kair-red); }
+/* El SALDO va en tono neutro a propósito: "más saldo" no es un estado bueno ni malo, y
+   con el semáforo (verde/ámbar/rojo) se leería como una alerta. */
+.kair-presupuesto-strip .kair-metric-card--saldo .kair-spark { color: var(--kair-slate); }
+.kair-presupuesto-strip .kair-spark__svg {
+    display: block;
+    width: 100%;
+    height: auto;
+    overflow: visible;
+}
+.kair-presupuesto-strip .kair-metric-foot {
+    margin: 0 calc(var(--krc-gap) * -1);
+    padding: 11px calc(var(--krc-gap) + var(--krc-pad-x)) 13px;
+    width: 100%;
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    background: none;
+    border: 0;
+    border-top: 1px solid var(--kair-line-soft);
+    color: var(--kair-muted);
+    font: 600 12px var(--kair-font-ui);
+    text-align: left;
+    cursor: pointer;
+    transition: var(--kair-transition);
+}
+.kair-presupuesto-strip .kair-metric-foot:hover { color: var(--kair-blue); }
+.kair-presupuesto-strip .kair-metric-foot__arrow { transition: transform var(--kair-transition); }
+.kair-presupuesto-strip .kair-metric-foot:hover .kair-metric-foot__arrow { transform: translateX(3px); }
+.kair-presupuesto-strip .kair-metric-foot:focus-visible {
+    outline: 2px solid var(--kair-blue);
+    outline-offset: -2px;
+}
+/* El "Ver detalle" baja a la tabla de partidas y RESALTA la columna que le toca. El
+   resalte sale de un token: el modo oscuro se invierte solo. */
+.kair-col-bath { animation: kair-col-bath 1.6s ease-out; }
+@keyframes kair-col-bath {
+    0% { background-color: var(--kair-blue-soft); }
+    100% { background-color: transparent; }
+}
 .pres-hero-score { position: absolute; bottom: clamp(15px, 1.9vw, 24px); right: clamp(17px, 1.9vw, 25px); text-align: right; }
 .pres-hero-score .val { display: block; font: 800 clamp(22px, 2.4vw, 32px)/1 var(--kair-font-display, 'Segoe UI'); color: #fff; letter-spacing: -0.03em; }
 .pres-hero-score .lbl { display: block; font: 500 clamp(10px, 0.95vw, 12px) var(--kair-font-ui, 'Segoe UI'); color: #9eafc6; margin-top: 2px; }
@@ -511,7 +612,7 @@ tbody tr:hover { background: var(--surface-row-hover); }
 </div>
 
 <!-- STRIP PREMIUM — Hero (% cumplimiento) + 3 métricas (patrón Capacitación) -->
-<div class="kair-premium-strip">
+<div class="kair-premium-strip kair-presupuesto-strip">
   <div class="kair-hero-card">
     <div class="kair-hero-eyebrow">Ejecución anual</div>
     <h2>% Cumplimiento</h2>
@@ -521,23 +622,50 @@ tbody tr:hover { background: var(--surface-row-hover); }
       <span class="lbl">del plan anual</span>
     </div>
   </div>
-  <div class="kair-metric-card">
-    <div class="kair-metric-head">Presupuesto Total</div>
-    <div class="kair-metric-value" id="totalPresupuesto">$0</div>
-    <p class="kair-metric-desc" id="descTotalPresupuesto">Asignación total del año</p>
-    <div class="kair-progress"><i id="barraTotalPresupuesto" style="width:0%"></i></div>
+  <div class="kair-metric-card kair-metric-card--v2 kair-metric-card--total">
+    <div class="kair-metric-inner">
+      <span class="kair-metric-head">Presupuesto Total</span>
+      <div class="kair-metric-value">
+        <span id="totalPresupuesto">$0</span>
+        <span class="kair-metric-badge kair-metric-badge--slate">Plan anual</span>
+      </div>
+      <p class="kair-metric-desc" id="descTotalPresupuesto">Asignación total del año</p>
+      <div class="kair-spark" id="sparkTotal" aria-hidden="true"></div>
+    </div>
+    <button type="button" class="kair-metric-foot" data-kair-pres-detalle="asignacion">
+      <span>Ver detalle</span>
+      <span class="kair-metric-foot__arrow" aria-hidden="true">&rarr;</span>
+    </button>
   </div>
-  <div class="kair-metric-card" id="cardEjecutado">
-    <div class="kair-metric-head">Ejecutado</div>
-    <div class="kair-metric-value" id="totalEmpresa">$0</div>
-    <p class="kair-metric-desc" id="descEjecutado">0% de lo asignado</p>
-    <div class="kair-progress"><i id="barraEjecutado" style="width:0%"></i></div>
+  <div class="kair-metric-card kair-metric-card--v2 kair-metric-card--ejecutado" id="cardEjecutado">
+    <div class="kair-metric-inner">
+      <span class="kair-metric-head">Ejecutado</span>
+      <div class="kair-metric-value">
+        <span id="totalEmpresa">$0</span>
+        <span class="kair-metric-badge" id="badgeEjecutado">0%</span>
+      </div>
+      <p class="kair-metric-desc" id="descEjecutado">Ejecutado sobre lo asignado</p>
+      <div class="kair-spark" id="sparkEjecutado" aria-hidden="true"></div>
+    </div>
+    <button type="button" class="kair-metric-foot" data-kair-pres-detalle="ejecutado">
+      <span>Ver detalle</span>
+      <span class="kair-metric-foot__arrow" aria-hidden="true">&rarr;</span>
+    </button>
   </div>
-  <div class="kair-metric-card kair-metric-card--saldo">
-    <div class="kair-metric-head">Saldo Disponible</div>
-    <div class="kair-metric-value" id="saldoDisponible">$0</div>
-    <p class="kair-metric-desc" id="descSaldo">0% sin ejecutar</p>
-    <div class="kair-progress"><i id="barraSaldo" style="width:0%"></i></div>
+  <div class="kair-metric-card kair-metric-card--v2 kair-metric-card--saldo">
+    <div class="kair-metric-inner">
+      <span class="kair-metric-head">Saldo Disponible</span>
+      <div class="kair-metric-value">
+        <span id="saldoDisponible">$0</span>
+        <span class="kair-metric-badge kair-metric-badge--slate" id="badgeSaldo">0%</span>
+      </div>
+      <p class="kair-metric-desc" id="descSaldo">Saldo sin ejecutar</p>
+      <div class="kair-spark" id="sparkSaldo" aria-hidden="true"></div>
+    </div>
+    <button type="button" class="kair-metric-foot" data-kair-pres-detalle="saldo">
+      <span>Ver detalle</span>
+      <span class="kair-metric-foot__arrow" aria-hidden="true">&rarr;</span>
+    </button>
   </div>
 </div>
 
@@ -661,6 +789,10 @@ function setupEventListeners() {
   document.getElementById('bdInfoBtn').addEventListener('click', openBDInfoModal);
   document.getElementById('addRowBtn').addEventListener('click', addNewRow);
   document.getElementById('saveBtn').addEventListener('click', saveChanges);
+  // 📦1117 · El pie "Ver detalle" de las 3 cards baja a la tabla de partidas.
+  document.querySelectorAll('[data-kair-pres-detalle]').forEach(btn => {
+      btn.addEventListener('click', () => irAPartidas(btn.getAttribute('data-kair-pres-detalle')));
+  });
         }
 
 /**
@@ -844,6 +976,13 @@ function parseFormattedNumber(value) {
             });
         }
 
+        // 📦1117 · Las 3 métricas de presupuesto pasan al diseño "card dentro de card".
+        // La barra de progreso se va: su dato (el %) vive ahora en el chip. Lo que entra
+        // es la curva de los 12 meses, con dato REAL:
+        //   · Presupuesto Total → el ritmo de ejecución mes a mes
+        //   · Ejecutado         → el acumulado mes a mes
+        //   · Saldo             → lo que queda por ejecutar mes a mes
+        // El HERO no se toca: sigue con su % de cumplimiento.
         function updateSummary() {
             let totalP = 0, totalE = 0;
             budgetData.forEach(item => {
@@ -858,27 +997,150 @@ function parseFormattedNumber(value) {
             document.getElementById('totalArl').textContent = formatPct(totalP > 0 ? (totalE / totalP) * 100 : 0);
             document.getElementById('saldoDisponible').textContent = '$' + formatNumber(totalP - totalE);
 
-            // --- Barras de avance ---------------------------------------------
-            // Mismo patrón que las tarjetas de Recursos (recursos-home.js →
-            // renderMetricCard): rótulo → valor → descripción → barra. La barra va
-            // ACOTADA a 0-100 (una sobre-ejecución no puede desbordarla) y el % real
-            // se muestra en la descripción. El semáforo es el de Recursos: ≥70 verde,
-            // ≥40 ámbar, <40 rojo.
             const pctEjecucion = totalP > 0 ? (totalE / totalP) * 100 : 0;
             const pctSaldo = totalP > 0 ? ((totalP - totalE) / totalP) * 100 : 0;
-            const acotarPct = (p) => Math.max(0, Math.min(100, p));
 
-            document.getElementById('barraTotalPresupuesto').style.width = (totalP > 0 ? 100 : 0) + '%';
-            document.getElementById('barraEjecutado').style.width = acotarPct(pctEjecucion) + '%';
-            document.getElementById('barraSaldo').style.width = acotarPct(pctSaldo) + '%';
+            // El % viaja en el chip (antes vivía en la descripción).
+            document.getElementById('badgeEjecutado').textContent = formatPct(pctEjecucion);
+            document.getElementById('badgeSaldo').textContent = formatPct(pctSaldo);
 
-            document.getElementById('descEjecutado').textContent = formatPct(pctEjecucion) + ' de lo asignado';
-            document.getElementById('descSaldo').textContent = formatPct(pctSaldo) + ' sin ejecutar';
-
+            // El semáforo es el de Recursos: >=70 verde, >=40 ámbar, <40 rojo. Las clases
+            // se QUITAN antes de volver a ponerlas (el usuario puede editar una celda en
+            // cualquier momento y el color tiene que cambiar con el dato).
             const cardEjec = document.getElementById('cardEjecutado');
             cardEjec.classList.remove('kair-metric-card--warning', 'kair-metric-card--danger');
             if (pctEjecucion < 40) cardEjec.classList.add('kair-metric-card--danger');
             else if (pctEjecucion < 70) cardEjec.classList.add('kair-metric-card--warning');
+
+            pintarCurvas(totalP);
+        }
+
+        // 📦1117 · Los 12 meses del presupuesto. Son las columnas de ejecución mes a mes
+        // de cada partida (la fila "TOTAL AÑO" no cuenta: es la suma).
+        const MESES_PRES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
+            'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+
+        function ejecutadoPorMes() {
+            const porMes = new Array(12).fill(0);
+            budgetData.forEach(item => {
+                if (item.id === 'TOTAL AÑO') return;
+                MESES_PRES.forEach((mes, i) => {
+                    porMes[i] += parseFormattedNumber(item[mes]);
+                });
+            });
+            return porMes;
+        }
+
+        // 📦1117 · Curva de 12 meses (SVG nativo, design_system §5.8). Escala UNIFORME:
+        // nada de preserveAspectRatio="none" (estirar el dibujo deformaba el punto final).
+        // Sin dato NO hay curva: se dibuja una línea de puntos, nunca un invento.
+        function buildPresSpark(serie, id) {
+            const W = 200, H = 34, PADX = 8, PADY = 5;
+            const baseY = H - PADY;
+            const vals = [];
+            // El largo real de la serie: pintarCurvas ya la recorto a los meses que
+            // tienen ejecucion. Con 12 fijos los meses que faltan salian en 0 y la
+            // curva se caia al piso.
+            const total = Math.min(12, (serie && serie.length) || 0);
+            for (let i = 0; i < total; i++) {
+                const v = Number(serie && serie[i]);
+                vals.push(isFinite(v) && v > 0 ? v : 0);
+            }
+            const max = Math.max.apply(null, vals);
+            const uid = 'pres-spk-' + id;
+
+            if (max <= 0) {
+                return '<svg viewBox="0 0 ' + W + ' ' + H + '" class="kair-spark__svg">'
+                    + '<line x1="0" y1="' + baseY + '" x2="' + W + '" y2="' + baseY + '" '
+                    + 'stroke="var(--kair-line)" stroke-width="1.5" stroke-dasharray="3 4" />'
+                    + '</svg>';
+            }
+
+            const pts = vals.map((v, i) => ({
+                x: PADX + (i * (W - PADX * 2)) / Math.max(1, vals.length - 1),
+                y: baseY - (v / max) * (baseY - PADY)
+            }));
+
+            // Curva suave: el control va en cada punto y el paso, por el punto medio.
+            let d = 'M ' + pts[0].x.toFixed(1) + ' ' + pts[0].y.toFixed(1);
+            for (let j = 1; j < pts.length - 1; j++) {
+                const mx = ((pts[j].x + pts[j + 1].x) / 2).toFixed(1);
+                const my = ((pts[j].y + pts[j + 1].y) / 2).toFixed(1);
+                d += ' Q ' + pts[j].x.toFixed(1) + ' ' + pts[j].y.toFixed(1) + ' ' + mx + ' ' + my;
+            }
+            const last = pts[pts.length - 1];
+            const pen = pts.length > 1 ? pts[pts.length - 2] : last;
+            if (pts.length > 1) {
+                d += ' Q ' + pen.x.toFixed(1) + ' ' + pen.y.toFixed(1) + ' ' + last.x.toFixed(1) + ' ' + last.y.toFixed(1);
+            }
+
+            const area = d + ' L ' + last.x.toFixed(1) + ' ' + baseY + ' L ' + pts[0].x.toFixed(1) + ' ' + baseY + ' Z';
+
+            return '<svg viewBox="0 0 ' + W + ' ' + H + '" class="kair-spark__svg">'
+                + '<defs><linearGradient id="' + uid + '" x1="0" y1="0" x2="0" y2="1">'
+                + '<stop offset="0%" stop-color="currentColor" stop-opacity="0.22" />'
+                + '<stop offset="100%" stop-color="currentColor" stop-opacity="0" />'
+                + '</linearGradient></defs>'
+                + '<path class="kair-spark__area" d="' + area + '" fill="url(#' + uid + ')" />'
+                + '<path class="kair-spark__line" d="' + d + '" fill="none" stroke="currentColor" stroke-width="2" '
+                + 'stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke" />'
+                + '<line class="kair-spark__guide" x1="' + last.x.toFixed(1) + '" y1="0" x2="' + last.x.toFixed(1) + '" y2="' + last.y.toFixed(1) + '" '
+                + 'stroke="currentColor" stroke-width="1" stroke-dasharray="2 3" opacity="0.35" />'
+                + '<circle class="kair-spark__halo" cx="' + last.x.toFixed(1) + '" cy="' + last.y.toFixed(1) + '" r="6" '
+                + 'fill="currentColor" opacity="0.16" />'
+                + '<circle class="kair-spark__dot" cx="' + last.x.toFixed(1) + '" cy="' + last.y.toFixed(1) + '" r="3.2" '
+                + 'fill="currentColor" />'
+                + '</svg>';
+        }
+
+        function pintarCurvas(totalP) {
+            const porMes = ejecutadoPorMes();
+            const acumulado = [];
+            let suma = 0;
+            porMes.forEach(v => { suma += v; acumulado.push(suma); });
+            const saldo = acumulado.map(v => Math.max(0, totalP - v));
+
+            // La ventana real: hasta el ultimo mes con ejecucion. Los meses que
+            // todavia no llegan NO se dibujan: con 0 arrastraban la curva hasta el
+            // piso y se leia como un colapso del presupuesto.
+            let ultimo = -1;
+            for (let i = 0; i < porMes.length; i++) {
+                if (porMes[i] > 0) ultimo = i;
+            }
+            const ventana = ultimo + 1;
+
+            const pintar = (id, serie) => {
+                const el = document.getElementById(id);
+                if (el) el.innerHTML = buildPresSpark(serie, id.replace('spark', '').toLowerCase());
+            };
+            pintar('sparkTotal', porMes.slice(0, ventana));
+            pintar('sparkEjecutado', acumulado.slice(0, ventana));
+            pintar('sparkSaldo', saldo.slice(0, ventana));
+        }
+
+        // 📦1117 · "Ver detalle" de cada card: baja a la tabla de partidas y resalta la
+        // columna que le toca (asignado, ejecutado, o las dos del saldo). NO hace
+        // postMessage: es navegación dentro del iframe, no una acción hacia el padre.
+        function irAPartidas(columna) {
+            const tabla = document.getElementById('budgetTable');
+            if (!tabla) return;
+            const tarjeta = tabla.closest('.k-section-card') || tabla;
+            tarjeta.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+            const cuerpo = document.getElementById('budgetTableBody');
+            if (!cuerpo) return;
+            const columnas = { asignacion: [2], ejecutado: [3], saldo: [2, 3] }[columna] || [];
+            if (!columnas.length) return;
+
+            document.querySelectorAll('.kair-col-bath').forEach(el => el.classList.remove('kair-col-bath'));
+            const cabeceras = document.querySelectorAll('#budgetTable thead th');
+            columnas.forEach(idx => {
+                if (cabeceras[idx]) cabeceras[idx].classList.add('kair-col-bath');
+                cuerpo.querySelectorAll('tr').forEach(fila => {
+                    const celda = fila.children[idx];
+                    if (celda) celda.classList.add('kair-col-bath');
+                });
+            });
         }
 
         function addNewRow() {

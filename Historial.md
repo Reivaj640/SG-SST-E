@@ -10652,3 +10652,30 @@ politica de la sesion dejo bloqueadas. **Sin push**: `origin/Dev` no se mueve ha
 **Lo que NO se cambió.** El hero. Las gráficas. La tabla. Y el **modo oscuro**: este módulo **no tiene bloque de tema propio** (sus tokens son suyos y son claros), así que las cards quedan claras como todo el módulo — eso es de antes, no de esta ronda.
 
 **Batería.** 38/38 (nuevo) · 87/87 (premium v2 del módulo) · 170/170 (desplegables) · 70/70 (modal) · 62/62 (tema) · 20/20 (gráficos) · 29/29 (esqueleto) · 35/35 (cards de Recursos) · 109/109 (tokens).
+
+**Actualización 2026-11-28 (madrugada) — LAS CARDS DE PRESUPUESTO: la "card dentro de card" en el módulo 1.1.3**
+
+**Lo que se pidió.** Llevar a las **3 cards de métricas de la vista de Gestión de Presupuesto** el mismo diseño que quedó en Recursos (📦1113) e Inducciones (📦1114): la **card dentro de card**, **sin tocar el hero**.
+
+**Lo que se encontró (leído, no supuesto).** La vista `modules/recursos/presupuesto/presupuesto-gestion.html` es un **archivo único** con el CSS y el JS dentro, y se carga como **iframe** desde `presupuesto-logic.js:39`. El dato real no es el que se suponía: cada partida tiene `asignacion` (el total del año) y **12 columnas de mes** que son la **ejecución mes a mes** (al editar un mes, el acumulado se recalcula como la suma de los meses). El **plan mensual NO existe** — hay un solo total anual — así que una curva de "planeado" sería inventada. Las series que sí se pueden dibujar son: lo ejecutado por mes, lo ejecutado acumulado y el saldo acumulado.
+
+**El hero no se tocó.** Ni una línea: sigue con su `.kair-hero-card`, su `pres-hero-score` y su `id="totalArl"`. El test lo verifica (que al hero no le cuelguen curva, chip, pie ni barra).
+
+**Qué cambió.**
+1. La **externa** toma el tono suave (`--kair-soft`) y envuelve a la **interna** (blanca, `--kair-card`), que lleva el diseño: rótulo, **valor + chip**, bajada y **curva**.
+2. La **barra de progreso sale** y su dato (el %) pasa al **chip**: "Plan anual" (tono neutro) en el total, el % con el **semáforo** (verde/ámbar/rojo) en el ejecutado, y el % en tono neutro en el saldo.
+3. Entra la **curva de 12 meses** con dato real: total = ritmo de ejecución mes a mes, ejecutado = acumulado mes a mes, saldo = lo que queda por ejecutar.
+4. El **pie "Ver detalle →"** vive en la externa: baja a la tabla de partidas y **resalta la columna** que le toca (la asignada, la ejecutada, o las dos del saldo). Es navegación interna: **no hace `postMessage`**.
+5. El **ámbito es propio** (`.kair-presupuesto-strip`): la clase compartida `.kair-metric-card` la usan 7 módulos y aquí no se toca.
+
+**La curva se recorta al último mes con ejecución.** Los meses que todavía no llegan no son un dato: dibujarlos en 0 hacía que la curva se cayera al piso y se leyera como un colapso del presupuesto. Ahora la curva muestra el avance real y termina con su punto final.
+
+**El tropiezo que casi se va (y se vio en la captura).** Al reemplazar el bloque de CSS por un rango de líneas, la búsqueda del ancla **se comió la regla del grid** del strip (`display: grid; grid-template-columns: 1.25fr repeat(3, 1fr)`): el hero y las 3 cards se apilaron en una sola columna. **Ningún test lo vio** (nadie miraba el grid): se vio mirando la captura. La regla se devolvió y quedó un check que la vigila.
+
+**La prueba.** `main/test-presupuesto-cards-v2.js`: **42/42** + **9 mordidas**. No mira texto: **recorta el script en línea de la vista y lo ejecuta en un `vm`** con un DOM mínimo, y juzga lo que produce (los chips, el semáforo, las 3 curvas, el recorte). El test viejo (`main/test-presupuesto-barras-avance.js`, 14/14) pedía el patrón de 4 piezas **con barra**, que ya no existe en esta vista: se reescribió y quedó como `test-presupuesto-cards-v2.js` (con `git mv`, para no perder la historia del archivo).
+
+**Los sellos.** El sello vive en **dos sitios**: la URL del iframe (`presupuesto-logic.js:39`) y el `<script>` que carga esa lógica (`index.html`). Los dos subieron a `PRE-20261128-presupuesto-cards`: si sube uno y no el otro, la app se queda con el HTML viejo (el archivo viejo pide el iframe viejo).
+
+**Lo que NO se cambió.** El hero. La tabla. El resto de vistas. La clase compartida `.kair-metric-card` de `shared/kair-components.css`.
+
+**Batería.** 42/42 (nuevo) · 16/16 (dispatch de la vista) · 41/41 + 22 mutaciones (alcance de tokens) · 109/109 (tokens y tema) · 29/29 (esqueleto) · 20/20 (gráficos) · 35/35 (cards de Recursos) · 38/38 (cards de Inducciones). Barrido amplio: **76 verdes, 0 rojos**. Barrido de caracteres no latinos y de fin de línea: **0 problemas**.

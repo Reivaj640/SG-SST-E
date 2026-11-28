@@ -36,7 +36,7 @@ class PresupuestoGestionComponent {
                 this.renderIframeView(mainContainer, 'modules/recursos/presupuesto/presupuesto-selector.html?v=PRESUP-20261014-889-theme', 'selector');
                 break;
             case 'gestion':
-                this.renderIframeView(mainContainer, 'modules/recursos/presupuesto/presupuesto-gestion.html?v=PRE-20261126-presupuesto-barras', 'gestion');
+                this.renderIframeView(mainContainer, 'modules/recursos/presupuesto/presupuesto-gestion.html?v=PRE-20261128-presupuesto-cards', 'gestion');
                 break;
             default:
                 this.log('WARN', `Vista desconocida: ${this.currentView}, usando home.`);

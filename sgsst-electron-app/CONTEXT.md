@@ -2491,17 +2491,17 @@ muestra el histórico completo (753 / 1 501 / 1 289 filas) y el orden es del má
 — defecto preexistente) y el KPI del home (`get-ausentismo-stats`, Excel + `PRI.xlsx`).
 
 
-## 📈 Gestión de Presupuesto (Recursos 1.1.3) — las tres tarjetas de indicadores ya tienen el esqueleto de cuatro piezas de Recursos
+## 📈 Gestión de Presupuesto (Recursos 1.1.3) — las tres tarjetas de indicadores ya tienen la card dentro de card
 
-**El modelo.** La tarjeta de indicador de K+AIR tiene **cuatro** piezas, no dos: rótulo, valor, descripción y barra de avance. Lo define `renderMetricCard()` (`modules/recursos/recursos-home.js:692`) y el CSS que lo sostiene **ya estaba escrito** (`shared/kair-components.css:82-91`, documentado en `design_system.md:182` como "KPI con título + valor + progress bar"). Las tres tarjetas de "Gestión de Presupuesto" mostraban solo rótulo y valor: el trabajo no fue inventar un componente, fue **copiar el esqueleto que ya existía**.
+**El modelo.** La tarjeta de indicador de K+AIR tenía **cuatro** piezas, no dos: rótulo, valor, descripción y barra de avance (el patrón de `renderMetricCard()`, `modules/recursos/recursos-home.js`, con el CSS en `shared/kair-components.css:82-91`). Ese patrón **ya no es el vigente en esta vista**: desde el 28-nov-2026 las tres tarjetas de "Gestión de Presupuesto" llevan el diseño de **card dentro de card** (el mismo de Recursos 📦1113 e Inducciones 📦1114): la **externa** con el tono suave (`--kair-soft`) y el pie "Ver detalle →", la **interna** (blanca, `--kair-card`) con rótulo, **valor + chip**, bajada y **curva de 12 meses**. La barra de progreso salió y su dato (el %) pasó al chip.
 
-**Lo que cambió.** Cada tarjeta de presupuesto gana su descripción y su barra de "Avance"; `updateSummary()` calcula los porcentajes, **acota el ancho a 0-100** y aplica el semáforo de Recursos al ejecutado (≥70 normal, ≥40 ámbar, <40 rojo). El saldo va en **tono neutro** (`--kair-slate`), no en el semáforo: más saldo no es un estado bueno ni malo. El porcentaje real va siempre en la descripción, para que la barra no pueda mentir.
+**El dato de las curvas.** Cada partida tiene `asignacion` (el total del año) y **12 columnas de mes** que son la **ejecución mes a mes** (al editar un mes, el acumulado se recalcula como la suma de los meses). El **plan mensual no existe** (hay un solo total anual), así que no hay curva de "planeado": las series reales son lo ejecutado por mes, lo ejecutado acumulado y el saldo acumulado. La curva **se recorta al último mes con ejecución**: los meses que todavía no llegan no son un dato, y dibujarlos en 0 la hacía caer al piso (se leía como un colapso del presupuesto).
 
-**Lo que NO cambió.** El hero de la vista (`.kair-hero-card`, `pres-hero-score`), el CSS compartido, el grid del strip, la tabla y las demás vistas. El test nuevo incluye el check que se pone rojo si alguien le cuelga una barra o una descripción al hero.
+**Lo que NO cambió.** El hero de la vista (`.kair-hero-card`, `pres-hero-score`, `id="totalArl"`), el CSS compartido (`.kair-metric-card` la usan 7 módulos: aquí el diseño va en un **ámbito propio**, `.kair-presupuesto-strip`), el grid del strip, la tabla y las demás vistas. El pie "Ver detalle" es navegación interna: **no hace `postMessage`**.
 
-**El sello del iframe.** `presupuesto-logic.js:39` pide esta vista en un iframe con el sello `?v=PRE-20261014-889-theme`: si el sello no sube, Electron sirve el HTML viejo del caché y **el cambio no llega a la app**. El sello de esta vista subió a `PRE-20261126-presupuesto-barras`, y el test del 📦889 que tenía la fecha escrita a mano pasó a preguntar por la **forma** del sello (`[PREFIJO-]AAAAMMDD-desc`) y por un **piso** de fecha.
+**El sello del iframe.** `presupuesto-logic.js:39` pide esta vista en un iframe con el sello `?v=PRE-20261128-presupuesto-cards`: si el sello no sube, Electron sirve el HTML viejo del caché y **el cambio no llega a la app**. El test del 📦889 que tenía la fecha escrita a mano pasó a preguntar por la **forma** del sello (`[PREFIJO-]AAAAMMDD-desc`) y por un **piso** de fecha.
 
-**Tests.** `main/test-presupuesto-barras-avance.js` (14/14, estático y por contenido) · `main/test-alcance-tokens-889.js` (41/41 + 22 mutaciones).
+**Tests.** `main/test-presupuesto-cards-v2.js` (42/42 + 9 mordidas: recorta el script en línea de la vista y lo ejecuta en un `vm`) · `main/test-alcance-tokens-889.js` (41/41 + 22 mutaciones) · `main/test-presupuesto-824-dispatch.js` (16/16).
 
 ## 📊 Medición del Ausentismo (3.3.6) — el home ya tiene cuatro tarjetas de indicador y la cuarta salió sin tocar el backend
 

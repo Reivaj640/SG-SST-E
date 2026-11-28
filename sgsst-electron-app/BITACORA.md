@@ -11602,3 +11602,32 @@ y el clic de verdad afuera **si** cierra. 0 errores de consola.
 **Lo que NO se cambio.** El hero. Las graficas. La tabla. Y el **modo oscuro**: este modulo **no tiene bloque de tema propio** (sus tokens son suyos y son claros), asi que las cards quedan claras como todo el modulo, eso es de antes, no de esta ronda.
 
 **Bateria.** 38/38 (nuevo), 87/87 (premium v2 del modulo), 170/170 (desplegables), 70/70 (modal), 62/62 (tema), 20/20 (graficos), 29/29 (esqueleto), 35/35 (cards de Recursos), 109/109 (tokens).
+
+## 📦 Cards de Presupuesto: la card dentro de card en el modulo 1.1.3 (2026-11-28)
+
+**Lo que se pidio.** Llevar a las **3 cards de metricas de la vista de gestion de presupuesto** (`modules/recursos/presupuesto/presupuesto-gestion.html`) el mismo diseno que quedo en Recursos (📦1113) e Inducciones (📦1114): la **card dentro de card**, **sin tocar el hero**.
+
+**Lo que se encontro (leido, no supuesto).** Esta vista es un **archivo unico** con el CSS y el JS dentro (69 KB), y se carga como **iframe** desde `presupuesto-logic.js:39`. El dato real no es el que se suponia: cada partida tiene `asignacion` (el total del ano) y **12 columnas de mes** que son la **ejecucion mes a mes** (al editar un mes, el acumulado se recalcula como la suma de los meses). El **plan mensual NO existe**: hay un solo total anual, asi que una curva "planeado" seria inventada. Las series que SI se pueden dibujar son: lo ejecutado por mes, lo ejecutado acumulado y el saldo acumulado.
+
+**El hero no se toco.** Ni una linea: sigue con su `.kair-hero-card`, su `pres-hero-score` y su `id="totalArl"`. El test lo verifica (que al hero no le colguen curva, chip, pie ni barra).
+
+**Que cambio.**
+1. La **externa** toma el tono suave (`--kair-soft`) y envuelve a la **interna** (blanca, `--kair-card`), que lleva el diseno: rotulo, **valor + chip**, bajada y **curva**.
+2. La **barra de progreso sale** y su dato (el %) pasa al **chip**: "Plan anual" (tono neutro) en el total, el % con el **semaforo** (verde/ambar/rojo) en el ejecutado, y el % en tono neutro en el saldo.
+3. Entra la **curva de 12 meses** con dato real: total = ritmo de ejecucion mes a mes, ejecutado = acumulado mes a mes, saldo = lo que queda por ejecutar.
+4. El **pie "Ver detalle →"** vive en la externa: baja a la tabla de partidas y **resalta la columna** que le toca (la asignada, la ejecutada, o las dos del saldo). Es navegacion interna: **no hace `postMessage`**.
+5. El **ambito es propio** (`.kair-presupuesto-strip`): la clase compartida `.kair-metric-card` la usan 7 modulos y aqui no se toca.
+
+**La curva se recorta al ultimo mes con ejecucion.** Los meses que todavia no llegan no son un dato: dibujarlos en 0 hacia que la curva se cayera al piso y se leia como un colapso del presupuesto. Ahora la curva muestra el avance real y termina con su punto final.
+
+**El tropiezo que casi se va (y se vio en la captura).** Al reemplazar el bloque de CSS por un rango de lineas, la busqueda del ancla **se comio la regla del grid** del strip (`display: grid; grid-template-columns: 1.25fr repeat(3, 1fr)`): el hero y las 3 cards se apilaron en una sola columna. **Ningun test lo vio** (nadie miraba el grid): se vio mirando la captura. La regla se devolvio y quedo un check que la vigila.
+
+**La prueba.** `main/test-presupuesto-cards-v2.js`: **42/42** + **9 mordidas**. No mira texto: **recorta el script en linea de la vista y lo ejecuta en un `vm`** con un DOM minimo, y juzga lo que produce (los chips, el semaforo, las 3 curvas, el recorte). Lo que mira: la estructura de card dentro de card, que las barras se fueron, los ids unicos, el semaforo (>=70 verde, >=40 ambar, <40 rojo), que el hero quedo intacto, que la curva escala uniforme y no se estira, el ambito propio, cero colores fijos, que el pie no habla con el padre, el sello, y **9 mordidas** (quitar el ambito, meter un color fijo, apagar la curva, estirar el SVG, volver la barra, colgarle una curva al hero, romper el semaforo, sacarle el grid, y hacer que el pie hable con el padre).
+
+**El test viejo se renombro.** `main/test-presupuesto-barras-avance.js` (14/14) pedia el patron viejo de 4 piezas **con barra**: ese patron ya no existe en esta vista, asi que el test se reescribio y quedo como `main/test-presupuesto-cards-v2.js` (con `git mv`, para no perder la historia del archivo).
+
+**Los sellos.** El sello vive en **dos sitios**: la URL del iframe (`presupuesto-logic.js:39`) y el `<script>` que carga esa logica (`index.html`). Los dos subieron a `PRE-20261128-presupuesto-cards`: si sube uno y no el otro, la app se queda con el HTML viejo (el archivo viejo pide el iframe viejo). El test del 📦889 que ancla la forma del sello (`test-alcance-tokens-889.js`) sigue verde, y el test nuevo vigila los dos sellos.
+
+**Lo que NO se cambio.** El hero. La tabla. El resto de vistas. La clase compartida `.kair-metric-card` de `shared/kair-components.css`.
+
+**Bateria.** 42/42 (nuevo) · 16/16 (dispatch de la vista) · 41/41 + 22 mutaciones (alcance de tokens) · 109/109 (tokens y tema) · 29/29 (esqueleto) · 20/20 (graficos) · 35/35 (cards de Recursos) · 38/38 (cards de Inducciones). Barrido amplio: **76 verdes, 0 rojos**. Barrido de caracteres no latinos y de fin de linea: **0 problemas**.
